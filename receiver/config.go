@@ -25,6 +25,9 @@ type Config struct {
 	// Bot token
 	Token tg.SecretToken
 
+	// API URL (defaults to https://api.telegram.org/bot)
+	BaseURL string
+
 	// Webhook configuration
 	WebhookPort   int
 	TLSCertPath   string

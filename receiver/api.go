@@ -3,13 +3,34 @@ package receiver
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/prilive-com/galigo/tg"
 )
+
+// P0.4 FIX: Default HTTP client with proper timeout (not http.DefaultClient)
+var defaultAPIClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:        10,
+		IdleConnTimeout:     90 * time.Second,
+		ForceAttemptHTTP2:   true,
+	},
+}
 
 // WebhookInfo contains information about the current webhook.
 type WebhookInfo struct {
@@ -34,7 +55,7 @@ type apiResponse struct {
 // SetWebhook registers a webhook URL with Telegram.
 func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, url, secret string) error {
 	if client == nil {
-		client = http.DefaultClient
+		client = defaultAPIClient
 	}
 
 	payload := map[string]interface{}{
@@ -83,7 +104,7 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 // DeleteWebhook removes the webhook from Telegram.
 func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, dropPending bool) error {
 	if client == nil {
-		client = http.DefaultClient
+		client = defaultAPIClient
 	}
 
 	apiURL := fmt.Sprintf("%s%s/deleteWebhook?drop_pending_updates=%t",
@@ -121,7 +142,7 @@ func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToke
 // GetWebhookInfo retrieves the current webhook configuration.
 func GetWebhookInfo(ctx context.Context, client *http.Client, token tg.SecretToken) (*WebhookInfo, error) {
 	if client == nil {
-		client = http.DefaultClient
+		client = defaultAPIClient
 	}
 
 	apiURL := fmt.Sprintf("%s%s/getWebhookInfo", telegramAPIBaseURL, token.Value())

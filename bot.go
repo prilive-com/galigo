@@ -2,8 +2,10 @@ package galigo
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
+	"github.com/prilive-com/galigo/internal/validate"
 	"github.com/prilive-com/galigo/receiver"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
@@ -122,8 +124,9 @@ func WithUpdateBufferSize(size int) Option {
 
 // New creates a new unified Bot.
 func New(token string, opts ...Option) (*Bot, error) {
-	if token == "" {
-		return nil, tg.ErrInvalidToken
+	// P0.7 FIX: Use proper token validation instead of just empty check
+	if err := validate.Token(token); err != nil {
+		return nil, fmt.Errorf("%w: %v", tg.ErrInvalidToken, err)
 	}
 
 	cfg := botConfig{

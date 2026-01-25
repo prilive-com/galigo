@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +36,12 @@ func NewMockServer(t *testing.T) *MockTelegramServer {
 }
 
 func (m *MockTelegramServer) handle(w http.ResponseWriter, r *http.Request) {
+	// Read body once for capture
 	body, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+
+	// Restore body for downstream handler
+	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	m.mu.Lock()
 	m.captures = append(m.captures, Capture{

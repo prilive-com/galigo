@@ -91,18 +91,9 @@ func NewAPIErrorWithRetry(method string, code int, description string, retryAfte
 }
 
 // detectSentinel maps Telegram error codes/descriptions to sentinel errors.
+// Description-based detection is prioritized over HTTP status codes for more specific errors.
 func detectSentinel(code int, desc string) error {
-	switch code {
-	case 401:
-		return ErrUnauthorized
-	case 403:
-		return ErrForbidden
-	case 404:
-		return ErrNotFound
-	case 429:
-		return ErrTooManyRequests
-	}
-
+	// Check description first for specific error messages
 	descLower := strings.ToLower(desc)
 	switch {
 	case strings.Contains(descLower, "message is not modified"):
@@ -132,6 +123,19 @@ func detectSentinel(code int, desc string) error {
 	case strings.Contains(descLower, "button_data_invalid"):
 		return ErrInvalidCallbackData
 	}
+
+	// Fall back to generic HTTP status code sentinels
+	switch code {
+	case 401:
+		return ErrUnauthorized
+	case 403:
+		return ErrForbidden
+	case 404:
+		return ErrNotFound
+	case 429:
+		return ErrTooManyRequests
+	}
+
 	return nil
 }
 

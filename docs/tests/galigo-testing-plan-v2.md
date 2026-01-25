@@ -1,8 +1,8 @@
-# galigo Testing Implementation Plan v3.0
+# galigo Testing Implementation Plan v3.1
 
 ## Comprehensive Test Strategy for 80%+ Coverage (Final Consolidated)
 
-**Version:** 3.0 (Final)  
+**Version:** 3.1 (Final with Test Fixes)  
 **Target Coverage:** ≥80% (critical packages higher)  
 **Go Version:** 1.21+ (compatible, no Go 1.25 assumptions)  
 **Testing Framework:** Standard `testing` + `testify` + Go fuzzing  
@@ -53,6 +53,33 @@ galigo/
 | `internal/resilience/` | 80% | Medium |
 | `internal/httpclient/` | 75% | Medium |
 | `bot.go` | 80% | Medium |
+
+---
+
+## Known Test Issues & Solutions
+
+### Issue 1: Empty Body After Capture
+
+**Problem:** Mock server reads `r.Body` for capture, handler can't re-read.
+
+**Solution:** Restore body with `io.NopCloser(bytes.NewReader(body))` after capture.
+
+### Issue 2: Circuit Breaker Opens During Retry Tests
+
+**Problem:** Breaker trips before retry completes, tests fail with wrong error.
+
+**Solution:** 
+- Add `WithCircuitBreakerSettings()` (public, clean API)
+- Create test helpers: `NewRetryTestClient()` (breaker never trips), `NewBreakerTestClient()` (trips quickly)
+- **Do NOT** add `WithCircuitBreakerDisabled()` - bad API design
+
+### Issue 3: Context Cancel Returns ErrRateLimited
+
+**Problem:** Context cancellation during limiter wait wraps as `ErrRateLimited`.
+
+**Solution:** Return context error directly from limiter wait path. Reserve `ErrRateLimited` for Telegram 429 only.
+
+See `galigo_test_fixes_final.md` for complete implementation details.
 
 ---
 
@@ -178,8 +205,9 @@ func (s *chatLimiterStore) reset() {
 
 type Client struct {
     // ... existing fields ...
-    chatLimiters *chatLimiterStore  // Changed from map
-    sleeper      resilience.Sleeper // NEW: for retry testing
+    chatLimiters    *chatLimiterStore      // Changed from map
+    sleeper         resilience.Sleeper     // For retry testing
+    breakerSettings CircuitBreakerSettings // Configurable breaker
 }
 
 // ChatLimiterCount returns the number of active per-chat limiters.
@@ -193,6 +221,179 @@ func WithSleeper(s resilience.Sleeper) Option {
     return func(c *Client) {
         c.sleeper = s
     }
+}
+```
+
+### 4. Circuit Breaker Settings (Configurable for Testing)
+
+```go
+// sender/options.go
+
+import "github.com/sony/gobreaker/v2"
+
+// CircuitBreakerSettings configures the circuit breaker behavior.
+type CircuitBreakerSettings struct {
+    MaxRequests uint32
+    Interval    time.Duration
+    Timeout     time.Duration
+    ReadyToTrip func(counts gobreaker.Counts) bool
+}
+
+// DefaultCircuitBreakerSettings returns production-ready defaults.
+func DefaultCircuitBreakerSettings() CircuitBreakerSettings {
+    return CircuitBreakerSettings{
+        MaxRequests: 1,
+        Interval:    0,
+        Timeout:     60 * time.Second,
+        ReadyToTrip: func(counts gobreaker.Counts) bool {
+            if counts.Requests < 3 {
+                return false
+            }
+            ratio := float64(counts.TotalFailures) / float64(counts.Requests)
+            return ratio >= 0.5
+        },
+    }
+}
+
+// WithCircuitBreakerSettings configures the circuit breaker.
+func WithCircuitBreakerSettings(settings CircuitBreakerSettings) Option {
+    return func(c *Client) {
+        c.breakerSettings = settings
+    }
+}
+```
+
+### 5. Test Client Helpers
+
+```go
+// internal/testutil/client.go
+
+package testutil
+
+import (
+    "testing"
+    "time"
+
+    "github.com/sony/gobreaker/v2"
+    "github.com/prilive-com/galigo/sender"
+    "github.com/stretchr/testify/require"
+)
+
+// circuitBreakerNeverTrip returns settings where breaker never opens.
+func circuitBreakerNeverTrip() sender.CircuitBreakerSettings {
+    return sender.CircuitBreakerSettings{
+        MaxRequests: 100,
+        Interval:    0,
+        Timeout:     time.Hour,
+        ReadyToTrip: func(counts gobreaker.Counts) bool {
+            return false // Never trip
+        },
+    }
+}
+
+// circuitBreakerAggressiveTrip returns settings for testing breaker behavior.
+func circuitBreakerAggressiveTrip() sender.CircuitBreakerSettings {
+    return sender.CircuitBreakerSettings{
+        MaxRequests: 1,
+        Interval:    0,
+        Timeout:     10 * time.Millisecond,
+        ReadyToTrip: func(counts gobreaker.Counts) bool {
+            return counts.ConsecutiveFailures >= 2
+        },
+    }
+}
+
+// NewRetryTestClient creates a client for testing retry behavior.
+// Circuit breaker is configured to never trip.
+func NewRetryTestClient(t *testing.T, baseURL string, sleeper *FakeSleeper, opts ...sender.Option) *sender.Client {
+    t.Helper()
+    
+    defaultOpts := []sender.Option{
+        sender.WithBaseURL(baseURL),
+        sender.WithCircuitBreakerSettings(circuitBreakerNeverTrip()),
+    }
+    
+    if sleeper != nil {
+        defaultOpts = append(defaultOpts, sender.WithSleeper(sleeper))
+    }
+    
+    client, err := sender.New(TestToken, append(defaultOpts, opts...)...)
+    require.NoError(t, err)
+    
+    t.Cleanup(func() { client.Close() })
+    return client
+}
+
+// NewBreakerTestClient creates a client for testing circuit breaker behavior.
+func NewBreakerTestClient(t *testing.T, baseURL string, opts ...sender.Option) *sender.Client {
+    t.Helper()
+    
+    defaultOpts := []sender.Option{
+        sender.WithBaseURL(baseURL),
+        sender.WithCircuitBreakerSettings(circuitBreakerAggressiveTrip()),
+        sender.WithRetries(0),
+    }
+    
+    client, err := sender.New(TestToken, append(defaultOpts, opts...)...)
+    require.NoError(t, err)
+    
+    t.Cleanup(func() { client.Close() })
+    return client
+}
+
+// NewTestClient creates a standard test client with default settings.
+func NewTestClient(t *testing.T, baseURL string, opts ...sender.Option) *sender.Client {
+    t.Helper()
+    
+    defaultOpts := []sender.Option{
+        sender.WithBaseURL(baseURL),
+    }
+    
+    client, err := sender.New(TestToken, append(defaultOpts, opts...)...)
+    require.NoError(t, err)
+    
+    t.Cleanup(func() { client.Close() })
+    return client
+}
+```
+
+### 6. Context Error Handling Fix
+
+```go
+// sender/client.go - Fix context error return
+
+func (c *Client) waitForRateLimit(ctx context.Context, chatID int64) error {
+    // Global limiter
+    if c.globalLimiter != nil {
+        if err := c.globalLimiter.Wait(ctx); err != nil {
+            // ✅ Return context error directly, not wrapped
+            return err
+        }
+    }
+    
+    // Per-chat limiter
+    if chatID != 0 {
+        limiter := c.chatLimiters.get(chatID)
+        if err := limiter.Wait(ctx); err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+```
+
+```go
+// sender/errors.go - Error helpers
+
+// IsContextError returns true if the error is due to context cancellation or timeout.
+func IsContextError(err error) bool {
+    return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+// IsTelegramRateLimit returns true if Telegram returned 429.
+func IsTelegramRateLimit(err error) bool {
+    return errors.Is(err, ErrRateLimited)
 }
 ```
 
@@ -285,6 +486,7 @@ galigo/
 package testutil
 
 import (
+    "bytes"
     "encoding/json"
     "io"
     "net/http"
@@ -330,8 +532,14 @@ func NewMockServer(t *testing.T) *MockTelegramServer {
 }
 
 func (m *MockTelegramServer) handle(w http.ResponseWriter, r *http.Request) {
+    // Read body once
     body, _ := io.ReadAll(r.Body)
+    r.Body.Close()
     
+    // ✅ KEY FIX: Restore body for downstream handler
+    r.Body = io.NopCloser(bytes.NewReader(body))
+    
+    // Capture request with timestamp
     m.mu.Lock()
     m.captures = append(m.captures, Capture{
         Method:      r.Method,
@@ -344,7 +552,7 @@ func (m *MockTelegramServer) handle(w http.ResponseWriter, r *http.Request) {
     })
     m.mu.Unlock()
     
-    // Find handler
+    // Find and call handler (can now decode r.Body if needed)
     key := r.Method + ":" + r.URL.Path
     m.mu.Lock()
     handler, exists := m.handlers[key]
@@ -355,7 +563,7 @@ func (m *MockTelegramServer) handle(w http.ResponseWriter, r *http.Request) {
         return
     }
     
-    // Default success
+    // Default: success response
     ReplyOK(w, map[string]any{})
 }
 
@@ -837,6 +1045,7 @@ package sender_test
 
 import (
     "context"
+    "errors"
     "net/http"
     "sync/atomic"
     "testing"
@@ -861,7 +1070,8 @@ func TestRetry_429WithRetryAfter(t *testing.T) {
     })
     
     sleeper := &testutil.FakeSleeper{}
-    client := newTestClientWithSleeper(t, server.BaseURL(), sleeper)
+    // ✅ Use retry test client (breaker won't interfere)
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper)
     
     msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
         ChatID: testutil.TestChatID,
@@ -890,7 +1100,7 @@ func TestRetry_5xxWithExponentialBackoff(t *testing.T) {
     })
     
     sleeper := &testutil.FakeSleeper{}
-    client := newTestClientWithSleeper(t, server.BaseURL(), sleeper, sender.WithRetries(3))
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, sender.WithRetries(3))
     
     msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
         ChatID: testutil.TestChatID,
@@ -916,7 +1126,7 @@ func TestRetry_NoRetryOn4xx(t *testing.T) {
         testutil.ReplyError(w, 400, "Bad Request", nil)
     })
     
-    client := newTestClient(t, server.BaseURL(), sender.WithRetries(3))
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), nil, sender.WithRetries(3))
     
     _, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
         ChatID: testutil.TestChatID,
@@ -937,7 +1147,7 @@ func TestRetry_ContextCancelStopsRetry(t *testing.T) {
     })
     
     sleeper := &testutil.FakeSleeper{}
-    client := newTestClientWithSleeper(t, server.BaseURL(), sleeper)
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper)
     
     ctx, cancel := context.WithCancel(context.Background())
     
@@ -955,8 +1165,10 @@ func TestRetry_ContextCancelStopsRetry(t *testing.T) {
     elapsed := time.Since(start)
     
     require.Error(t, err)
-    assert.ErrorIs(t, err, context.Canceled)
-    assert.Less(t, elapsed, time.Second, "should exit quickly on cancel")
+    
+    // ✅ Clean assertion: context error returned directly
+    assert.True(t, errors.Is(err, context.Canceled), "expected context.Canceled, got: %v", err)
+    assert.Less(t, elapsed, 500*time.Millisecond, "should exit quickly on cancel")
 }
 
 func TestRetry_MaxRetriesExceeded(t *testing.T) {
@@ -969,7 +1181,7 @@ func TestRetry_MaxRetriesExceeded(t *testing.T) {
     })
     
     sleeper := &testutil.FakeSleeper{}
-    client := newTestClientWithSleeper(t, server.BaseURL(), sleeper, sender.WithRetries(2))
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, sender.WithRetries(2))
     
     _, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
         ChatID: testutil.TestChatID,
@@ -977,34 +1189,8 @@ func TestRetry_MaxRetriesExceeded(t *testing.T) {
     })
     
     require.Error(t, err)
+    assert.ErrorIs(t, err, sender.ErrMaxRetries)
     assert.Equal(t, int32(3), atomic.LoadInt32(&attempts)) // 1 initial + 2 retries
-}
-
-// Helper to create test client
-func newTestClient(t *testing.T, baseURL string, opts ...sender.Option) *sender.Client {
-    t.Helper()
-    
-    allOpts := append([]sender.Option{sender.WithBaseURL(baseURL)}, opts...)
-    client, err := sender.New(testutil.TestToken, allOpts...)
-    require.NoError(t, err)
-    
-    t.Cleanup(func() { client.Close() })
-    return client
-}
-
-func newTestClientWithSleeper(t *testing.T, baseURL string, sleeper *testutil.FakeSleeper, opts ...sender.Option) *sender.Client {
-    t.Helper()
-    
-    allOpts := append([]sender.Option{
-        sender.WithBaseURL(baseURL),
-        sender.WithSleeper(sleeper),
-    }, opts...)
-    
-    client, err := sender.New(testutil.TestToken, allOpts...)
-    require.NoError(t, err)
-    
-    t.Cleanup(func() { client.Close() })
-    return client
 }
 ```
 
@@ -1652,5 +1838,56 @@ jobs:
 
 ---
 
-*galigo Testing Implementation Plan v3.0 - Final Consolidated*  
+*galigo Testing Implementation Plan v3.1 - Final Consolidated*  
 *Combines best practices from multiple independent analyses*
+
+---
+
+## Appendix: Quick Reference
+
+### Test Client Selection
+
+```go
+// For testing retry behavior (breaker won't interfere)
+client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, opts...)
+
+// For testing circuit breaker behavior (trips quickly)
+client := testutil.NewBreakerTestClient(t, server.BaseURL(), opts...)
+
+// For general API testing (default settings)
+client := testutil.NewTestClient(t, server.BaseURL(), opts...)
+```
+
+### Error Assertion Quick Reference
+
+```go
+// Context cancellation
+assert.True(t, errors.Is(err, context.Canceled))
+
+// Context timeout
+assert.True(t, errors.Is(err, context.DeadlineExceeded))
+
+// Telegram 429 (API rate limit)
+assert.True(t, errors.Is(err, sender.ErrRateLimited))
+
+// Circuit breaker open
+assert.True(t, errors.Is(err, sender.ErrCircuitOpen))
+
+// Max retries exceeded
+assert.True(t, errors.Is(err, sender.ErrMaxRetries))
+
+// Any context error
+assert.True(t, sender.IsContextError(err))
+```
+
+### Key Decisions Summary
+
+| Issue | Solution | Why |
+|-------|----------|-----|
+| Go version | **1.25** | Latest features |
+| WaitGroup pattern | `syncutil.Go()` helper | Future-proof |
+| Body capture | Restore with `NopCloser` | Handlers can re-read |
+| Circuit breaker | Configurable settings | Clean API, no "disable" escape hatch |
+| Context errors | Return directly | Clear semantics, Go conventions |
+| Error goroutines | `errgroup.Group` | Context-aware |
+| `fmt` usage | `strconv.Itoa` | Simpler |

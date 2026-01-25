@@ -27,15 +27,67 @@ const (
 	maxResponseSize = 10 << 20 // 10MB
 )
 
+// Sleeper abstracts time-based waiting for testing.
+type Sleeper interface {
+	Sleep(ctx context.Context, d time.Duration) error
+}
+
+// CircuitBreakerSettings configures the circuit breaker behavior.
+type CircuitBreakerSettings struct {
+	// MaxRequests is the maximum number of requests allowed in half-open state.
+	MaxRequests uint32
+
+	// Interval is the cyclic period of the closed state.
+	// If 0, internal counts never reset in closed state.
+	Interval time.Duration
+
+	// Timeout is the duration of the open state before transitioning to half-open.
+	Timeout time.Duration
+
+	// ReadyToTrip determines if breaker should trip based on failure counts.
+	// If nil, uses default (50% failure rate after 3 requests).
+	ReadyToTrip func(counts gobreaker.Counts) bool
+}
+
+// DefaultCircuitBreakerSettings returns production-ready defaults.
+func DefaultCircuitBreakerSettings() CircuitBreakerSettings {
+	return CircuitBreakerSettings{
+		MaxRequests: 5,
+		Interval:    60 * time.Second,
+		Timeout:     30 * time.Second,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			if counts.Requests < 3 {
+				return false
+			}
+			ratio := float64(counts.TotalFailures) / float64(counts.Requests)
+			return ratio >= 0.5
+		},
+	}
+}
+
+// realSleeper uses actual time.
+type realSleeper struct{}
+
+func (realSleeper) Sleep(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
 // Client is the main sender client for Telegram Bot API.
 type Client struct {
-	config        Config
-	httpClient    *http.Client
-	logger        *slog.Logger
-	globalLimiter *rate.Limiter
-	chatLimiters  map[int64]*chatLimiterEntry // P1.2: Track last used time
-	limiterMu     sync.RWMutex
-	breaker       *gobreaker.CircuitBreaker[*apiResponse]
+	config         Config
+	httpClient     *http.Client
+	logger         *slog.Logger
+	globalLimiter  *rate.Limiter
+	chatLimiters   map[int64]*chatLimiterEntry // P1.2: Track last used time
+	limiterMu      sync.RWMutex
+	breaker        *gobreaker.CircuitBreaker[*apiResponse]
+	breakerSettings CircuitBreakerSettings
+	sleeper        Sleeper // For testing retry logic
 
 	// P1.2: Cleanup
 	cleanupTicker *time.Ticker
@@ -95,6 +147,35 @@ func WithRetries(max int) Option {
 	}
 }
 
+// WithBaseURL sets the API base URL (useful for testing).
+func WithBaseURL(url string) Option {
+	return func(c *Client) {
+		c.config.BaseURL = url
+	}
+}
+
+// WithSleeper sets a custom sleeper for retry timing (useful for testing).
+func WithSleeper(s Sleeper) Option {
+	return func(c *Client) {
+		c.sleeper = s
+	}
+}
+
+// WithPerChatRateLimit sets per-chat rate limiting parameters.
+func WithPerChatRateLimit(rps float64, burst int) Option {
+	return func(c *Client) {
+		c.config.PerChatRPS = rps
+		c.config.PerChatBurst = burst
+	}
+}
+
+// WithCircuitBreakerSettings configures the circuit breaker.
+func WithCircuitBreakerSettings(settings CircuitBreakerSettings) Option {
+	return func(c *Client) {
+		c.breakerSettings = settings
+	}
+}
+
 // P1.5 FIX: Deduplicated HTTP client creation
 func createHTTPClient(cfg Config) *http.Client {
 	return &http.Client{
@@ -149,19 +230,23 @@ func New(token string, opts ...Option) (*Client, error) {
 		c.globalLimiter = rate.NewLimiter(rate.Limit(c.config.GlobalRPS), c.config.GlobalBurst)
 	}
 
+	// Default sleeper
+	if c.sleeper == nil {
+		c.sleeper = realSleeper{}
+	}
+
+	// Default circuit breaker settings
+	if c.breakerSettings.ReadyToTrip == nil {
+		c.breakerSettings = DefaultCircuitBreakerSettings()
+	}
+
 	// Circuit breaker
 	c.breaker = gobreaker.NewCircuitBreaker[*apiResponse](gobreaker.Settings{
 		Name:        "galigo-sender",
-		MaxRequests: c.config.BreakerMaxRequests,
-		Interval:    c.config.BreakerInterval,
-		Timeout:     c.config.BreakerTimeout,
-		ReadyToTrip: func(counts gobreaker.Counts) bool {
-			if counts.Requests < 3 {
-				return false
-			}
-			ratio := float64(counts.TotalFailures) / float64(counts.Requests)
-			return ratio >= 0.5
-		},
+		MaxRequests: c.breakerSettings.MaxRequests,
+		Interval:    c.breakerSettings.Interval,
+		Timeout:     c.breakerSettings.Timeout,
+		ReadyToTrip: c.breakerSettings.ReadyToTrip,
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			c.logger.Info("circuit breaker state changed",
 				"name", name,
@@ -205,18 +290,22 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 		c.globalLimiter = rate.NewLimiter(rate.Limit(c.config.GlobalRPS), c.config.GlobalBurst)
 	}
 
+	// Default sleeper
+	if c.sleeper == nil {
+		c.sleeper = realSleeper{}
+	}
+
+	// Default circuit breaker settings
+	if c.breakerSettings.ReadyToTrip == nil {
+		c.breakerSettings = DefaultCircuitBreakerSettings()
+	}
+
 	c.breaker = gobreaker.NewCircuitBreaker[*apiResponse](gobreaker.Settings{
 		Name:        "galigo-sender",
-		MaxRequests: c.config.BreakerMaxRequests,
-		Interval:    c.config.BreakerInterval,
-		Timeout:     c.config.BreakerTimeout,
-		ReadyToTrip: func(counts gobreaker.Counts) bool {
-			if counts.Requests < 3 {
-				return false
-			}
-			ratio := float64(counts.TotalFailures) / float64(counts.Requests)
-			return ratio >= 0.5
-		},
+		MaxRequests: c.breakerSettings.MaxRequests,
+		Interval:    c.breakerSettings.Interval,
+		Timeout:     c.breakerSettings.Timeout,
+		ReadyToTrip: c.breakerSettings.ReadyToTrip,
 	})
 
 	// P1.2: Start chat limiter cleanup goroutine
@@ -271,6 +360,14 @@ func (c *Client) cleanupStaleLimiters() {
 			delete(c.chatLimiters, chatID)
 		}
 	}
+}
+
+// ChatLimiterCount returns the number of active per-chat limiters.
+// Useful for monitoring and testing.
+func (c *Client) ChatLimiterCount() int {
+	c.limiterMu.RLock()
+	defer c.limiterMu.RUnlock()
+	return len(c.chatLimiters)
 }
 
 // SendMessage sends a text message.
@@ -439,7 +536,9 @@ func (c *Client) Acknowledge(ctx context.Context, cb *tg.CallbackQuery) error {
 func (c *Client) sendMessageOnce(ctx context.Context, req SendMessageRequest) (*tg.Message, error) {
 	chatID := extractChatID(req.ChatID)
 	if err := c.waitForRateLimit(ctx, chatID); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRateLimited, err)
+		// Return context errors directly (Canceled, DeadlineExceeded)
+		// ErrRateLimited is reserved for Telegram 429 responses
+		return nil, err
 	}
 
 	resp, err := c.breaker.Execute(func() (*apiResponse, error) {
@@ -459,7 +558,9 @@ func (c *Client) sendMessageOnce(ctx context.Context, req SendMessageRequest) (*
 func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.Message, error) {
 	chatID := extractChatID(req.ChatID)
 	if err := c.waitForRateLimit(ctx, chatID); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRateLimited, err)
+		// Return context errors directly (Canceled, DeadlineExceeded)
+		// ErrRateLimited is reserved for Telegram 429 responses
+		return nil, err
 	}
 
 	resp, err := c.breaker.Execute(func() (*apiResponse, error) {
@@ -588,20 +689,21 @@ func withRetry[T any](c *Client, ctx context.Context, chatID tg.ChatID, fn func(
 
 		lastErr = err
 
-		if attempt >= c.config.MaxRetries {
-			break
-		}
-
+		// Non-retryable errors return immediately (not wrapped in ErrMaxRetries)
 		if !isRetryable(err) {
 			return zero, err
 		}
 
+		// Check if we've exhausted retries
+		if attempt >= c.config.MaxRetries {
+			break
+		}
+
 		backoff := calculateBackoff(c.config, attempt+1, err)
 
-		select {
-		case <-ctx.Done():
-			return zero, ctx.Err()
-		case <-time.After(backoff):
+		// Use sleeper for testable timing
+		if err := c.sleeper.Sleep(ctx, backoff); err != nil {
+			return zero, err
 		}
 	}
 

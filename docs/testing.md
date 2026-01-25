@@ -27,10 +27,8 @@ func TestSendMessage_Success(t *testing.T) {
         testutil.ReplyMessage(w, 123)
     })
 
-    // Create client with mock server URL
-    client, err := sender.New(testutil.TestToken, sender.WithBaseURL(server.BaseURL()))
-    require.NoError(t, err)
-    defer client.Close()
+    // Create client using test helper (automatically cleaned up)
+    client := testutil.NewTestClient(t, server.BaseURL())
 
     // Test
     msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
@@ -201,6 +199,44 @@ sleeper := testutil.RealSleeper{}
 err := sleeper.Sleep(ctx, 100*time.Millisecond)
 ```
 
+### Test Client Helpers
+
+Pre-configured test clients for different testing scenarios:
+
+```go
+// Standard test client (no retries, default circuit breaker)
+client := testutil.NewTestClient(t, server.BaseURL())
+
+// Retry test client (circuit breaker never trips, use with FakeSleeper)
+sleeper := &testutil.FakeSleeper{}
+client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper,
+    sender.WithRetries(3),
+)
+
+// Circuit breaker test client (aggressive tripping, no retries)
+client := testutil.NewBreakerTestClient(t, server.BaseURL())
+```
+
+All test clients are automatically cleaned up when the test completes.
+
+#### Circuit Breaker Settings
+
+For tests that need custom circuit breaker behavior:
+
+```go
+// Never trip - for testing retry logic without breaker interference
+settings := testutil.CircuitBreakerNeverTrip()
+
+// Aggressive trip - for testing circuit breaker behavior
+settings := testutil.CircuitBreakerAggressiveTrip()
+
+// Use with manual client creation
+client, _ := sender.New(testutil.TestToken,
+    sender.WithBaseURL(server.BaseURL()),
+    sender.WithCircuitBreakerSettings(settings),
+)
+```
+
 ### Test Fixtures
 
 Pre-built test data for consistent tests:
@@ -276,11 +312,11 @@ wg.Wait()
 
 ```go
 func TestRetry_429WithRetryAfter(t *testing.T) {
-    var attempts int32
+    var attempts atomic.Int32
 
     server := testutil.NewMockServer(t)
     server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
-        if atomic.AddInt32(&attempts, 1) == 1 {
+        if attempts.Add(1) == 1 {
             testutil.ReplyRateLimit(w, 2)  // First: rate limit
             return
         }
@@ -288,34 +324,48 @@ func TestRetry_429WithRetryAfter(t *testing.T) {
     })
 
     sleeper := &testutil.FakeSleeper{}
-    client := newTestClient(t, server.BaseURL(), sleeper)
+    client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper,
+        sender.WithRetries(3),
+    )
 
-    msg, err := client.SendMessage(ctx, req)
+    msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+        ChatID: testutil.TestChatID,
+        Text:   "Hello",
+    })
 
     require.NoError(t, err)
-    assert.Equal(t, int32(2), atomic.LoadInt32(&attempts))
+    assert.Equal(t, int32(2), attempts.Load())
     assert.Equal(t, 2*time.Second, sleeper.LastCall())  // Used retry_after
 }
 ```
 
-### Testing Rate Limiting
+### Testing Circuit Breaker
 
 ```go
-func TestRateLimit_Throttles(t *testing.T) {
+func TestCircuitBreaker_OpensOnFailures(t *testing.T) {
     server := testutil.NewMockServer(t)
     server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
-        testutil.ReplyMessage(w, 123)
+        testutil.ReplyServerError(w, 500, "Internal Server Error")
     })
 
-    client := newTestClient(t, server.BaseURL(), sender.WithRateLimit(2, 1))  // 2 RPS
+    // Use breaker test client (trips after 2 consecutive failures)
+    client := testutil.NewBreakerTestClient(t, server.BaseURL())
 
-    start := time.Now()
+    // Make requests to trip breaker
     for i := 0; i < 3; i++ {
-        client.SendMessage(ctx, req)
+        client.SendMessage(context.Background(), sender.SendMessageRequest{
+            ChatID: testutil.TestChatID,
+            Text:   "Hello",
+        })
     }
-    elapsed := time.Since(start)
 
-    assert.GreaterOrEqual(t, elapsed, 500*time.Millisecond)
+    // Next request should fail with circuit open
+    _, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+        ChatID: testutil.TestChatID,
+        Text:   "Hello",
+    })
+
+    assert.ErrorIs(t, err, sender.ErrCircuitOpen)
 }
 ```
 
@@ -328,9 +378,12 @@ func TestSendMessage_BotBlocked(t *testing.T) {
         testutil.ReplyForbidden(w, "bot was blocked by the user")
     })
 
-    client := newTestClient(t, server.BaseURL())
+    client := testutil.NewTestClient(t, server.BaseURL())
 
-    _, err := client.SendMessage(ctx, req)
+    _, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+        ChatID: testutil.TestChatID,
+        Text:   "Hello",
+    })
 
     require.Error(t, err)
     assert.ErrorIs(t, err, sender.ErrBotBlocked)
@@ -347,14 +400,18 @@ func TestSendMessage_ContextCancel(t *testing.T) {
         testutil.ReplyMessage(w, 123)
     })
 
-    client := newTestClient(t, server.BaseURL())
+    client := testutil.NewTestClient(t, server.BaseURL())
 
     ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
     defer cancel()
 
-    _, err := client.SendMessage(ctx, req)
+    _, err := client.SendMessage(ctx, sender.SendMessageRequest{
+        ChatID: testutil.TestChatID,
+        Text:   "Hello",
+    })
 
-    assert.ErrorIs(t, err, context.DeadlineExceeded)
+    // Context errors are returned directly (not wrapped)
+    assert.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
 }
 ```
 
@@ -393,7 +450,7 @@ func TestSendMessage(t *testing.T) {
             server := testutil.NewMockServer(t)
             server.On("/bot"+testutil.TestToken+"/sendMessage", tt.response)
 
-            client := newTestClient(t, server.BaseURL())
+            client := testutil.NewTestClient(t, server.BaseURL())
             _, err := client.SendMessage(context.Background(), tt.request)
 
             if tt.wantErr {
@@ -467,16 +524,33 @@ if (( $(echo "$COVERAGE < 80" | bc -l) )); then
 fi
 ```
 
+## Error Semantics
+
+Understanding which errors are returned in different scenarios:
+
+| Scenario | Error | How to Check |
+|----------|-------|--------------|
+| Context cancelled during any wait | `context.Canceled` | `errors.Is(err, context.Canceled)` |
+| Context timeout elapsed | `context.DeadlineExceeded` | `errors.Is(err, context.DeadlineExceeded)` |
+| Telegram returned 429 | `sender.ErrTooManyRequests` | `errors.Is(err, sender.ErrTooManyRequests)` |
+| Circuit breaker is open | `sender.ErrCircuitOpen` | `errors.Is(err, sender.ErrCircuitOpen)` |
+| Max retries exhausted | `sender.ErrMaxRetries` | `errors.Is(err, sender.ErrMaxRetries)` |
+| Bot blocked by user | `sender.ErrBotBlocked` | `errors.Is(err, sender.ErrBotBlocked)` |
+| Chat not found | `sender.ErrChatNotFound` | `errors.Is(err, sender.ErrChatNotFound)` |
+
+Note: Context errors (`context.Canceled`, `context.DeadlineExceeded`) are returned directly without wrapping, making them easy to check with `errors.Is()`.
+
 ## Best Practices
 
 1. **Use table-driven tests** for testing multiple scenarios
 2. **Always clean up** - use `t.Cleanup()` or `defer`
 3. **Test error paths** - not just happy paths
 4. **Use FakeSleeper** for retry tests to avoid slow tests
-5. **Verify request content** with capture assertions
-6. **Use meaningful test names** that describe the scenario
-7. **Keep tests independent** - each test should set up its own server
-8. **Test edge cases** - empty responses, large payloads, timeouts
+5. **Use NewRetryTestClient** for retry tests to prevent circuit breaker interference
+6. **Verify request content** with capture assertions
+7. **Use meaningful test names** that describe the scenario
+8. **Keep tests independent** - each test should set up its own server
+9. **Test edge cases** - empty responses, large payloads, timeouts
 
 ## Fuzzing
 

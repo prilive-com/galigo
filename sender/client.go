@@ -33,16 +33,33 @@ type Client struct {
 	httpClient    *http.Client
 	logger        *slog.Logger
 	globalLimiter *rate.Limiter
-	chatLimiters  map[int64]*rate.Limiter
+	chatLimiters  map[int64]*chatLimiterEntry // P1.2: Track last used time
 	limiterMu     sync.RWMutex
 	breaker       *gobreaker.CircuitBreaker[*apiResponse]
+
+	// P1.2: Cleanup
+	cleanupTicker *time.Ticker
+	cleanupDone   chan struct{}
+}
+
+// chatLimiterEntry wraps a rate limiter with last used timestamp
+type chatLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastUsed time.Time
 }
 
 type apiResponse struct {
-	OK          bool            `json:"ok"`
-	Result      json.RawMessage `json:"result,omitempty"`
-	ErrorCode   int             `json:"error_code,omitempty"`
-	Description string          `json:"description,omitempty"`
+	OK          bool                `json:"ok"`
+	Result      json.RawMessage     `json:"result,omitempty"`
+	ErrorCode   int                 `json:"error_code,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Parameters  *responseParameters `json:"parameters,omitempty"` // P0.3: For retry_after
+}
+
+// responseParameters contains special parameters returned by Telegram API
+type responseParameters struct {
+	RetryAfter      int   `json:"retry_after,omitempty"`
+	MigrateToChatID int64 `json:"migrate_to_chat_id,omitempty"`
 }
 
 // Option configures the Client.
@@ -78,6 +95,26 @@ func WithRetries(max int) Option {
 	}
 }
 
+// P1.5 FIX: Deduplicated HTTP client creation
+func createHTTPClient(cfg Config) *http.Client {
+	return &http.Client{
+		Timeout: cfg.RequestTimeout,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: cfg.KeepAlive,
+			}).DialContext,
+			MaxIdleConns:        cfg.MaxIdleConns,
+			IdleConnTimeout:     cfg.IdleTimeout,
+			TLSHandshakeTimeout: 10 * time.Second,
+			ForceAttemptHTTP2:   true,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
+}
+
 // New creates a new Client with the given token and options.
 func New(token string, opts ...Option) (*Client, error) {
 	cfg := DefaultConfig()
@@ -89,7 +126,7 @@ func New(token string, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		config:       cfg,
-		chatLimiters: make(map[int64]*rate.Limiter),
+		chatLimiters: make(map[int64]*chatLimiterEntry), // P1.2: Use entry type
 	}
 
 	// Apply options
@@ -102,24 +139,9 @@ func New(token string, opts ...Option) (*Client, error) {
 		c.logger = slog.Default()
 	}
 
-	// Default HTTP client
+	// Default HTTP client (P1.5: Use helper function)
 	if c.httpClient == nil {
-		c.httpClient = &http.Client{
-			Timeout: c.config.RequestTimeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: c.config.KeepAlive,
-				}).DialContext,
-				MaxIdleConns:        c.config.MaxIdleConns,
-				IdleConnTimeout:     c.config.IdleTimeout,
-				TLSHandshakeTimeout: 10 * time.Second,
-				ForceAttemptHTTP2:   true,
-				TLSClientConfig: &tls.Config{
-					MinVersion: tls.VersionTLS12,
-				},
-			},
-		}
+		c.httpClient = createHTTPClient(c.config)
 	}
 
 	// Default global limiter
@@ -149,6 +171,9 @@ func New(token string, opts ...Option) (*Client, error) {
 		},
 	})
 
+	// P1.2: Start chat limiter cleanup goroutine
+	c.startLimiterCleanup()
+
 	return c, nil
 }
 
@@ -160,7 +185,7 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		config:       cfg,
-		chatLimiters: make(map[int64]*rate.Limiter),
+		chatLimiters: make(map[int64]*chatLimiterEntry), // P1.2: Use entry type
 	}
 
 	for _, opt := range opts {
@@ -171,23 +196,9 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 		c.logger = slog.Default()
 	}
 
+	// P1.5 FIX: Use helper function
 	if c.httpClient == nil {
-		c.httpClient = &http.Client{
-			Timeout: c.config.RequestTimeout,
-			Transport: &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   10 * time.Second,
-					KeepAlive: c.config.KeepAlive,
-				}).DialContext,
-				MaxIdleConns:        c.config.MaxIdleConns,
-				IdleConnTimeout:     c.config.IdleTimeout,
-				TLSHandshakeTimeout: 10 * time.Second,
-				ForceAttemptHTTP2:   true,
-				TLSClientConfig: &tls.Config{
-					MinVersion: tls.VersionTLS12,
-				},
-			},
-		}
+		c.httpClient = createHTTPClient(c.config)
 	}
 
 	if c.globalLimiter == nil {
@@ -208,12 +219,58 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 		},
 	})
 
+	// P1.2: Start chat limiter cleanup goroutine
+	c.startLimiterCleanup()
+
 	return c, nil
 }
 
 // Close releases resources.
 func (c *Client) Close() error {
+	// P1.6 FIX: Actually close resources
+
+	// Stop limiter cleanup goroutine
+	if c.cleanupTicker != nil {
+		c.cleanupTicker.Stop()
+		close(c.cleanupDone)
+	}
+
+	// Close idle HTTP connections
+	if t, ok := c.httpClient.Transport.(*http.Transport); ok {
+		t.CloseIdleConnections()
+	}
+
 	return nil
+}
+
+// P1.2: Start background goroutine to cleanup stale chat limiters
+func (c *Client) startLimiterCleanup() {
+	c.cleanupTicker = time.NewTicker(5 * time.Minute)
+	c.cleanupDone = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-c.cleanupDone:
+				return
+			case <-c.cleanupTicker.C:
+				c.cleanupStaleLimiters()
+			}
+		}
+	}()
+}
+
+// cleanupStaleLimiters removes chat limiters that haven't been used in 10 minutes
+func (c *Client) cleanupStaleLimiters() {
+	c.limiterMu.Lock()
+	defer c.limiterMu.Unlock()
+
+	threshold := time.Now().Add(-10 * time.Minute)
+	for chatID, entry := range c.chatLimiters {
+		if entry.lastUsed.Before(threshold) {
+			delete(c.chatLimiters, chatID)
+		}
+	}
 }
 
 // SendMessage sends a text message.
@@ -447,13 +504,14 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	}
 	defer resp.Body.Close()
 
-	limitedReader := io.LimitReader(resp.Body, maxResponseSize)
+	// P0.8 FIX: Read maxResponseSize+1 to detect overflow without false positive
+	limitedReader := io.LimitReader(resp.Body, maxResponseSize+1)
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if len(body) == maxResponseSize {
+	if int64(len(body)) > maxResponseSize {
 		return nil, ErrResponseTooLarge
 	}
 
@@ -463,11 +521,13 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	}
 
 	if !apiResp.OK {
-		retryAfter := resp.Header.Get("Retry-After")
-		if apiResp.ErrorCode == 429 && retryAfter != "" {
-			if seconds, err := strconv.Atoi(retryAfter); err == nil {
-				return nil, NewAPIErrorWithRetry(method, apiResp.ErrorCode, apiResp.Description, time.Duration(seconds)*time.Second)
-			}
+		// P0.3 FIX: Parse retry_after from JSON response body, not HTTP headers
+		var retryAfter time.Duration
+		if apiResp.Parameters != nil && apiResp.Parameters.RetryAfter > 0 {
+			retryAfter = time.Duration(apiResp.Parameters.RetryAfter) * time.Second
+		}
+		if retryAfter > 0 {
+			return nil, NewAPIErrorWithRetry(method, apiResp.ErrorCode, apiResp.Description, retryAfter)
 		}
 		return nil, NewAPIError(method, apiResp.ErrorCode, apiResp.Description)
 	}
@@ -484,24 +544,36 @@ func (c *Client) waitForRateLimit(ctx context.Context, chatID int64) error {
 }
 
 func (c *Client) getChatLimiter(chatID int64) *rate.Limiter {
+	now := time.Now()
+
 	c.limiterMu.RLock()
-	limiter, exists := c.chatLimiters[chatID]
+	entry, exists := c.chatLimiters[chatID]
 	c.limiterMu.RUnlock()
 
 	if exists {
-		return limiter
+		// Update last used time (P1.2)
+		c.limiterMu.Lock()
+		entry.lastUsed = now
+		c.limiterMu.Unlock()
+		return entry.limiter
 	}
 
 	c.limiterMu.Lock()
 	defer c.limiterMu.Unlock()
 
-	if limiter, exists = c.chatLimiters[chatID]; exists {
-		return limiter
+	// Double-check after acquiring write lock
+	if entry, exists = c.chatLimiters[chatID]; exists {
+		entry.lastUsed = now
+		return entry.limiter
 	}
 
-	limiter = rate.NewLimiter(rate.Limit(c.config.PerChatRPS), c.config.PerChatBurst)
-	c.chatLimiters[chatID] = limiter
-	return limiter
+	// Create new entry with limiter
+	entry = &chatLimiterEntry{
+		limiter:  rate.NewLimiter(rate.Limit(c.config.PerChatRPS), c.config.PerChatBurst),
+		lastUsed: now,
+	}
+	c.chatLimiters[chatID] = entry
+	return entry.limiter
 }
 
 func withRetry[T any](c *Client, ctx context.Context, chatID tg.ChatID, fn func() (T, error)) (T, error) {

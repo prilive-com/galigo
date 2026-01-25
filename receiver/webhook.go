@@ -99,84 +99,95 @@ func NewWebhookHandler(
 
 // ServeHTTP implements http.Handler.
 func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Rate limit check
+	// Rate limit check (outside breaker)
 	if !h.limiter.Allow() {
 		h.fail(w, "rate limit exceeded", http.StatusTooManyRequests)
 		return
 	}
 
-	// Process through circuit breaker
+	// P0.6 FIX: Authentication checks OUTSIDE circuit breaker
+	// This prevents attackers from tripping the breaker with bad credentials
+
+	// Domain validation
+	if h.allowedDomain != "" && r.Host != h.allowedDomain {
+		h.fail(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Secret validation (constant-time comparison)
+	if h.webhookSecret != "" {
+		secret := r.Header.Get("X-Telegram-Bot-Api-Secret-Token")
+		if subtle.ConstantTimeCompare([]byte(secret), []byte(h.webhookSecret)) != 1 {
+			h.fail(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Method validation
+	if r.Method != http.MethodPost {
+		h.fail(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Only downstream processing inside circuit breaker
 	_, err := h.breaker.Execute(func() (interface{}, error) {
-		// Domain validation
-		if h.allowedDomain != "" && r.Host != h.allowedDomain {
-			return nil, ErrForbidden
-		}
-
-		// Secret validation (constant-time comparison)
-		if h.webhookSecret != "" {
-			secret := r.Header.Get("X-Telegram-Bot-Api-Secret-Token")
-			if subtle.ConstantTimeCompare([]byte(secret), []byte(h.webhookSecret)) != 1 {
-				return nil, ErrUnauthorized
-			}
-		}
-
-		// Method validation
-		if r.Method != http.MethodPost {
-			return nil, ErrMethodNotAllowed
-		}
-
-		// Get pooled buffer
-		bufPtr := h.bufferPool.Get().(*[]byte)
-		buffer := *bufPtr
-		defer h.bufferPool.Put(bufPtr)
-
-		// Read body with size limit
-		r.Body = http.MaxBytesReader(w, r.Body, h.maxBodySize)
-		n, err := io.ReadFull(r.Body, buffer)
-		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-			return nil, &WebhookError{Code: 500, Message: "failed to read body", Err: err}
-		}
-		defer r.Body.Close()
-
-		// Parse update
-		var update tg.Update
-		if err := json.Unmarshal(buffer[:n], &update); err != nil {
-			return nil, &WebhookError{Code: 400, Message: "invalid JSON", Err: err}
-		}
-
-		// Send to channel
-		select {
-		case h.updates <- update:
-			h.logger.Info("update forwarded", "update_id", update.UpdateID)
-		default:
-			return nil, ErrChannelBlocked
-		}
-
-		return nil, nil
+		return nil, h.processUpdate(w, r)
 	})
 
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrForbidden):
-			h.fail(w, "forbidden", http.StatusForbidden)
-		case errors.Is(err, ErrUnauthorized):
-			h.fail(w, "unauthorized", http.StatusUnauthorized)
-		case errors.Is(err, ErrMethodNotAllowed):
-			h.fail(w, "method not allowed", http.StatusMethodNotAllowed)
-		case errors.Is(err, ErrChannelBlocked):
+		var webhookErr *WebhookError
+		if errors.As(err, &webhookErr) {
+			h.fail(w, webhookErr.Message, webhookErr.Code)
+		} else if errors.Is(err, ErrChannelBlocked) {
 			h.fail(w, "service unavailable", http.StatusServiceUnavailable)
-		default:
-			var webhookErr *WebhookError
-			if errors.As(err, &webhookErr) {
-				h.fail(w, webhookErr.Message, webhookErr.Code)
-			} else {
-				h.fail(w, err.Error(), http.StatusInternalServerError)
-			}
+		} else {
+			h.fail(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// processUpdate handles the actual update processing (inside circuit breaker)
+func (h *WebhookHandler) processUpdate(w http.ResponseWriter, r *http.Request) error {
+	// Get pooled buffer
+	bufPtr := h.bufferPool.Get().(*[]byte)
+	buffer := *bufPtr
+	defer h.bufferPool.Put(bufPtr)
+
+	// Read body with size limit
+	r.Body = http.MaxBytesReader(w, r.Body, h.maxBodySize)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		// P0.5 FIX: Return 413 for oversized body
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return &WebhookError{Code: http.StatusRequestEntityTooLarge, Message: "payload too large", Err: err}
+		}
+		return &WebhookError{Code: http.StatusInternalServerError, Message: "failed to read body", Err: err}
+	}
+	defer r.Body.Close()
+
+	// Copy to buffer for potential reuse
+	n := copy(buffer, body)
+
+	// Parse update
+	var update tg.Update
+	if err := json.Unmarshal(buffer[:n], &update); err != nil {
+		return &WebhookError{Code: http.StatusBadRequest, Message: "invalid JSON", Err: err}
+	}
+
+	// Send to channel
+	select {
+	case h.updates <- update:
+		// P1.8 FIX: Use Debug level for per-update logging
+		h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+	default:
+		return ErrChannelBlocked
+	}
+
+	return nil
 }
 
 func (h *WebhookHandler) fail(w http.ResponseWriter, msg string, code int) {

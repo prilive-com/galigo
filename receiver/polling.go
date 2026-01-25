@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,8 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/url"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,11 +23,15 @@ import (
 	"github.com/sony/gobreaker/v2"
 )
 
-const telegramAPIBaseURL = "https://api.telegram.org/bot"
+const (
+	telegramAPIBaseURL     = "https://api.telegram.org/bot"
+	maxPollResponseSize    = 50 << 20 // 50MB for updates
+)
 
 // PollingClient polls Telegram's getUpdates API for updates.
 type PollingClient struct {
 	token   tg.SecretToken
+	baseURL string
 	updates chan<- tg.Update
 	logger  *slog.Logger
 
@@ -48,10 +55,11 @@ type PollingClient struct {
 
 	// State
 	running           atomic.Bool
-	offset            int
+	offset            atomic.Int64 // P1.1: Use atomic for thread-safe access
 	consecutiveErrors atomic.Int32
 	stopCh            chan struct{}
-	closeOnce         sync.Once
+	stopped           atomic.Bool  // P1.3: Track if stopped for restart capability
+	mu                sync.Mutex   // P1.3: Protects stopCh recreation
 	wg                sync.WaitGroup
 }
 
@@ -116,8 +124,14 @@ func NewPollingClient(
 	cfg Config,
 	opts ...PollingOption,
 ) *PollingClient {
+	baseURL := cfg.BaseURL
+	if baseURL == "" {
+		baseURL = telegramAPIBaseURL
+	}
+
 	c := &PollingClient{
 		token:              token,
+		baseURL:            baseURL,
 		updates:            updates,
 		logger:             logger,
 		timeout:            cfg.PollingTimeout,
@@ -187,6 +201,14 @@ func (c *PollingClient) Start(ctx context.Context) error {
 		return ErrAlreadyRunning
 	}
 
+	// P1.3: Support restart by recreating stopCh if previously stopped
+	c.mu.Lock()
+	if c.stopped.Load() {
+		c.stopCh = make(chan struct{})
+		c.stopped.Store(false)
+	}
+	c.mu.Unlock()
+
 	if c.deleteWebhookOnStart {
 		c.logger.Info("deleting existing webhook")
 		if err := DeleteWebhook(ctx, c.client, c.token, false); err != nil {
@@ -195,8 +217,10 @@ func (c *PollingClient) Start(ctx context.Context) error {
 		}
 	}
 
-	c.wg.Add(1)
-	go c.pollLoop(ctx)
+	// P1.4: Use sync.WaitGroup.Go() for Go 1.25
+	c.wg.Go(func() {
+		c.pollLoop(ctx)
+	})
 
 	c.logger.Info("long polling started",
 		"timeout", c.timeout,
@@ -213,9 +237,16 @@ func (c *PollingClient) Stop() {
 		return
 	}
 
-	c.closeOnce.Do(func() {
+	c.mu.Lock()
+	select {
+	case <-c.stopCh:
+		// Already closed
+	default:
 		close(c.stopCh)
-	})
+	}
+	c.stopped.Store(true)
+	c.mu.Unlock()
+
 	c.wg.Wait()
 	c.logger.Info("long polling stopped")
 }
@@ -239,12 +270,12 @@ func (c *PollingClient) ConsecutiveErrors() int32 {
 }
 
 // Offset returns the current update offset.
-func (c *PollingClient) Offset() int {
-	return c.offset
+func (c *PollingClient) Offset() int64 {
+	return c.offset.Load()
 }
 
 func (c *PollingClient) pollLoop(ctx context.Context) {
-	defer c.wg.Done()
+	// Note: No defer c.wg.Done() needed when using wg.Go()
 	defer c.running.Store(false)
 
 	for {
@@ -285,16 +316,24 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 
 		c.consecutiveErrors.Store(0)
 
+		// P0.1 FIX: Only advance offset AFTER successful channel delivery
+		// This prevents permanent update loss when channel is full
 		for _, update := range updates {
-			if update.UpdateID >= c.offset {
-				c.offset = update.UpdateID + 1
-			}
-
 			select {
 			case c.updates <- update:
+				// Only advance offset after successful delivery
+				if int64(update.UpdateID) >= c.offset.Load() {
+					c.offset.Store(int64(update.UpdateID) + 1)
+				}
 				c.logger.Debug("update sent", "update_id", update.UpdateID)
-			default:
-				c.logger.Warn("updates channel full", "update_id", update.UpdateID)
+			case <-ctx.Done():
+				// Don't advance offset - updates will be redelivered on restart
+				c.logger.Info("stopping update delivery: context cancelled")
+				return
+			case <-c.stopCh:
+				// Don't advance offset - updates will be redelivered on restart
+				c.logger.Info("stopping update delivery: stop signal")
+				return
 			}
 		}
 	}
@@ -308,22 +347,26 @@ type getUpdatesResponse struct {
 }
 
 func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
-	url := fmt.Sprintf("%s%s/getUpdates?timeout=%d&limit=%d&offset=%d",
-		telegramAPIBaseURL,
-		c.token.Value(),
-		c.timeout,
-		c.limit,
-		c.offset,
-	)
+	// P0.2 FIX: Use url.Values for proper URL encoding
+	params := url.Values{}
+	params.Set("timeout", strconv.Itoa(c.timeout))
+	params.Set("limit", strconv.Itoa(c.limit))
+	params.Set("offset", strconv.FormatInt(c.offset.Load(), 10))
 
 	if len(c.allowedUpdates) > 0 {
 		encoded, err := json.Marshal(c.allowedUpdates)
 		if err == nil {
-			url += "&allowed_updates=" + string(encoded)
+			params.Set("allowed_updates", string(encoded))
 		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	apiURL := fmt.Sprintf("%s%s/getUpdates?%s",
+		c.baseURL,
+		c.token.Value(),
+		params.Encode(),
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, &APIError{Description: "failed to create request", Err: err}
 	}
@@ -338,9 +381,15 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 			resp.Body.Close()
 		}()
 
-		body, err := io.ReadAll(resp.Body)
+		// P0.9 FIX: Add response size limit to prevent memory exhaustion
+		limitedReader := io.LimitReader(resp.Body, maxPollResponseSize+1)
+		body, err := io.ReadAll(limitedReader)
 		if err != nil {
 			return nil, err
+		}
+
+		if int64(len(body)) > maxPollResponseSize {
+			return nil, errors.New("response too large")
 		}
 
 		if resp.StatusCode != http.StatusOK {

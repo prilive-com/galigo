@@ -1,0 +1,70 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Verify Go version
+        run: go version
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+        continue-on-error: true
+
+      - name: Run tests with race detector
+        run: go test -v -race ./...
+
+      - name: Run tests with coverage
+        run: |
+          go test -v -coverpkg=./... -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tee coverage.txt
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(tail -1 coverage.txt | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::Coverage $COVERAGE% is below 80% threshold"
+            exit 1
+          fi
+          echo "Coverage meets 80% threshold"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
+
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Run vulnerability check
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

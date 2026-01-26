@@ -28,7 +28,7 @@ func CircuitBreakerAggressiveTrip() sender.CircuitBreakerSettings {
 	return sender.CircuitBreakerSettings{
 		MaxRequests: 1,
 		Interval:    0,
-		Timeout:     10 * time.Millisecond, // Fast recovery for tests
+		Timeout:     2 * time.Second, // Long enough to stay open during test assertions
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
 			return counts.ConsecutiveFailures >= 2
 		},

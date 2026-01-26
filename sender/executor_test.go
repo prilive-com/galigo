@@ -10,6 +10,7 @@ import (
 
 	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -420,4 +421,130 @@ func TestExecutor_JSONSerialization(t *testing.T) {
 	cap := server.LastCapture()
 	cap.AssertJSONField(t, "disable_notification", true)
 	cap.AssertJSONField(t, "protect_content", true)
+}
+
+// Test chat ID variations
+
+func TestExecutor_SendMessage_IntChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 1)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	// Use int instead of int64
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: int(12345),
+		Text:   "Hello",
+	})
+
+	require.NoError(t, err)
+}
+
+func TestExecutor_SendMessage_StringChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 1)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	// Use string (username) chat ID
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: "@mychannel",
+		Text:   "Hello to channel",
+	})
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "chat_id", "@mychannel")
+}
+
+// Test additional error sentinels
+
+func TestExecutor_ErrorSentinel_TooManyRequests(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyRateLimit(w, 5)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Hello",
+	})
+
+	// 429 errors are retried until max retries exceeded
+	// The error chain includes ErrMaxRetries wrapping the API error
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sender.ErrMaxRetries)
+	assert.Contains(t, err.Error(), "429")
+}
+
+func TestExecutor_ErrorSentinel_ChatNotFound(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyServerError(w, 400, "chat not found")
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Hello",
+	})
+
+	assert.ErrorIs(t, err, sender.ErrChatNotFound)
+}
+
+func TestExecutor_ErrorSentinel_CallbackExpired(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/answerCallbackQuery", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyServerError(w, 400, "query is too old")
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.Acknowledge(context.Background(), &tg.CallbackQuery{ID: "old_query"})
+
+	assert.ErrorIs(t, err, sender.ErrCallbackExpired)
+}
+
+func TestExecutor_InvalidResultJSON(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		// Return ok=true but with invalid message JSON in result
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true,"result":"not a message object"}`))
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Hello",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse message")
+}
+
+func TestExecutor_ErrorSentinel_MessageTooOld(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/editMessageText", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyServerError(w, 400, "message is too old")
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.EditMessageText(context.Background(), sender.EditMessageTextRequest{
+		ChatID:    testutil.TestChatID,
+		MessageID: 123,
+		Text:      "Updated",
+	})
+
+	assert.ErrorIs(t, err, sender.ErrMessageTooOld)
 }

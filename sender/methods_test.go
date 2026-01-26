@@ -590,3 +590,487 @@ func TestValidationError(t *testing.T) {
 	assert.Equal(t, "chat_id", err.Field)
 	assert.Equal(t, "must be non-zero", err.Message)
 }
+
+// ================== Bot Identity Methods ==================
+
+func TestGetMe_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getMe", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyUser(w)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	user, err := client.GetMe(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, testutil.TestBotID, user.ID)
+	assert.True(t, user.IsBot)
+	assert.Equal(t, "Test Bot", user.FirstName)
+}
+
+func TestLogOut_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/logOut", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.LogOut(context.Background())
+
+	require.NoError(t, err)
+}
+
+func TestCloseBot_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/close", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.CloseBot(context.Background())
+
+	require.NoError(t, err)
+}
+
+// ================== Media Methods ==================
+
+func TestSendDocument_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendDocument", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 100)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendDocument(context.Background(), sender.SendDocumentRequest{
+		ChatID:   testutil.TestChatID,
+		Document: sender.FromFileID("file_id_123"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 100, msg.MessageID)
+}
+
+func TestSendVideo_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendVideo", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 101)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendVideo(context.Background(), sender.SendVideoRequest{
+		ChatID: testutil.TestChatID,
+		Video:  sender.FromURL("https://example.com/video.mp4"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 101, msg.MessageID)
+}
+
+func TestSendAudio_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendAudio", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 102)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendAudio(context.Background(), sender.SendAudioRequest{
+		ChatID: testutil.TestChatID,
+		Audio:  sender.FromFileID("audio_file_id"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 102, msg.MessageID)
+}
+
+func TestSendVoice_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendVoice", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 103)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendVoice(context.Background(), sender.SendVoiceRequest{
+		ChatID: testutil.TestChatID,
+		Voice:  sender.FromFileID("voice_file_id"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 103, msg.MessageID)
+}
+
+func TestSendAnimation_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendAnimation", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 104)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendAnimation(context.Background(), sender.SendAnimationRequest{
+		ChatID:    testutil.TestChatID,
+		Animation: sender.FromURL("https://example.com/animation.gif"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 104, msg.MessageID)
+}
+
+func TestSendVideoNote_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendVideoNote", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 105)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendVideoNote(context.Background(), sender.SendVideoNoteRequest{
+		ChatID:    testutil.TestChatID,
+		VideoNote: sender.FromFileID("video_note_id"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 105, msg.MessageID)
+}
+
+func TestSendSticker_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendSticker", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 106)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendSticker(context.Background(), sender.SendStickerRequest{
+		ChatID:  testutil.TestChatID,
+		Sticker: sender.FromFileID("sticker_file_id"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 106, msg.MessageID)
+}
+
+func TestSendMediaGroup_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMediaGroup", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, []map[string]any{
+			{"message_id": 107, "date": 1234567890},
+			{"message_id": 108, "date": 1234567890},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msgs, err := client.SendMediaGroup(context.Background(), sender.SendMediaGroupRequest{
+		ChatID: testutil.TestChatID,
+		Media: []sender.InputFile{
+			sender.FromURL("https://example.com/photo1.jpg").WithMediaType("photo"),
+			sender.FromURL("https://example.com/photo2.jpg").WithMediaType("photo"),
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, msgs, 2)
+	assert.Equal(t, 107, msgs[0].MessageID)
+	assert.Equal(t, 108, msgs[1].MessageID)
+}
+
+// ================== Utility Methods ==================
+
+func TestGetFile_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getFile", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, map[string]any{
+			"file_id":        "file_id_123",
+			"file_unique_id": "unique_123",
+			"file_size":      12345,
+			"file_path":      "documents/file.pdf",
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	file, err := client.GetFile(context.Background(), "file_id_123")
+
+	require.NoError(t, err)
+	assert.Equal(t, "file_id_123", file.FileID)
+	assert.Equal(t, "unique_123", file.FileUniqueID)
+	assert.Equal(t, int64(12345), file.FileSize)
+	assert.Equal(t, "documents/file.pdf", file.FilePath)
+}
+
+func TestSendChatAction_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendChatAction", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendChatAction(context.Background(), testutil.TestChatID, "typing")
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "action", "typing")
+}
+
+func TestGetUserProfilePhotos_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getUserProfilePhotos", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, map[string]any{
+			"total_count": 2,
+			"photos": [][]map[string]any{
+				{{"file_id": "photo1", "width": 100, "height": 100}},
+				{{"file_id": "photo2", "width": 100, "height": 100}},
+			},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	photos, err := client.GetUserProfilePhotos(context.Background(), 123456)
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, photos.TotalCount)
+	assert.Len(t, photos.Photos, 2)
+}
+
+func TestGetUserProfilePhotos_WithOptions(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getUserProfilePhotos", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, map[string]any{
+			"total_count": 1,
+			"photos":      [][]map[string]any{},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.GetUserProfilePhotos(context.Background(), 123456,
+		sender.WithPhotosOffset(5),
+		sender.WithPhotosLimit(3),
+	)
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "offset", float64(5))
+	cap.AssertJSONField(t, "limit", float64(3))
+}
+
+// ================== Location/Contact Methods ==================
+
+func TestSendLocation_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendLocation", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 110)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendLocation(context.Background(), sender.SendLocationRequest{
+		ChatID:    testutil.TestChatID,
+		Latitude:  40.7128,
+		Longitude: -74.0060,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 110, msg.MessageID)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "latitude", 40.7128)
+	cap.AssertJSONField(t, "longitude", -74.0060)
+}
+
+func TestSendVenue_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendVenue", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 111)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendVenue(context.Background(), sender.SendVenueRequest{
+		ChatID:    testutil.TestChatID,
+		Latitude:  40.7128,
+		Longitude: -74.0060,
+		Title:     "Statue of Liberty",
+		Address:   "New York, NY",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 111, msg.MessageID)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "title", "Statue of Liberty")
+	cap.AssertJSONField(t, "address", "New York, NY")
+}
+
+func TestSendContact_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendContact", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 112)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendContact(context.Background(), sender.SendContactRequest{
+		ChatID:      testutil.TestChatID,
+		PhoneNumber: "+1234567890",
+		FirstName:   "John",
+		LastName:    "Doe",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 112, msg.MessageID)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "phone_number", "+1234567890")
+	cap.AssertJSONField(t, "first_name", "John")
+}
+
+func TestSendPoll_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendPoll", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 113)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendPoll(context.Background(), sender.SendPollRequest{
+		ChatID:   testutil.TestChatID,
+		Question: "What's your favorite color?",
+		Options:  []string{"Red", "Blue", "Green"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 113, msg.MessageID)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "question", "What's your favorite color?")
+}
+
+func TestSendDice_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendDice", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 114)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendDice(context.Background(), testutil.TestChatID)
+
+	require.NoError(t, err)
+	assert.Equal(t, 114, msg.MessageID)
+}
+
+func TestSendDice_WithEmoji(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendDice", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 115)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	msg, err := client.SendDice(context.Background(), testutil.TestChatID,
+		sender.WithDiceEmoji("\U0001F3B2"), // 🎲
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 115, msg.MessageID)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "emoji", "\U0001F3B2")
+}
+
+// ================== Bulk Operations ==================
+
+func TestForwardMessages_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/forwardMessages", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, []map[string]any{
+			{"message_id": 200},
+			{"message_id": 201},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	ids, err := client.ForwardMessages(context.Background(), sender.ForwardMessagesRequest{
+		ChatID:     testutil.TestChatID,
+		FromChatID: int64(111),
+		MessageIDs: []int{1, 2, 3},
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, ids, 2)
+	assert.Equal(t, 200, ids[0].MessageID)
+	assert.Equal(t, 201, ids[1].MessageID)
+}
+
+func TestCopyMessages_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/copyMessages", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, []map[string]any{
+			{"message_id": 300},
+			{"message_id": 301},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	ids, err := client.CopyMessages(context.Background(), sender.CopyMessagesRequest{
+		ChatID:     testutil.TestChatID,
+		FromChatID: int64(222),
+		MessageIDs: []int{10, 20},
+	})
+
+	require.NoError(t, err)
+	assert.Len(t, ids, 2)
+	assert.Equal(t, 300, ids[0].MessageID)
+}
+
+func TestDeleteMessages_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/deleteMessages", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.DeleteMessages(context.Background(), testutil.TestChatID, []int{1, 2, 3})
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONFieldExists(t, "message_ids")
+}
+
+func TestSetMessageReaction_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setMessageReaction", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetMessageReaction(context.Background(), sender.SetMessageReactionRequest{
+		ChatID:    testutil.TestChatID,
+		MessageID: 123,
+		Reaction: []sender.ReactionType{
+			{Type: "emoji", Emoji: "\U0001F44D"}, // 👍
+		},
+	})
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "message_id", float64(123))
+}

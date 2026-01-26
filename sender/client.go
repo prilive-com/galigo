@@ -715,6 +715,11 @@ func isRetryable(err error) bool {
 		return false
 	}
 
+	// Circuit breaker errors are not retryable
+	if errors.Is(err, ErrCircuitOpen) {
+		return false
+	}
+
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		return true

@@ -17,6 +17,23 @@ const (
 	ModeLongPolling Mode = "longpolling"
 )
 
+// UpdateDeliveryPolicy defines how updates are handled when the channel is full.
+type UpdateDeliveryPolicy int
+
+const (
+	// DeliveryPolicyBlock waits for channel space (with timeout).
+	// This is the safest default - no updates lost unless timeout.
+	DeliveryPolicyBlock UpdateDeliveryPolicy = iota
+
+	// DeliveryPolicyDropNewest drops the current update if channel is full.
+	// Offset advances - update is lost but polling continues.
+	DeliveryPolicyDropNewest
+
+	// DeliveryPolicyDropOldest drops oldest update to make room.
+	// Uses non-blocking receive/send pattern.
+	DeliveryPolicyDropOldest
+)
+
 // Config holds receiver configuration.
 type Config struct {
 	// Mode selection
@@ -52,6 +69,11 @@ type Config struct {
 	RateLimitBurst    int           // Burst size
 	MaxBodySize       int64         // Max webhook body size
 
+	// Update delivery policy (for long polling)
+	UpdateDeliveryPolicy  UpdateDeliveryPolicy  // Behavior when update channel is full
+	UpdateDeliveryTimeout time.Duration         // Max time to wait in Block mode (0 = block forever)
+	OnUpdateDropped       func(int, string)     // Callback when update is dropped (updateID, reason)
+
 	// Circuit breaker
 	BreakerMaxRequests uint32
 	BreakerInterval    time.Duration
@@ -71,28 +93,30 @@ type Config struct {
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		Mode:               ModeWebhook,
-		WebhookPort:        8443,
-		PollingTimeout:     30,
-		PollingLimit:       100,
-		PollingMaxErrors:   10,
-		DeleteWebhookFirst: false,
-		RetryInitialDelay:  time.Second,
-		RetryMaxDelay:      60 * time.Second,
-		RetryBackoffFactor: 2.0,
-		UpdateBufferSize:   100,
-		RateLimitRequests:  10,
-		RateLimitBurst:     20,
-		MaxBodySize:        1 << 20, // 1MB
-		BreakerMaxRequests: 5,
-		BreakerInterval:    2 * time.Minute,
-		BreakerTimeout:     60 * time.Second,
-		ReadTimeout:        10 * time.Second,
-		ReadHeaderTimeout:  2 * time.Second,
-		WriteTimeout:       15 * time.Second,
-		IdleTimeout:        120 * time.Second,
-		DrainDelay:         5 * time.Second,
-		ShutdownTimeout:    15 * time.Second,
+		Mode:                  ModeWebhook,
+		WebhookPort:           8443,
+		PollingTimeout:        30,
+		PollingLimit:          100,
+		PollingMaxErrors:      10,
+		DeleteWebhookFirst:    false,
+		RetryInitialDelay:     time.Second,
+		RetryMaxDelay:         60 * time.Second,
+		RetryBackoffFactor:    2.0,
+		UpdateBufferSize:      100,
+		RateLimitRequests:     10,
+		RateLimitBurst:        20,
+		MaxBodySize:           1 << 20, // 1MB
+		UpdateDeliveryPolicy:  DeliveryPolicyBlock,
+		UpdateDeliveryTimeout: 5 * time.Second,
+		BreakerMaxRequests:    5,
+		BreakerInterval:       2 * time.Minute,
+		BreakerTimeout:        60 * time.Second,
+		ReadTimeout:           10 * time.Second,
+		ReadHeaderTimeout:     2 * time.Second,
+		WriteTimeout:          15 * time.Second,
+		IdleTimeout:           120 * time.Second,
+		DrainDelay:            5 * time.Second,
+		ShutdownTimeout:       15 * time.Second,
 	}
 }
 
@@ -181,6 +205,23 @@ func LoadConfig() (*Config, error) {
 	// Body size
 	if i, err := strconv.ParseInt(getEnv("MAX_BODY_SIZE", "1048576"), 10, 64); err == nil {
 		cfg.MaxBodySize = i
+	}
+
+	// Update delivery policy
+	policyStr := strings.ToLower(getEnv("UPDATE_DELIVERY_POLICY", "block"))
+	switch policyStr {
+	case "block":
+		cfg.UpdateDeliveryPolicy = DeliveryPolicyBlock
+	case "drop_newest", "dropnewest":
+		cfg.UpdateDeliveryPolicy = DeliveryPolicyDropNewest
+	case "drop_oldest", "dropoldest":
+		cfg.UpdateDeliveryPolicy = DeliveryPolicyDropOldest
+	default:
+		return nil, tg.NewValidationError("UPDATE_DELIVERY_POLICY", "must be 'block', 'drop_newest', or 'drop_oldest'")
+	}
+
+	if d, err := time.ParseDuration(getEnv("UPDATE_DELIVERY_TIMEOUT", "5s")); err == nil {
+		cfg.UpdateDeliveryTimeout = d
 	}
 
 	// Circuit breaker

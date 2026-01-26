@@ -41,12 +41,19 @@ func ReplyError(w http.ResponseWriter, code int, description string, params *Par
 	})
 }
 
-// ReplyRateLimit writes a 429 rate limit response with retry_after.
+// ReplyRateLimit writes a 429 rate limit response with retry_after in both JSON and HTTP header.
 func ReplyRateLimit(w http.ResponseWriter, retryAfter int) {
 	w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 	ReplyError(w, 429, "Too Many Requests: retry after "+strconv.Itoa(retryAfter), &Parameters{
 		RetryAfter: retryAfter,
 	})
+}
+
+// ReplyRateLimitHeaderOnly writes a 429 rate limit response with retry_after ONLY in HTTP header.
+// Useful for testing HTTP header fallback parsing.
+func ReplyRateLimitHeaderOnly(w http.ResponseWriter, retryAfter int) {
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+	ReplyError(w, 429, "Too Many Requests: retry after "+strconv.Itoa(retryAfter), nil)
 }
 
 // ReplyServerError writes a 5xx server error response.

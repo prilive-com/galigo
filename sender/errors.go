@@ -1,155 +1,70 @@
 package sender
 
 import (
-	"errors"
-	"fmt"
-	"strings"
-	"time"
+	"github.com/prilive-com/galigo/tg"
 )
 
-// Sentinel errors
-var (
-	// API errors
-	ErrUnauthorized    = errors.New("galigo/sender: unauthorized")
-	ErrForbidden       = errors.New("galigo/sender: forbidden")
-	ErrNotFound        = errors.New("galigo/sender: not found")
-	ErrTooManyRequests = errors.New("galigo/sender: too many requests")
-
-	// Message errors
-	ErrMessageNotFound      = errors.New("galigo/sender: message not found")
-	ErrMessageNotModified   = errors.New("galigo/sender: message not modified")
-	ErrMessageCantBeEdited  = errors.New("galigo/sender: message can't be edited")
-	ErrMessageCantBeDeleted = errors.New("galigo/sender: message can't be deleted")
-	ErrMessageTooOld        = errors.New("galigo/sender: message too old")
-
-	// Chat/User errors
-	ErrBotBlocked      = errors.New("galigo/sender: bot blocked by user")
-	ErrBotKicked       = errors.New("galigo/sender: bot kicked from chat")
-	ErrChatNotFound    = errors.New("galigo/sender: chat not found")
-	ErrUserDeactivated = errors.New("galigo/sender: user deactivated")
-	ErrNoRights        = errors.New("galigo/sender: not enough rights")
-
-	// Callback errors
-	ErrCallbackExpired     = errors.New("galigo/sender: callback query expired")
-	ErrInvalidCallbackData = errors.New("galigo/sender: invalid callback data")
-
-	// Client errors
-	ErrRateLimited      = errors.New("galigo/sender: rate limited")
-	ErrCircuitOpen      = errors.New("galigo/sender: circuit breaker open")
-	ErrMaxRetries       = errors.New("galigo/sender: max retries exceeded")
-	ErrResponseTooLarge = errors.New("galigo/sender: response too large")
-
-	// Validation errors
-	ErrInvalidToken = errors.New("galigo/sender: invalid token")
-	ErrPathTraversal = errors.New("galigo/sender: path traversal attempt")
-)
+// Type aliases for backward compatibility.
+// These types are identical to the canonical types in tg package.
 
 // APIError represents an error response from Telegram API.
-type APIError struct {
-	Code        int
-	Description string
-	RetryAfter  time.Duration
-	Method      string
-	cause       error
-}
-
-func (e *APIError) Error() string {
-	if e.RetryAfter > 0 {
-		return fmt.Sprintf("galigo/sender: %s failed: %s (code=%d, retry_after=%s)",
-			e.Method, e.Description, e.Code, e.RetryAfter)
-	}
-	return fmt.Sprintf("galigo/sender: %s failed: %s (code=%d)", e.Method, e.Description, e.Code)
-}
-
-// Unwrap returns the underlying sentinel error.
-func (e *APIError) Unwrap() error { return e.cause }
-
-// IsRetryable returns true if the error may succeed on retry.
-func (e *APIError) IsRetryable() bool {
-	return e.Code == 429 || (e.Code >= 500 && e.Code <= 504)
-}
-
-// NewAPIError creates an APIError with automatic sentinel detection.
-func NewAPIError(method string, code int, description string) *APIError {
-	return &APIError{
-		Code:        code,
-		Description: description,
-		Method:      method,
-		cause:       detectSentinel(code, description),
-	}
-}
-
-// NewAPIErrorWithRetry creates an APIError with retry information.
-func NewAPIErrorWithRetry(method string, code int, description string, retryAfter time.Duration) *APIError {
-	return &APIError{
-		Code:        code,
-		Description: description,
-		Method:      method,
-		RetryAfter:  retryAfter,
-		cause:       detectSentinel(code, description),
-	}
-}
-
-// detectSentinel maps Telegram error codes/descriptions to sentinel errors.
-// Description-based detection is prioritized over HTTP status codes for more specific errors.
-func detectSentinel(code int, desc string) error {
-	// Check description first for specific error messages
-	descLower := strings.ToLower(desc)
-	switch {
-	case strings.Contains(descLower, "message is not modified"):
-		return ErrMessageNotModified
-	case strings.Contains(descLower, "message to edit not found"),
-		strings.Contains(descLower, "message to delete not found"),
-		strings.Contains(descLower, "message not found"):
-		return ErrMessageNotFound
-	case strings.Contains(descLower, "message can't be edited"):
-		return ErrMessageCantBeEdited
-	case strings.Contains(descLower, "message can't be deleted"):
-		return ErrMessageCantBeDeleted
-	case strings.Contains(descLower, "message is too old"):
-		return ErrMessageTooOld
-	case strings.Contains(descLower, "bot was blocked"):
-		return ErrBotBlocked
-	case strings.Contains(descLower, "bot was kicked"):
-		return ErrBotKicked
-	case strings.Contains(descLower, "chat not found"):
-		return ErrChatNotFound
-	case strings.Contains(descLower, "user is deactivated"):
-		return ErrUserDeactivated
-	case strings.Contains(descLower, "not enough rights"):
-		return ErrNoRights
-	case strings.Contains(descLower, "query is too old"):
-		return ErrCallbackExpired
-	case strings.Contains(descLower, "button_data_invalid"):
-		return ErrInvalidCallbackData
-	}
-
-	// Fall back to generic HTTP status code sentinels
-	switch code {
-	case 401:
-		return ErrUnauthorized
-	case 403:
-		return ErrForbidden
-	case 404:
-		return ErrNotFound
-	case 429:
-		return ErrTooManyRequests
-	}
-
-	return nil
-}
+// Deprecated: Use tg.APIError instead. Will be removed in v2.0.
+type APIError = tg.APIError
 
 // ValidationError represents a validation error.
-type ValidationError struct {
-	Field   string
-	Message string
-}
+// Deprecated: Use tg.ValidationError instead. Will be removed in v2.0.
+type ValidationError = tg.ValidationError
 
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("galigo/sender: validation: %s - %s", e.Field, e.Message)
-}
+// ResponseParameters contains information about why a request was unsuccessful.
+// Deprecated: Use tg.ResponseParameters instead. Will be removed in v2.0.
+type ResponseParameters = tg.ResponseParameters
+
+// Sentinel error aliases for backward compatibility.
+// Deprecated: Use tg.Err* instead. Will be removed in v2.0.
+var (
+	// API errors
+	ErrUnauthorized    = tg.ErrUnauthorized
+	ErrForbidden       = tg.ErrForbidden
+	ErrNotFound        = tg.ErrNotFound
+	ErrTooManyRequests = tg.ErrTooManyRequests
+
+	// Message errors
+	ErrMessageNotFound      = tg.ErrMessageNotFound
+	ErrMessageNotModified   = tg.ErrMessageNotModified
+	ErrMessageCantBeEdited  = tg.ErrMessageCantBeEdited
+	ErrMessageCantBeDeleted = tg.ErrMessageCantBeDeleted
+	ErrMessageTooOld        = tg.ErrMessageTooOld
+
+	// Chat/User errors
+	ErrBotBlocked      = tg.ErrBotBlocked
+	ErrBotKicked       = tg.ErrBotKicked
+	ErrChatNotFound    = tg.ErrChatNotFound
+	ErrUserDeactivated = tg.ErrUserDeactivated
+	ErrNoRights        = tg.ErrNoRights
+
+	// Callback errors
+	ErrCallbackExpired     = tg.ErrCallbackExpired
+	ErrInvalidCallbackData = tg.ErrInvalidCallbackData
+
+	// Client errors
+	ErrRateLimited      = tg.ErrRateLimited
+	ErrCircuitOpen      = tg.ErrCircuitOpen
+	ErrMaxRetries       = tg.ErrMaxRetries
+	ErrResponseTooLarge = tg.ErrResponseTooLarge
+
+	// Validation errors
+	ErrInvalidToken  = tg.ErrInvalidToken
+	ErrPathTraversal = tg.ErrPathTraversal
+)
+
+// NewAPIError creates an APIError with automatic sentinel detection.
+// Deprecated: Use tg.NewAPIError instead. Will be removed in v2.0.
+var NewAPIError = tg.NewAPIError
+
+// NewAPIErrorWithRetry creates an APIError with retry information.
+// Deprecated: Use tg.NewAPIErrorWithRetry instead. Will be removed in v2.0.
+var NewAPIErrorWithRetry = tg.NewAPIErrorWithRetry
 
 // NewValidationError creates a new ValidationError.
-func NewValidationError(field, message string) *ValidationError {
-	return &ValidationError{Field: field, Message: message}
-}
+// Deprecated: Use tg.NewValidationError instead. Will be removed in v2.0.
+var NewValidationError = tg.NewValidationError

@@ -32,7 +32,7 @@ const (
 type PollingClient struct {
 	token   tg.SecretToken
 	baseURL string
-	updates chan<- tg.Update
+	updates chan tg.Update // Changed to bidirectional for DropOldest policy
 	logger  *slog.Logger
 
 	// Configuration
@@ -46,6 +46,11 @@ type PollingClient struct {
 	retryInitialDelay  time.Duration
 	retryMaxDelay      time.Duration
 	retryBackoffFactor float64
+
+	// Update delivery policy
+	deliveryPolicy  UpdateDeliveryPolicy
+	deliveryTimeout time.Duration
+	onUpdateDropped func(int, string)
 
 	// HTTP client
 	client *http.Client
@@ -116,10 +121,32 @@ func WithPollingRetryConfig(initial, max time.Duration, factor float64) PollingO
 	}
 }
 
+// WithDeliveryPolicy sets the update delivery policy.
+func WithDeliveryPolicy(policy UpdateDeliveryPolicy) PollingOption {
+	return func(c *PollingClient) {
+		c.deliveryPolicy = policy
+	}
+}
+
+// WithDeliveryTimeout sets the timeout for blocking delivery policy.
+func WithDeliveryTimeout(timeout time.Duration) PollingOption {
+	return func(c *PollingClient) {
+		c.deliveryTimeout = timeout
+	}
+}
+
+// WithUpdateDroppedCallback sets the callback for dropped updates.
+func WithUpdateDroppedCallback(fn func(updateID int, reason string)) PollingOption {
+	return func(c *PollingClient) {
+		c.onUpdateDropped = fn
+	}
+}
+
 // NewPollingClient creates a new long polling client.
+// Note: The updates channel must be bidirectional (chan tg.Update) if using DeliveryPolicyDropOldest.
 func NewPollingClient(
 	token tg.SecretToken,
-	updates chan<- tg.Update,
+	updates chan tg.Update,
 	logger *slog.Logger,
 	cfg Config,
 	opts ...PollingOption,
@@ -140,6 +167,9 @@ func NewPollingClient(
 		retryInitialDelay:  cfg.RetryInitialDelay,
 		retryMaxDelay:      cfg.RetryMaxDelay,
 		retryBackoffFactor: cfg.RetryBackoffFactor,
+		deliveryPolicy:     cfg.UpdateDeliveryPolicy,
+		deliveryTimeout:    cfg.UpdateDeliveryTimeout,
+		onUpdateDropped:    cfg.OnUpdateDropped,
 		client:             defaultPollingHTTPClient(cfg.PollingTimeout),
 		stopCh:             make(chan struct{}),
 	}
@@ -316,26 +346,146 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 
 		c.consecutiveErrors.Store(0)
 
-		// P0.1 FIX: Only advance offset AFTER successful channel delivery
-		// This prevents permanent update loss when channel is full
-		for _, update := range updates {
-			select {
-			case c.updates <- update:
-				// Only advance offset after successful delivery
-				if int64(update.UpdateID) >= c.offset.Load() {
-					c.offset.Store(int64(update.UpdateID) + 1)
-				}
-				c.logger.Debug("update sent", "update_id", update.UpdateID)
-			case <-ctx.Done():
-				// Don't advance offset - updates will be redelivered on restart
+		// Deliver updates using configured policy
+		if err := c.deliverUpdates(ctx, updates); err != nil {
+			if err == context.Canceled || errors.Is(err, context.Canceled) {
 				c.logger.Info("stopping update delivery: context cancelled")
-				return
-			case <-c.stopCh:
-				// Don't advance offset - updates will be redelivered on restart
+			} else {
 				c.logger.Info("stopping update delivery: stop signal")
-				return
+			}
+			return
+		}
+	}
+}
+
+// deliverUpdates delivers updates using the configured delivery policy.
+func (c *PollingClient) deliverUpdates(ctx context.Context, updates []tg.Update) error {
+	for _, update := range updates {
+		if err := c.deliverUpdate(ctx, update); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deliverUpdate delivers a single update using the configured policy.
+func (c *PollingClient) deliverUpdate(ctx context.Context, update tg.Update) error {
+	switch c.deliveryPolicy {
+	case DeliveryPolicyBlock:
+		return c.deliverBlocking(ctx, update)
+	case DeliveryPolicyDropNewest:
+		return c.deliverDropNewest(ctx, update)
+	case DeliveryPolicyDropOldest:
+		return c.deliverDropOldest(ctx, update)
+	default:
+		return c.deliverBlocking(ctx, update)
+	}
+}
+
+// deliverBlocking waits for channel space with optional timeout.
+func (c *PollingClient) deliverBlocking(ctx context.Context, update tg.Update) error {
+	// Create delivery context with timeout (if configured)
+	deliveryCtx := ctx
+	var cancel context.CancelFunc
+
+	if c.deliveryTimeout > 0 {
+		deliveryCtx, cancel = context.WithTimeout(ctx, c.deliveryTimeout)
+		defer cancel()
+	}
+
+	select {
+	case c.updates <- update:
+		// Only advance offset after successful delivery
+		c.advanceOffset(update.UpdateID)
+		c.logger.Debug("update sent", "update_id", update.UpdateID)
+		return nil
+
+	case <-deliveryCtx.Done():
+		if ctx.Err() != nil {
+			// Parent context cancelled - normal shutdown
+			return ctx.Err()
+		}
+
+		// Delivery timeout - drop update, advance offset, continue
+		c.logger.Warn("update delivery timeout, dropping",
+			"update_id", update.UpdateID,
+			"timeout", c.deliveryTimeout,
+		)
+
+		if c.onUpdateDropped != nil {
+			c.onUpdateDropped(update.UpdateID, "delivery_timeout")
+		}
+
+		// Advance offset to prevent infinite retry loop
+		c.advanceOffset(update.UpdateID)
+		return nil
+
+	case <-c.stopCh:
+		// Don't advance offset - updates will be redelivered on restart
+		return errors.New("stop signal received")
+	}
+}
+
+// deliverDropNewest drops the current update if channel is full.
+func (c *PollingClient) deliverDropNewest(ctx context.Context, update tg.Update) error {
+	select {
+	case c.updates <- update:
+		c.advanceOffset(update.UpdateID)
+		c.logger.Debug("update sent", "update_id", update.UpdateID)
+		return nil
+
+	default:
+		// Channel full - drop this update
+		c.logger.Warn("channel full, dropping newest update",
+			"update_id", update.UpdateID,
+		)
+
+		if c.onUpdateDropped != nil {
+			c.onUpdateDropped(update.UpdateID, "channel_full_drop_newest")
+		}
+
+		// Advance offset - intentionally dropping
+		c.advanceOffset(update.UpdateID)
+		return nil
+	}
+}
+
+// deliverDropOldest drops oldest update to make room for new one.
+func (c *PollingClient) deliverDropOldest(ctx context.Context, update tg.Update) error {
+	for {
+		select {
+		case c.updates <- update:
+			c.advanceOffset(update.UpdateID)
+			c.logger.Debug("update sent", "update_id", update.UpdateID)
+			return nil
+
+		default:
+			// Channel full - try to drain oldest
+			select {
+			case dropped := <-c.updates:
+				c.logger.Warn("channel full, dropping oldest update",
+					"dropped_id", dropped.UpdateID,
+					"new_id", update.UpdateID,
+				)
+				if c.onUpdateDropped != nil {
+					c.onUpdateDropped(dropped.UpdateID, "channel_full_drop_oldest")
+				}
+				// Loop and try to send again
+
+			case <-ctx.Done():
+				return ctx.Err()
+
+			case <-c.stopCh:
+				return errors.New("stop signal received")
 			}
 		}
+	}
+}
+
+// advanceOffset updates the offset if the update ID is >= current offset.
+func (c *PollingClient) advanceOffset(updateID int) {
+	if int64(updateID) >= c.offset.Load() {
+		c.offset.Store(int64(updateID) + 1)
 	}
 }
 

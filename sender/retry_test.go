@@ -43,6 +43,35 @@ func TestRetry_429WithRetryAfter(t *testing.T) {
 	assert.Equal(t, 5*time.Second, sleeper.LastCall(), "should sleep for retry_after duration")
 }
 
+func TestRetry_429WithRetryAfterHTTPHeaderFallback(t *testing.T) {
+	var attempts atomic.Int32
+
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		if attempts.Add(1) == 1 {
+			// First attempt: rate limited (header only, no JSON body param)
+			testutil.ReplyRateLimitHeaderOnly(w, 3)
+			return
+		}
+		// Second attempt: success
+		testutil.ReplyMessage(w, 456)
+	})
+
+	sleeper := &testutil.FakeSleeper{}
+	client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, sender.WithRetries(3))
+
+	msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Hello",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 456, msg.MessageID)
+	assert.Equal(t, int32(2), attempts.Load(), "should have made 2 attempts")
+	assert.Equal(t, 1, sleeper.CallCount(), "should have slept once")
+	assert.Equal(t, 3*time.Second, sleeper.LastCall(), "should sleep for HTTP header retry_after duration")
+}
+
 func TestRetry_429MultipleRetries(t *testing.T) {
 	var attempts atomic.Int32
 

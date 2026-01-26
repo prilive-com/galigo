@@ -7,10 +7,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 Unified Go library for Telegram Bot API combining receiving and sending functionality with built-in resilience:
 
 - **galigo** (root): Unified `Bot` type with functional options
-- **tg/**: Shared Telegram types, `Editable` interface, `SecretToken`, keyboard builders
-- **receiver/**: Dual-mode update receiving (webhook + long polling) with circuit breaker
-- **sender/**: Resilient message sending with rate limiting, retries, and circuit breaker
-- **internal/**: HTTP client, resilience utilities, validation
+- **tg/**: Shared Telegram types, `Editable` interface, `SecretToken`, keyboard builders, canonical errors
+- **receiver/**: Dual-mode update receiving (webhook + long polling) with circuit breaker and delivery policies
+- **sender/**: Resilient message sending with rate limiting, retries, circuit breaker, and file uploads
+- **internal/**: HTTP client, resilience utilities, validation, test utilities
+
+## Package Structure
+
+```
+galigo/
+├── bot.go           # Unified Bot type with options
+├── tg/              # Shared Telegram types
+│   ├── types.go     # Message, User, Chat, File, Editable interface
+│   ├── update.go    # Update, CallbackQuery
+│   ├── keyboard.go  # Fluent inline keyboard builder with generics
+│   ├── errors.go    # Canonical error types and sentinels
+│   ├── config.go    # Configuration helpers
+│   ├── parse_mode.go # ParseMode constants
+│   └── secret.go    # SecretToken (auto-redacts in logs)
+├── receiver/        # Update receiving (webhook/polling)
+│   ├── polling.go   # Long polling with circuit breaker + delivery policies
+│   ├── webhook.go   # Webhook HTTP handler
+│   ├── api.go       # Webhook management API (set/delete/get)
+│   ├── config.go    # Receiver configuration + delivery policy
+│   └── errors.go    # Receiver error types
+├── sender/          # Message sending
+│   ├── client.go    # Sender client with retry and rate limiting
+│   ├── methods.go   # API methods (GetMe, SendDocument, SendVideo, etc.)
+│   ├── requests.go  # Request types (SendMessage, SendDocument, etc.)
+│   ├── inputfile.go # InputFile for file uploads (FileID, URL, Reader)
+│   ├── multipart.go # Multipart encoder for file uploads
+│   ├── options.go   # Functional options for requests
+│   ├── config.go    # Sender configuration
+│   └── errors.go    # Error aliases (backward compatible with tg.Err*)
+└── internal/        # Internal packages
+    ├── httpclient/  # HTTP client with TLS 1.2+
+    ├── resilience/  # Circuit breaker, rate limiting, retry
+    ├── testutil/    # Test utilities and mocks
+    └── validate/    # Validation utilities
+```
 
 ## Build and Test Commands
 
@@ -27,12 +62,16 @@ go test -v ./...
 # Run with race detector
 go test -race ./...
 
+# Run with coverage (80% threshold)
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+
 # Format and vet
 go fmt ./...
 go vet ./...
 
-# Tidy dependencies
-go mod tidy
+# Full CI check
+make ci
 ```
 
 ## Architecture
@@ -46,6 +85,7 @@ User Application
        ├── receiver.PollingClient              │
        │   └── Circuit breaker                 │
        │   └── Exponential backoff             │
+       │   └── Delivery policies               │
        │                                       │
        ├── receiver.WebhookHandler             │
        │   └── Rate limiting                   │
@@ -56,6 +96,7 @@ User Application
            └── Per-chat rate limiting
            └── Global rate limiting
            └── Retry with jitter
+           └── File uploads (streaming)
                    │
                    ▼
            Telegram Bot API
@@ -85,6 +126,19 @@ func (s SecretToken) LogValue() slog.Value  // slog.LogValuer
 func (s SecretToken) String() string        // fmt.Stringer
 func (s SecretToken) GoString() string      // fmt.GoStringer
 func (s SecretToken) MarshalText() ([]byte, error)  // encoding.TextMarshaler
+
+// InputFile for file uploads (sender/inputfile.go)
+type InputFile struct {
+    FileID, URL string
+    Reader      io.Reader
+    FileName    string
+    MediaType   string  // "photo", "video", "document", etc.
+    Caption     string
+    ParseMode   string
+}
+func FromReader(r io.Reader, filename string) InputFile
+func FromFileID(fileID string) InputFile
+func FromURL(url string) InputFile
 ```
 
 ### Concurrency Patterns
@@ -95,6 +149,58 @@ func (s SecretToken) MarshalText() ([]byte, error)  // encoding.TextMarshaler
 - Buffered channels for update processing
 - Context cancellation for graceful shutdown
 
+## Error Handling
+
+Errors are defined canonically in `tg` package with backward-compatible aliases in `sender`:
+
+```go
+// Canonical errors (tg/errors.go)
+var ErrBotBlocked = errors.New("galigo: bot blocked by user")
+var ErrTooManyRequests = errors.New("galigo: too many requests")
+var ErrCircuitOpen = errors.New("galigo: circuit breaker open")
+
+// APIError with sentinel unwrapping
+type APIError struct {
+    Code        int
+    Description string
+    RetryAfter  time.Duration
+    Method      string
+    cause       error  // sentinel error
+}
+
+func (e *APIError) Unwrap() error { return e.cause }
+func (e *APIError) IsRetryable() bool  // Check if error can be retried
+
+// DetectSentinel maps API errors to sentinels
+// Priority: description matching first (more specific), then HTTP code (more generic)
+func DetectSentinel(code int, description string) error
+
+// Usage - both tg.Err* and sender.Err* work (aliases)
+if errors.Is(err, tg.ErrBotBlocked) {
+    // Handle blocked bot
+}
+if errors.Is(err, sender.ErrTooManyRequests) {
+    // Rate limited - will be retried automatically
+}
+```
+
+### Available Sentinel Errors
+
+| Error | Description |
+|-------|-------------|
+| `ErrUnauthorized` | Invalid bot token |
+| `ErrForbidden` | Bot lacks permissions |
+| `ErrNotFound` | Resource not found |
+| `ErrTooManyRequests` | Rate limited (429) |
+| `ErrBotBlocked` | Bot blocked by user |
+| `ErrBotKicked` | Bot kicked from chat |
+| `ErrChatNotFound` | Chat doesn't exist |
+| `ErrMessageNotFound` | Message to edit/delete not found |
+| `ErrMessageNotModified` | Message content unchanged |
+| `ErrCircuitOpen` | Circuit breaker is open |
+| `ErrMaxRetries` | Max retries exceeded |
+| `ErrRateLimited` | Local rate limit exceeded |
+
 ## Adding New Features
 
 ### Adding a New Bot Method
@@ -103,24 +209,26 @@ func (s SecretToken) MarshalText() ([]byte, error)  // encoding.TextMarshaler
 ```go
 type SendDocumentRequest struct {
     ChatID   tg.ChatID `json:"chat_id"`
-    Document string    `json:"document"`
+    Document InputFile `json:"document"`
     Caption  string    `json:"caption,omitempty"`
     // ...
 }
 ```
 
-2. Add method to sender client in `sender/client.go`:
+2. Add method to sender client in `sender/methods.go`:
 ```go
 func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg.Message, error) {
-    return withRetry(c, ctx, req.ChatID, func() (*tg.Message, error) {
-        return c.sendDocumentOnce(ctx, req)
-    })
+    resp, err := c.executeRequest(ctx, "sendDocument", req)
+    if err != nil {
+        return nil, err
+    }
+    return parseMessage(resp)
 }
 ```
 
 3. Add convenience method to Bot in `bot.go`:
 ```go
-func (b *Bot) SendDocument(ctx context.Context, chatID tg.ChatID, doc string, opts ...DocumentOption) (*tg.Message, error) {
+func (b *Bot) SendDocument(ctx context.Context, chatID tg.ChatID, doc InputFile, opts ...DocumentOption) (*tg.Message, error) {
     req := sender.SendDocumentRequest{ChatID: chatID, Document: doc}
     for _, opt := range opts {
         opt(&req)
@@ -145,38 +253,20 @@ type Document struct {
 
 ### Adding New Sentinel Errors
 
-1. Add sentinel in `sender/errors.go`:
+1. Add sentinel in `tg/errors.go` (canonical location):
 ```go
-var ErrDocumentTooLarge = errors.New("galigo/sender: document too large")
+var ErrDocumentTooLarge = errors.New("galigo: document too large")
 ```
 
-2. Add detection in `detectSentinel()`:
+2. Add detection in `DetectSentinel()`:
 ```go
 case strings.Contains(descLower, "file is too big"):
     return ErrDocumentTooLarge
 ```
 
-## Error Handling
-
+3. Add alias in `sender/errors.go` (backward compatibility):
 ```go
-// Sentinel errors support errors.Is
-var ErrBotBlocked = errors.New("galigo/sender: bot blocked by user")
-
-// APIError wraps sentinels via Unwrap()
-type APIError struct {
-    Code        int
-    Description string
-    RetryAfter  time.Duration
-    Method      string
-    cause       error  // sentinel error
-}
-
-func (e *APIError) Unwrap() error { return e.cause }
-
-// Usage
-if errors.Is(err, sender.ErrBotBlocked) {
-    // Handle blocked bot
-}
+var ErrDocumentTooLarge = tg.ErrDocumentTooLarge
 ```
 
 ## Resilience Configuration
@@ -204,7 +294,7 @@ gobreaker.Settings{
 // Global limiter
 globalLimiter := rate.NewLimiter(rate.Limit(30.0), 5)
 
-// Per-chat limiter (created on demand)
+// Per-chat limiter (created on demand, cleaned up after 10 minutes idle)
 chatLimiter := rate.NewLimiter(rate.Limit(1.0), 3)
 ```
 
@@ -214,7 +304,99 @@ chatLimiter := rate.NewLimiter(rate.Limit(1.0), 3)
 // Exponential backoff with cryptographic jitter
 backoff := baseWait * math.Pow(factor, attempt-1)
 jitter := crypto/rand.Int(backoff * 0.2)  // +/- 20%
+
+// retry_after parsing priority:
+// 1. JSON response body parameters.retry_after (primary)
+// 2. HTTP Retry-After header (fallback)
 ```
+
+### Update Delivery Policy (receiver/config.go)
+
+```go
+type UpdateDeliveryPolicy int
+
+const (
+    DeliveryPolicyBlock      UpdateDeliveryPolicy = iota  // Block with timeout (default)
+    DeliveryPolicyDropNewest                               // Drop new updates when full
+    DeliveryPolicyDropOldest                               // Drop oldest updates when full
+)
+
+cfg := receiver.DefaultConfig()
+cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyBlock
+cfg.UpdateDeliveryTimeout = 5 * time.Second
+cfg.OnUpdateDropped = func(updateID int, reason string) {
+    metrics.IncrCounter("updates_dropped", 1, "reason", reason)
+}
+```
+
+## File Uploads
+
+```go
+import "github.com/prilive-com/galigo/sender"
+
+// From file ID (already on Telegram servers)
+doc := sender.FromFileID("AgACAgIAAxkBAAI...")
+
+// From URL (Telegram will download)
+doc := sender.FromURL("https://example.com/file.pdf")
+
+// From io.Reader (streamed, no memory buffering)
+file, _ := os.Open("document.pdf")
+defer file.Close()
+doc := sender.FromReader(file, "document.pdf")
+
+// Send document
+client.SendDocument(ctx, sender.SendDocumentRequest{
+    ChatID:   chatID,
+    Document: doc,
+    Caption:  "Here's your document",
+})
+```
+
+## Supported API Methods
+
+### Bot Identity
+- `GetMe` - Get bot information
+- `LogOut` - Log out from cloud Bot API
+- `CloseBot` - Close bot instance
+
+### Messages
+- `SendMessage` - Send text messages
+- `SendPhoto` - Send photos
+- `SendDocument` - Send documents
+- `SendVideo` - Send videos
+- `SendAudio` - Send audio files
+- `SendVoice` - Send voice messages
+- `SendAnimation` - Send GIFs/animations
+- `SendVideoNote` - Send video notes
+- `SendSticker` - Send stickers
+- `SendMediaGroup` - Send albums
+
+### Utilities
+- `GetFile` - Get file info for download
+- `SendChatAction` - Send typing indicator, etc.
+- `GetUserProfilePhotos` - Get user's profile photos
+
+### Location & Contact
+- `SendLocation` - Send location
+- `SendVenue` - Send venue
+- `SendContact` - Send phone contact
+- `SendPoll` - Send native polls
+- `SendDice` - Send animated dice
+
+### Message Operations
+- `EditMessageText` - Edit message text
+- `EditMessageCaption` - Edit caption
+- `EditMessageReplyMarkup` - Edit reply markup
+- `DeleteMessage` - Delete a message
+- `ForwardMessage` - Forward a message
+- `CopyMessage` - Copy a message
+
+### Bulk Operations
+- `ForwardMessages` - Forward multiple messages
+- `CopyMessages` - Copy multiple messages
+- `DeleteMessages` - Delete multiple messages
+- `SetMessageReaction` - Set message reaction
 
 ## Module Structure
 
@@ -230,6 +412,7 @@ import "github.com/prilive-com/galigo/receiver"
 // Internal (not importable)
 // github.com/prilive-com/galigo/internal/httpclient
 // github.com/prilive-com/galigo/internal/resilience
+// github.com/prilive-com/galigo/internal/testutil
 // github.com/prilive-com/galigo/internal/validate
 ```
 
@@ -237,8 +420,9 @@ import "github.com/prilive-com/galigo/receiver"
 
 ```go
 require (
-    github.com/sony/gobreaker/v2 v2.0.0  // Circuit breaker
-    golang.org/x/time v0.5.0              // Rate limiting
+    github.com/sony/gobreaker/v2 v2.4.0   // Circuit breaker
+    golang.org/x/time v0.14.0              // Rate limiting
+    github.com/stretchr/testify v1.8.4     // Testing
 )
 ```
 

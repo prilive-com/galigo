@@ -280,3 +280,53 @@ func (m InlineMessage) MessageSig() (string, int64) {
 }
 
 var _ Editable = InlineMessage{}
+
+// File represents a file ready to be downloaded.
+type File struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	FileSize     int64  `json:"file_size,omitempty"`
+	FilePath     string `json:"file_path,omitempty"`
+}
+
+// UserProfilePhotos represents a user's profile pictures.
+type UserProfilePhotos struct {
+	TotalCount int           `json:"total_count"`
+	Photos     [][]PhotoSize `json:"photos"`
+}
+
+// Sticker represents a sticker.
+type Sticker struct {
+	FileID           string     `json:"file_id"`
+	FileUniqueID     string     `json:"file_unique_id"`
+	Type             string     `json:"type"`
+	Width            int        `json:"width"`
+	Height           int        `json:"height"`
+	IsAnimated       bool       `json:"is_animated"`
+	IsVideo          bool       `json:"is_video"`
+	Thumbnail        *PhotoSize `json:"thumbnail,omitempty"`
+	Emoji            string     `json:"emoji,omitempty"`
+	SetName          string     `json:"set_name,omitempty"`
+	PremiumAnimation *File      `json:"premium_animation,omitempty"`
+	CustomEmojiID    string     `json:"custom_emoji_id,omitempty"`
+	FileSize         int64      `json:"file_size,omitempty"`
+}
+
+// Animation represents an animation file (GIF or H.264/MPEG-4 AVC video without sound).
+type Animation struct {
+	FileID       string     `json:"file_id"`
+	FileUniqueID string     `json:"file_unique_id"`
+	Width        int        `json:"width"`
+	Height       int        `json:"height"`
+	Duration     int        `json:"duration"`
+	Thumbnail    *PhotoSize `json:"thumbnail,omitempty"`
+	FileName     string     `json:"file_name,omitempty"`
+	MimeType     string     `json:"mime_type,omitempty"`
+	FileSize     int64      `json:"file_size,omitempty"`
+}
+
+// Dice represents an animated emoji that displays a random value.
+type Dice struct {
+	Emoji string `json:"emoji"`
+	Value int    `json:"value"`
+}

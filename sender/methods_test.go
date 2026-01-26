@@ -586,7 +586,7 @@ func TestCopyOption_WithKeyboard(t *testing.T) {
 func TestValidationError(t *testing.T) {
 	err := sender.NewValidationError("chat_id", "must be non-zero")
 
-	assert.Equal(t, "galigo/sender: validation: chat_id - must be non-zero", err.Error())
+	assert.Equal(t, "galigo: validation: chat_id - must be non-zero", err.Error())
 	assert.Equal(t, "chat_id", err.Field)
 	assert.Equal(t, "must be non-zero", err.Message)
 }

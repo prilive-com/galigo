@@ -622,11 +622,8 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	}
 
 	if !apiResp.OK {
-		// P0.3 FIX: Parse retry_after from JSON response body, not HTTP headers
-		var retryAfter time.Duration
-		if apiResp.Parameters != nil && apiResp.Parameters.RetryAfter > 0 {
-			retryAfter = time.Duration(apiResp.Parameters.RetryAfter) * time.Second
-		}
+		// Parse retry_after: JSON body (primary) + HTTP header (fallback)
+		retryAfter := parseRetryAfter(&apiResp, resp)
 		if retryAfter > 0 {
 			return nil, NewAPIErrorWithRetry(method, apiResp.ErrorCode, apiResp.Description, retryAfter)
 		}
@@ -773,4 +770,23 @@ func parseMessage(resp *apiResponse) (*tg.Message, error) {
 		return nil, fmt.Errorf("failed to parse message: %w", err)
 	}
 	return &msg, nil
+}
+
+// parseRetryAfter extracts retry_after from JSON body (primary) or HTTP header (fallback).
+func parseRetryAfter(apiResp *apiResponse, httpResp *http.Response) time.Duration {
+	// Primary source: JSON response body
+	if apiResp.Parameters != nil && apiResp.Parameters.RetryAfter > 0 {
+		return time.Duration(apiResp.Parameters.RetryAfter) * time.Second
+	}
+
+	// Fallback: HTTP Retry-After header
+	if httpResp != nil {
+		if retryHeader := httpResp.Header.Get("Retry-After"); retryHeader != "" {
+			if seconds, err := strconv.Atoi(retryHeader); err == nil && seconds > 0 {
+				return time.Duration(seconds) * time.Second
+			}
+		}
+	}
+
+	return 0
 }

@@ -34,9 +34,10 @@ var (
 	ErrInvalidCallbackData = errors.New("galigo: invalid callback data")
 
 	// Client errors
-	ErrRateLimited = errors.New("galigo: rate limit exceeded")
-	ErrCircuitOpen = errors.New("galigo: circuit breaker open")
-	ErrMaxRetries  = errors.New("galigo: max retries exceeded")
+	ErrRateLimited      = errors.New("galigo: rate limit exceeded")
+	ErrCircuitOpen      = errors.New("galigo: circuit breaker open")
+	ErrMaxRetries       = errors.New("galigo: max retries exceeded")
+	ErrResponseTooLarge = errors.New("galigo: response too large")
 
 	// Validation errors
 	ErrInvalidToken  = errors.New("galigo: invalid bot token format")
@@ -44,14 +45,21 @@ var (
 	ErrInvalidConfig = errors.New("galigo: invalid configuration")
 )
 
+// ResponseParameters contains information about why a request was unsuccessful.
+type ResponseParameters struct {
+	MigrateToChatID int64 `json:"migrate_to_chat_id,omitempty"`
+	RetryAfter      int   `json:"retry_after,omitempty"`
+}
+
 // APIError represents an error response from Telegram API.
 // Use errors.As() to extract details, errors.Is() to match sentinels.
 type APIError struct {
 	Code        int
 	Description string
 	RetryAfter  time.Duration
-	Method      string // API method that failed
-	cause       error  // Underlying sentinel for errors.Is()
+	Method      string              // API method that failed
+	Parameters  *ResponseParameters // Additional response parameters
+	cause       error               // Underlying sentinel for errors.Is()
 }
 
 func (e *APIError) Error() string {
@@ -76,7 +84,7 @@ func NewAPIError(method string, code int, description string) *APIError {
 		Code:        code,
 		Description: description,
 		Method:      method,
-		cause:       detectSentinel(code, description),
+		cause:       DetectSentinel(code, description),
 	}
 }
 
@@ -87,25 +95,14 @@ func NewAPIErrorWithRetry(method string, code int, description string, retryAfte
 		Description: description,
 		Method:      method,
 		RetryAfter:  retryAfter,
-		cause:       detectSentinel(code, description),
+		cause:       DetectSentinel(code, description),
 	}
 }
 
-// detectSentinel maps Telegram error codes/descriptions to sentinel errors.
-func detectSentinel(code int, desc string) error {
-	// Check by code first
-	switch code {
-	case 401:
-		return ErrUnauthorized
-	case 403:
-		return ErrForbidden
-	case 404:
-		return ErrNotFound
-	case 429:
-		return ErrTooManyRequests
-	}
-
-	// Check by description
+// DetectSentinel maps Telegram error codes/descriptions to sentinel errors.
+// Description-based detection is prioritized over HTTP status codes for more specific errors.
+func DetectSentinel(code int, desc string) error {
+	// Check description first for specific error messages
 	descLower := strings.ToLower(desc)
 	switch {
 	case strings.Contains(descLower, "message is not modified"):
@@ -135,6 +132,19 @@ func detectSentinel(code int, desc string) error {
 	case strings.Contains(descLower, "button_data_invalid"):
 		return ErrInvalidCallbackData
 	}
+
+	// Fall back to generic HTTP status code sentinels
+	switch code {
+	case 401:
+		return ErrUnauthorized
+	case 403:
+		return ErrForbidden
+	case 404:
+		return ErrNotFound
+	case 429:
+		return ErrTooManyRequests
+	}
+
 	return nil
 }
 

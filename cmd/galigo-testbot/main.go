@@ -81,7 +81,8 @@ func main() {
 }
 
 func showCoverageStatus(logger *slog.Logger) {
-	scenarios := suites.AllPhaseAScenarios()
+	// Combine all scenarios from all phases
+	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -91,8 +92,8 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (Phase A)")
-	fmt.Println("================================")
+	fmt.Println("Method Coverage Status (All Phases)")
+	fmt.Println("===================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
 		fmt.Printf("  + %s\n", m)
@@ -121,11 +122,24 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
 	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
-	case "core", "all":
+	case "core":
 		scenarios = suites.AllPhaseAScenarios()
+	// Phase B: Media
+	case "media":
+		scenarios = suites.AllPhaseBScenarios()
+	case "media-uploads":
+		scenarios = []engine.Scenario{suites.S6_MediaUploads()}
+	case "media-groups":
+		scenarios = []engine.Scenario{suites.S7_MediaGroups()}
+	case "edit-media":
+		scenarios = []engine.Scenario{suites.S8_EditMedia()}
+	case "get-file":
+		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	case "all":
+		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, all")
 		os.Exit(1)
 	}
 
@@ -259,7 +273,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, all")
 		return
 	}
 
@@ -279,8 +293,21 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
 	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
-	case "core", "all":
+	case "core":
 		scenarios = suites.AllPhaseAScenarios()
+	// Phase B: Media
+	case "media":
+		scenarios = suites.AllPhaseBScenarios()
+	case "media-uploads":
+		scenarios = []engine.Scenario{suites.S6_MediaUploads()}
+	case "media-groups":
+		scenarios = []engine.Scenario{suites.S7_MediaGroups()}
+	case "edit-media":
+		scenarios = []engine.Scenario{suites.S8_EditMedia()}
+	case "get-file":
+		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	case "all":
+		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
 		return
@@ -312,7 +339,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 }
 
 func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int64) {
-	scenarios := suites.AllPhaseAScenarios()
+	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -322,7 +349,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	report := registry.CheckCoverage(coverers)
 
 	var sb strings.Builder
-	sb.WriteString("Method Coverage (Phase A)\n\n")
+	sb.WriteString("Method Coverage (All Phases)\n\n")
 	sb.WriteString(fmt.Sprintf("Covered: %d\n", len(report.Covered)))
 	sb.WriteString(fmt.Sprintf("Missing: %d\n\n", len(report.Missing)))
 
@@ -340,13 +367,23 @@ func handleHelp(ctx context.Context, adapter *engine.SenderAdapter, chatID int64
 	help := `galigo-testbot Commands:
 
 /run <suite> - Run test suite
+
+Phase A (Core):
   smoke    - Quick sanity check
   identity - Bot identity (getMe)
   messages - Send, edit, delete
   forward  - Forward and copy
   actions  - Chat actions (typing)
-  core     - All core tests
-  all      - Everything
+  core     - All Phase A tests
+
+Phase B (Media):
+  media         - All media tests
+  media-uploads - Photo, document, animation
+  media-groups  - Albums
+  edit-media    - Edit captions
+  get-file      - File download info
+
+  all      - All tests
 
 /status - Show method coverage
 

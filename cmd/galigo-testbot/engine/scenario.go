@@ -106,6 +106,28 @@ type SenderClient interface {
 	ForwardMessage(ctx context.Context, chatID, fromChatID int64, messageID int) (*tg.Message, error)
 	CopyMessage(ctx context.Context, chatID, fromChatID int64, messageID int) (*tg.MessageID, error)
 	SendChatAction(ctx context.Context, chatID int64, action string) error
+
+	// Media methods (Phase B)
+	SendPhoto(ctx context.Context, chatID int64, photo MediaInput, caption string) (*tg.Message, error)
+	SendDocument(ctx context.Context, chatID int64, document MediaInput, caption string) (*tg.Message, error)
+	SendAnimation(ctx context.Context, chatID int64, animation MediaInput, caption string) (*tg.Message, error)
+	SendVideo(ctx context.Context, chatID int64, video MediaInput, caption string) (*tg.Message, error)
+	SendAudio(ctx context.Context, chatID int64, audio MediaInput, caption string) (*tg.Message, error)
+	SendVoice(ctx context.Context, chatID int64, voice MediaInput, caption string) (*tg.Message, error)
+	SendSticker(ctx context.Context, chatID int64, sticker MediaInput) (*tg.Message, error)
+	SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error)
+	GetFile(ctx context.Context, fileID string) (*tg.File, error)
+	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)
+}
+
+// MediaInput represents a file input for media uploads.
+// Use one of: FromReader, FromFileID, FromURL.
+type MediaInput struct {
+	Reader   func() []byte // Factory to get fresh bytes (can be called multiple times)
+	FileName string
+	FileID   string
+	URL      string
+	Type     string // "photo", "video", "document", etc.
 }
 
 // SendOption configures message sending.
@@ -129,4 +151,27 @@ func WithParseMode(mode string) SendOption {
 	return func(o *SendOptions) {
 		o.ParseMode = mode
 	}
+}
+
+// MediaFromBytes creates a MediaInput from bytes.
+func MediaFromBytes(data []byte, filename, mediaType string) MediaInput {
+	return MediaInput{
+		Reader: func() []byte {
+			cp := make([]byte, len(data))
+			copy(cp, data)
+			return cp
+		},
+		FileName: filename,
+		Type:     mediaType,
+	}
+}
+
+// MediaFromFileID creates a MediaInput from a file ID.
+func MediaFromFileID(fileID string) MediaInput {
+	return MediaInput{FileID: fileID}
+}
+
+// MediaFromURL creates a MediaInput from a URL.
+func MediaFromURL(url string) MediaInput {
+	return MediaInput{URL: url}
 }

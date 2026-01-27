@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/prilive-com/galigo/sender"
@@ -80,6 +81,116 @@ func (a *SenderAdapter) CopyMessage(ctx context.Context, chatID, fromChatID int6
 // SendChatAction sends a chat action.
 func (a *SenderAdapter) SendChatAction(ctx context.Context, chatID int64, action string) error {
 	return a.client.SendChatAction(ctx, chatID, action)
+}
+
+// mediaInputToInputFile converts MediaInput to sender.InputFile.
+func mediaInputToInputFile(m MediaInput) sender.InputFile {
+	if m.FileID != "" {
+		return sender.FromFileID(m.FileID)
+	}
+	if m.URL != "" {
+		return sender.FromURL(m.URL)
+	}
+	if m.Reader != nil {
+		return sender.FromReader(bytes.NewReader(m.Reader()), m.FileName)
+	}
+	return sender.InputFile{}
+}
+
+// SendPhoto sends a photo.
+// Note: SendPhotoRequest.Photo is a string (URL or file_id), not InputFile.
+func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo MediaInput, caption string) (*tg.Message, error) {
+	// Get the string value (URL or file_id)
+	photoValue := photo.URL
+	if photoValue == "" {
+		photoValue = photo.FileID
+	}
+	return a.client.SendPhoto(ctx, sender.SendPhotoRequest{
+		ChatID:  chatID,
+		Photo:   photoValue,
+		Caption: caption,
+	})
+}
+
+// SendDocument sends a document.
+func (a *SenderAdapter) SendDocument(ctx context.Context, chatID int64, document MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendDocument(ctx, sender.SendDocumentRequest{
+		ChatID:   chatID,
+		Document: mediaInputToInputFile(document),
+		Caption:  caption,
+	})
+}
+
+// SendAnimation sends an animation (GIF).
+func (a *SenderAdapter) SendAnimation(ctx context.Context, chatID int64, animation MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendAnimation(ctx, sender.SendAnimationRequest{
+		ChatID:    chatID,
+		Animation: mediaInputToInputFile(animation),
+		Caption:   caption,
+	})
+}
+
+// SendVideo sends a video.
+func (a *SenderAdapter) SendVideo(ctx context.Context, chatID int64, video MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendVideo(ctx, sender.SendVideoRequest{
+		ChatID:  chatID,
+		Video:   mediaInputToInputFile(video),
+		Caption: caption,
+	})
+}
+
+// SendAudio sends an audio file.
+func (a *SenderAdapter) SendAudio(ctx context.Context, chatID int64, audio MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendAudio(ctx, sender.SendAudioRequest{
+		ChatID:  chatID,
+		Audio:   mediaInputToInputFile(audio),
+		Caption: caption,
+	})
+}
+
+// SendVoice sends a voice message.
+func (a *SenderAdapter) SendVoice(ctx context.Context, chatID int64, voice MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendVoice(ctx, sender.SendVoiceRequest{
+		ChatID:  chatID,
+		Voice:   mediaInputToInputFile(voice),
+		Caption: caption,
+	})
+}
+
+// SendSticker sends a sticker.
+func (a *SenderAdapter) SendSticker(ctx context.Context, chatID int64, sticker MediaInput) (*tg.Message, error) {
+	return a.client.SendSticker(ctx, sender.SendStickerRequest{
+		ChatID:  chatID,
+		Sticker: mediaInputToInputFile(sticker),
+	})
+}
+
+// SendMediaGroup sends a media group (album).
+func (a *SenderAdapter) SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error) {
+	inputFiles := make([]sender.InputFile, len(media))
+	for i, m := range media {
+		f := mediaInputToInputFile(m)
+		f.MediaType = m.Type
+		inputFiles[i] = f
+	}
+	return a.client.SendMediaGroup(ctx, sender.SendMediaGroupRequest{
+		ChatID: chatID,
+		Media:  inputFiles,
+	})
+}
+
+// GetFile gets file info for download.
+func (a *SenderAdapter) GetFile(ctx context.Context, fileID string) (*tg.File, error) {
+	return a.client.GetFile(ctx, fileID)
+}
+
+// EditMessageCaption edits a message's caption.
+func (a *SenderAdapter) EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error) {
+	return a.client.EditMessageCaption(ctx, sender.EditMessageCaptionRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Caption:   caption,
+	})
 }
 
 // Ensure SenderAdapter implements SenderClient.

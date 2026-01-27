@@ -53,8 +53,9 @@ galigo/
 │       ├── main.go     # CLI entry point (--run, --status flags)
 │       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter
 │       ├── suites/     # Test scenario definitions
-│       │   ├── tier1.go  # Phase A: core scenarios (S0-S5)
-│       │   └── media.go  # Phase B: media scenarios (S6-S9)
+│       │   ├── tier1.go     # Phase A: core scenarios (S0-S5)
+│       │   ├── media.go     # Phase B: media scenarios (S6-S9)
+│       │   └── keyboards.go # Phase C: keyboard scenarios (S10+)
 │       ├── fixtures/   # Embedded test media files (go:embed)
 │       │   ├── photo.jpg      # 100x100 JPEG
 │       │   ├── animation.gif  # 100x100 2-frame GIF
@@ -317,6 +318,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 |-------|-----------|-----------------|
 | A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
 | B (Media) | S6-S9: Media Uploads, Media Groups, Edit Media, Get File | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile |
+| C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
 
 ### Running Tests
 
@@ -331,6 +333,7 @@ go run ./cmd/galigo-testbot --run all
 # Run specific phase or scenario
 go run ./cmd/galigo-testbot --run core
 go run ./cmd/galigo-testbot --run media
+go run ./cmd/galigo-testbot --run keyboards
 go run ./cmd/galigo-testbot --run media-uploads
 
 # Check coverage
@@ -339,7 +342,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `keyboards`, `inline-keyboard`, `all`
 
 ### Test Fixtures
 

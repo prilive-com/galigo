@@ -621,23 +621,25 @@ TESTBOT_LOG_LEVEL=info            # info or debug
 ### Running Acceptance Tests
 
 ```bash
-# Run all scenarios (Phase A + B)
+# Run all scenarios (Phase A + B + C)
 go run ./cmd/galigo-testbot --run all
 
 # Run by phase
-go run ./cmd/galigo-testbot --run core     # Phase A: core messaging
-go run ./cmd/galigo-testbot --run media    # Phase B: media uploads
+go run ./cmd/galigo-testbot --run core       # Phase A: core messaging
+go run ./cmd/galigo-testbot --run media      # Phase B: media uploads
+go run ./cmd/galigo-testbot --run keyboards  # Phase C: keyboards
 
 # Run individual scenarios
-go run ./cmd/galigo-testbot --run smoke          # S0: Quick sanity check
-go run ./cmd/galigo-testbot --run identity       # S1: Bot identity
-go run ./cmd/galigo-testbot --run messages       # S2: Send, edit, delete
-go run ./cmd/galigo-testbot --run forward        # S4: Forward and copy
-go run ./cmd/galigo-testbot --run actions        # S5: Chat actions
-go run ./cmd/galigo-testbot --run media-uploads  # S6: Photo, document, animation, audio, voice
-go run ./cmd/galigo-testbot --run media-groups   # S7: Albums
-go run ./cmd/galigo-testbot --run edit-media     # S8: Edit captions
-go run ./cmd/galigo-testbot --run get-file       # S9: File download info
+go run ./cmd/galigo-testbot --run smoke            # S0: Quick sanity check
+go run ./cmd/galigo-testbot --run identity         # S1: Bot identity
+go run ./cmd/galigo-testbot --run messages         # S2: Send, edit, delete
+go run ./cmd/galigo-testbot --run forward          # S4: Forward and copy
+go run ./cmd/galigo-testbot --run actions          # S5: Chat actions
+go run ./cmd/galigo-testbot --run media-uploads    # S6: Photo, document, animation, audio, voice
+go run ./cmd/galigo-testbot --run media-groups     # S7: Albums
+go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
+go run ./cmd/galigo-testbot --run get-file         # S9: File download info
+go run ./cmd/galigo-testbot --run inline-keyboard  # S10: Inline keyboard + edit markup
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -674,13 +676,19 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 | S8-EditMedia | sendPhoto, editMessageCaption | Caption editing |
 | S9-GetFile | sendDocument, getFile | File metadata retrieval |
 
+#### Phase C: Keyboards (S10+)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S10-InlineKeyboard | sendMessage (with markup), editMessageReplyMarkup | Send, edit, and remove inline keyboard |
+
 ### Method Coverage
 
-Current coverage: **15/25 methods** (60%)
+Current coverage: **16/25 methods** (64%)
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile, editMessageReplyMarkup
 
-**Not yet covered:** answerCallbackQuery, sendSticker, sendVideo, sendVideoNote, editMessageMedia, editMessageReplyMarkup, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+**Not yet covered:** answerCallbackQuery, sendSticker, sendVideo, sendVideoNote, editMessageMedia, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
 
 ### Test Fixtures
 
@@ -734,8 +742,9 @@ cmd/galigo-testbot/
 │   ├── runner.go   # Scenario executor with timing and error handling
 │   └── adapter.go  # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
-│   ├── tier1.go    # Phase A scenarios (S0-S5)
-│   └── media.go    # Phase B scenarios (S6-S9)
+│   ├── tier1.go      # Phase A scenarios (S0-S5)
+│   ├── media.go      # Phase B scenarios (S6-S9)
+│   └── keyboards.go  # Phase C scenarios (S10+)
 ├── fixtures/
 │   ├── fixtures.go # go:embed declarations and accessor functions
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg

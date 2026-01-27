@@ -105,7 +105,7 @@ galigo/
 │   └── galigo-testbot/ # Acceptance test bot (see docs/testing.md)
 │       ├── main.go     # CLI entry point
 │       ├── engine/     # Scenario runner, steps, adapter
-│       ├── suites/     # Test scenario definitions (Phase A, B)
+│       ├── suites/     # Test scenario definitions (Phase A, B, C)
 │       ├── fixtures/   # Embedded test media files (JPEG, GIF, PNG, MP3, OGG)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation

@@ -85,6 +85,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
+	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -94,8 +95,8 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (All Phases: A, B, C + Interactive)")
-	fmt.Println("==========================================================")
+	fmt.Println("Method Coverage Status (All Phases + Interactive + Webhook)")
+	fmt.Println("============================================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
 		fmt.Printf("  + %s\n", m)
@@ -107,7 +108,7 @@ func showCoverageStatus(logger *slog.Logger) {
 }
 
 func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
-	adapter := engine.NewSenderAdapter(senderClient)
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
 	rt := engine.NewRuntime(adapter, cfg.ChatID)
 	runner := engine.NewRunner(rt, cfg.SendInterval, cfg.MaxMessagesPerRun, logger)
 
@@ -151,12 +152,19 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	case "callback":
 		runInteractiveSuite(cfg, senderClient, logger)
 		return
+	// Webhook management (opt-in, excluded from "all")
+	case "webhook":
+		scenarios = suites.AllWebhookScenarios()
+	case "webhook-lifecycle":
+		scenarios = []engine.Scenario{suites.S13_WebhookLifecycle()}
+	case "get-updates":
+		scenarios = []engine.Scenario{suites.S14_GetUpdates()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, callback, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
 		os.Exit(1)
 	}
 
@@ -219,7 +227,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 	defer pollingClient.Stop()
 
 	// Create runtime with callback channel
-	adapter := engine.NewSenderAdapter(senderClient)
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
 	callbackChan := make(chan *tg.CallbackQuery, 10)
 	rt := engine.NewRuntime(adapter, cfg.ChatID)
 	rt.CallbackChan = callbackChan
@@ -309,7 +317,7 @@ func runInteractive(cfg *config.Config, senderClient *sender.Client, logger *slo
 		os.Exit(1)
 	}
 
-	adapter := engine.NewSenderAdapter(senderClient)
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
 	cleaner := cleanup.NewCleaner(adapter, logger)
 
 	logger.Info("listening for commands",
@@ -372,7 +380,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string, updates <-chan tg.Update) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, webhook, get-updates, all")
 		return
 	}
 
@@ -428,6 +436,13 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 				}
 			}
 		}()
+	// Webhook management (opt-in)
+	case "webhook":
+		scenarios = suites.AllWebhookScenarios()
+	case "webhook-lifecycle":
+		scenarios = []engine.Scenario{suites.S13_WebhookLifecycle()}
+	case "get-updates":
+		scenarios = []engine.Scenario{suites.S14_GetUpdates()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -465,6 +480,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
+	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -516,7 +532,12 @@ Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)
   callback    - Alias for interactive
 
-  all      - All non-interactive tests
+Webhook (opt-in, excluded from "all"):
+  webhook           - All webhook tests (S13+S14)
+  webhook-lifecycle - Set, verify, delete webhook
+  get-updates       - Non-blocking getUpdates call
+
+  all      - All non-interactive, non-webhook tests
 
 /status - Show method coverage
 

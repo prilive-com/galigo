@@ -128,6 +128,21 @@ type SenderClient interface {
 
 	// Callback query methods (interactive scenarios)
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
+
+	// Webhook management methods
+	SetWebhook(ctx context.Context, url string) error
+	DeleteWebhook(ctx context.Context) error
+	GetWebhookInfo(ctx context.Context) (*WebhookInfo, error)
+
+	// Polling
+	GetUpdates(ctx context.Context, offset int64, limit int, timeout int) ([]tg.Update, error)
+}
+
+// WebhookInfo contains information about the current webhook configuration.
+type WebhookInfo struct {
+	URL                string
+	PendingUpdateCount int
+	HasCustomCert      bool
 }
 
 // MediaInput represents a file input for media uploads.

@@ -56,7 +56,8 @@ galigo/
 │       │   ├── tier1.go     # Phase A: core scenarios (S0-S5)
 │       │   ├── media.go     # Phase B: media scenarios (S6-S9)
 │       │   ├── keyboards.go   # Phase C: keyboard scenarios (S10+)
-│       │   └── interactive.go # Interactive scenarios (S12+, opt-in)
+│       │   ├── interactive.go # Interactive scenarios (S12+, opt-in)
+│       │   └── webhook.go    # Webhook scenarios (S13-S14, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
 │       │   ├── photo.jpg      # 100x100 JPEG
 │       │   ├── animation.gif  # 100x100 2-frame GIF
@@ -325,6 +326,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | B (Media) | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
 | C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
 | Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
+| Webhook | S13-S14: Webhook Lifecycle, GetUpdates (opt-in) | setWebhook, getWebhookInfo, deleteWebhook, getUpdates |
 
 ### Running Tests
 
@@ -348,7 +350,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `interactive`, `callback`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `interactive`, `callback`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
 
 ### Test Fixtures
 

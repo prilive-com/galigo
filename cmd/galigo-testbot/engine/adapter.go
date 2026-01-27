@@ -3,19 +3,40 @@ package engine
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
 
+	"github.com/prilive-com/galigo/receiver"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
 // SenderAdapter adapts sender.Client to SenderClient interface.
 type SenderAdapter struct {
-	client *sender.Client
+	client     *sender.Client
+	token      tg.SecretToken
+	httpClient *http.Client
 }
 
 // NewSenderAdapter creates a new adapter wrapping a sender.Client.
 func NewSenderAdapter(client *sender.Client) *SenderAdapter {
 	return &SenderAdapter{client: client}
+}
+
+// WithToken sets the token for webhook/polling operations.
+func (a *SenderAdapter) WithToken(token tg.SecretToken) *SenderAdapter {
+	a.token = token
+	return a
+}
+
+// WithHTTPClient sets the HTTP client for webhook/polling operations.
+func (a *SenderAdapter) WithHTTPClient(client *http.Client) *SenderAdapter {
+	a.httpClient = client
+	return a
 }
 
 // GetMe returns basic information about the bot.
@@ -220,6 +241,70 @@ func (a *SenderAdapter) AnswerCallbackQuery(ctx context.Context, callbackQueryID
 		Text:            text,
 		ShowAlert:       showAlert,
 	})
+}
+
+// SetWebhook sets a webhook URL.
+func (a *SenderAdapter) SetWebhook(ctx context.Context, webhookURL string) error {
+	return receiver.SetWebhook(ctx, a.httpClient, a.token, webhookURL, "")
+}
+
+// DeleteWebhook removes the webhook.
+func (a *SenderAdapter) DeleteWebhook(ctx context.Context) error {
+	return receiver.DeleteWebhook(ctx, a.httpClient, a.token, false)
+}
+
+// GetWebhookInfo retrieves webhook configuration.
+func (a *SenderAdapter) GetWebhookInfo(ctx context.Context) (*WebhookInfo, error) {
+	info, err := receiver.GetWebhookInfo(ctx, a.httpClient, a.token)
+	if err != nil {
+		return nil, err
+	}
+	return &WebhookInfo{
+		URL:                info.URL,
+		PendingUpdateCount: info.PendingUpdateCount,
+		HasCustomCert:      info.HasCustomCertificate,
+	}, nil
+}
+
+// GetUpdates calls the getUpdates API directly.
+func (a *SenderAdapter) GetUpdates(ctx context.Context, offset int64, limit int, timeout int) ([]tg.Update, error) {
+	params := url.Values{}
+	params.Set("offset", strconv.FormatInt(offset, 10))
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("timeout", strconv.Itoa(timeout))
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?%s", a.token.Value(), params.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := a.httpClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	var result struct {
+		OK          bool        `json:"ok"`
+		Result      []tg.Update `json:"result"`
+		ErrorCode   int         `json:"error_code,omitempty"`
+		Description string      `json:"description,omitempty"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode getUpdates response: %w", err)
+	}
+	if !result.OK {
+		return nil, fmt.Errorf("getUpdates failed: %d %s", result.ErrorCode, result.Description)
+	}
+	return result.Result, nil
 }
 
 // Ensure SenderAdapter implements SenderClient.

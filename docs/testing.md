@@ -645,6 +645,11 @@ go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + 
 # Interactive scenarios (requires user interaction, excluded from "all")
 go run ./cmd/galigo-testbot --run interactive           # S12: Callback query (click button)
 
+# Webhook scenarios (excluded from "all", may disrupt active webhooks)
+go run ./cmd/galigo-testbot --run webhook               # S13+S14: All webhook tests
+go run ./cmd/galigo-testbot --run webhook-lifecycle      # S13: Set, verify, delete webhook
+go run ./cmd/galigo-testbot --run get-updates            # S14: Non-blocking getUpdates
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -695,13 +700,20 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 
 Interactive scenarios require a human to click buttons in the chat. They are excluded from `--run all` to keep CI pipelines non-interactive. Run explicitly with `--run interactive`.
 
+#### Webhook (opt-in, excluded from `--run all`)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S13-WebhookLifecycle | setWebhook, getWebhookInfo, deleteWebhook | Backup → set → verify → delete → verify → restore |
+| S14-GetUpdates | getUpdates | Non-blocking getUpdates call (timeout=0) |
+
+Webhook scenarios are excluded from `--run all` to avoid disrupting production webhooks. Run explicitly with `--run webhook`.
+
 ### Method Coverage
 
-Current coverage: **21/25 methods** (84%)
+Current coverage: **25/25 methods** (100%)
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup, answerCallbackQuery
-
-**Not yet covered:** getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup, answerCallbackQuery, setWebhook, getWebhookInfo, deleteWebhook, getUpdates
 
 ### Test Fixtures
 
@@ -760,7 +772,8 @@ cmd/galigo-testbot/
 │   ├── tier1.go       # Phase A scenarios (S0-S5)
 │   ├── media.go       # Phase B scenarios (S6-S11)
 │   ├── keyboards.go   # Phase C scenarios (S10+)
-│   └── interactive.go # Interactive scenarios (S12+, opt-in)
+│   ├── interactive.go # Interactive scenarios (S12+, opt-in)
+│   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
 │   ├── fixtures.go # go:embed declarations and accessor functions
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg

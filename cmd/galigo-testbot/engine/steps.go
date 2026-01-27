@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
@@ -744,6 +745,72 @@ func (s *EditMessageMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepR
 		Evidence: map[string]any{
 			"message_id": msg.MessageID,
 			"media_type": s.Media.Type,
+		},
+	}, nil
+}
+
+// ================= Interactive Steps (require user interaction) =================
+
+// WaitForCallbackStep waits for a callback query on rt.CallbackChan.
+type WaitForCallbackStep struct {
+	Timeout time.Duration // Max wait time; defaults to 60s
+}
+
+func (s *WaitForCallbackStep) Name() string { return "waitForCallback" }
+
+func (s *WaitForCallbackStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	if rt.CallbackChan == nil {
+		return nil, fmt.Errorf("CallbackChan not set — interactive scenarios require polling mode")
+	}
+
+	timeout := s.Timeout
+	if timeout == 0 {
+		timeout = 60 * time.Second
+	}
+
+	select {
+	case cb := <-rt.CallbackChan:
+		rt.CapturedFileIDs["callback_query_id"] = cb.ID
+		return &StepResult{
+			Method: "waitForCallback",
+			Evidence: map[string]any{
+				"callback_query_id": cb.ID,
+				"callback_data":     cb.Data,
+				"from_user_id":      cb.From.ID,
+			},
+		}, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("timeout waiting for callback query (%s) — please click a button in the chat", timeout)
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// AnswerCallbackQueryStep answers the last received callback query.
+type AnswerCallbackQueryStep struct {
+	Text      string
+	ShowAlert bool
+}
+
+func (s *AnswerCallbackQueryStep) Name() string { return "answerCallbackQuery" }
+
+func (s *AnswerCallbackQueryStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	cbID, ok := rt.CapturedFileIDs["callback_query_id"]
+	if !ok || cbID == "" {
+		return nil, fmt.Errorf("no callback_query_id captured — run WaitForCallbackStep first")
+	}
+
+	err := rt.Sender.AnswerCallbackQuery(ctx, cbID, s.Text, s.ShowAlert)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StepResult{
+		Method: "answerCallbackQuery",
+		Evidence: map[string]any{
+			"callback_query_id": cbID,
+			"text":              s.Text,
+			"show_alert":        s.ShowAlert,
 		},
 	}, nil
 }

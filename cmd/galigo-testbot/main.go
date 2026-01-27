@@ -81,9 +81,10 @@ func main() {
 }
 
 func showCoverageStatus(logger *slog.Logger) {
-	// Combine all scenarios from all phases
+	// Combine all scenarios from all phases (including interactive)
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -93,8 +94,8 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (All Phases: A, B, C)")
-	fmt.Println("=============================================")
+	fmt.Println("Method Coverage Status (All Phases: A, B, C + Interactive)")
+	fmt.Println("==========================================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
 		fmt.Printf("  + %s\n", m)
@@ -143,12 +144,19 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = suites.AllPhaseCScenarios()
 	case "inline-keyboard":
 		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
+	// Interactive (opt-in, excluded from "all")
+	case "interactive":
+		runInteractiveSuite(cfg, senderClient, logger)
+		return
+	case "callback":
+		runInteractiveSuite(cfg, senderClient, logger)
+		return
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, keyboards, inline-keyboard, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, callback, all")
 		os.Exit(1)
 	}
 
@@ -176,6 +184,88 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	}
 
 	// Print summary
+	fmt.Println("\n" + report.FormatSummary())
+
+	if !report.Success {
+		os.Exit(1)
+	}
+}
+
+// runInteractiveSuite runs interactive scenarios that require user interaction.
+// It starts a polling loop to receive callback queries from Telegram.
+func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger) {
+	logger.Info("starting interactive test suite (requires user interaction)")
+
+	// Start polling to receive callback queries
+	updates := make(chan tg.Update, 100)
+	receiverCfg := receiver.DefaultConfig()
+	receiverCfg.Mode = receiver.ModeLongPolling
+	receiverCfg.PollingTimeout = 30
+
+	pollingClient := receiver.NewPollingClient(
+		tg.SecretToken(cfg.Token),
+		updates,
+		logger,
+		receiverCfg,
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := pollingClient.Start(ctx); err != nil {
+		logger.Error("failed to start polling for interactive suite", "error", err)
+		os.Exit(1)
+	}
+	defer pollingClient.Stop()
+
+	// Create runtime with callback channel
+	adapter := engine.NewSenderAdapter(senderClient)
+	callbackChan := make(chan *tg.CallbackQuery, 10)
+	rt := engine.NewRuntime(adapter, cfg.ChatID)
+	rt.CallbackChan = callbackChan
+	runner := engine.NewRunner(rt, cfg.SendInterval, cfg.MaxMessagesPerRun, logger)
+
+	// Forward callback queries from polling to the runtime channel
+	go func() {
+		for update := range updates {
+			if update.CallbackQuery != nil {
+				select {
+				case callbackChan <- update.CallbackQuery:
+					logger.Debug("forwarded callback query", "id", update.CallbackQuery.ID, "data", update.CallbackQuery.Data)
+				default:
+					logger.Warn("callback channel full, dropping query")
+				}
+			}
+		}
+	}()
+
+	scenarios := suites.AllInteractiveScenarios()
+
+	fmt.Printf("Running %d interactive scenario(s)...\n", len(scenarios))
+	fmt.Println("Please interact with the bot in the chat when prompted.")
+
+	report := evidence.NewReport()
+
+	for _, scenario := range scenarios {
+		logger.Info("running scenario", "name", scenario.Name())
+		result := runner.Run(ctx, scenario)
+		report.AddScenario(result)
+
+		if !result.Success {
+			logger.Error("scenario failed", "name", scenario.Name(), "error", result.Error)
+		}
+	}
+
+	report.Finalize()
+
+	// Save report
+	filename, err := report.Save(cfg.StorageDir)
+	if err != nil {
+		logger.Error("failed to save report", "error", err)
+	} else {
+		logger.Info("report saved", "filename", filename)
+	}
+
 	fmt.Println("\n" + report.FormatSummary())
 
 	if !report.Success {
@@ -255,17 +345,17 @@ func runInteractive(cfg *config.Config, senderClient *sender.Client, logger *slo
 			args = strings.Join(parts[1:], " ")
 		}
 
-		handleCommand(ctx, cfg, senderClient, adapter, cleaner, logger, msg.Chat.ID, command, args)
+		handleCommand(ctx, cfg, senderClient, adapter, cleaner, logger, msg.Chat.ID, command, args, updates)
 	}
 }
 
 func handleCommand(ctx context.Context, cfg *config.Config, senderClient *sender.Client,
 	adapter *engine.SenderAdapter, cleaner *cleanup.Cleaner, logger *slog.Logger,
-	chatID int64, command, args string) {
+	chatID int64, command, args string, updates <-chan tg.Update) {
 
 	switch command {
 	case "run":
-		handleRun(ctx, cfg, senderClient, adapter, logger, chatID, args)
+		handleRun(ctx, cfg, senderClient, adapter, logger, chatID, args, updates)
 	case "status":
 		handleStatus(ctx, adapter, chatID)
 	case "cleanup":
@@ -279,10 +369,10 @@ func handleCommand(ctx context.Context, cfg *config.Config, senderClient *sender
 }
 
 func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Client,
-	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string) {
+	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string, updates <-chan tg.Update) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, keyboards, inline-keyboard, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, all")
 		return
 	}
 
@@ -322,6 +412,22 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = suites.AllPhaseCScenarios()
 	case "inline-keyboard":
 		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
+	// Interactive (opt-in, requires user interaction)
+	case "interactive", "callback":
+		scenarios = suites.AllInteractiveScenarios()
+		// Wire callback channel for interactive scenarios
+		callbackChan := make(chan *tg.CallbackQuery, 10)
+		rt.CallbackChan = callbackChan
+		go func() {
+			for update := range updates {
+				if update.CallbackQuery != nil {
+					select {
+					case callbackChan <- update.CallbackQuery:
+					default:
+					}
+				}
+			}
+		}()
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -358,6 +464,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int64) {
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -405,7 +512,11 @@ Phase C (Keyboards):
   keyboards       - All keyboard tests
   inline-keyboard - Inline keyboard + edit markup
 
-  all      - All tests
+Interactive (opt-in, excluded from "all"):
+  interactive - Callback query tests (requires user click)
+  callback    - Alias for interactive
+
+  all      - All non-interactive tests
 
 /status - Show method coverage
 

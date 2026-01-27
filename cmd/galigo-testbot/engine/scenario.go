@@ -78,6 +78,9 @@ type Runtime struct {
 	LastMessage     *tg.Message
 	LastMessageID   *tg.MessageID
 	CapturedFileIDs map[string]string // name -> file_id for reuse
+
+	// CallbackChan receives callback queries from polling (interactive scenarios only).
+	CallbackChan chan *tg.CallbackQuery
 }
 
 // NewRuntime creates a new runtime for scenario execution.
@@ -122,6 +125,9 @@ type SenderClient interface {
 	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)
 	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) (*tg.Message, error)
 	EditMessageMedia(ctx context.Context, chatID int64, messageID int, media sender.InputMedia) (*tg.Message, error)
+
+	// Callback query methods (interactive scenarios)
+	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 }
 
 // MediaInput represents a file input for media uploads.

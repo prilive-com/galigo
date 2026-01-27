@@ -213,5 +213,14 @@ func (a *SenderAdapter) EditMessageMedia(ctx context.Context, chatID int64, mess
 	})
 }
 
+// AnswerCallbackQuery answers a callback query.
+func (a *SenderAdapter) AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error {
+	return a.client.AnswerCallbackQuery(ctx, sender.AnswerCallbackQueryRequest{
+		CallbackQueryID: callbackQueryID,
+		Text:            text,
+		ShowAlert:       showAlert,
+	})
+}
+
 // Ensure SenderAdapter implements SenderClient.
 var _ SenderClient = (*SenderAdapter)(nil)

@@ -40,9 +40,11 @@ type Message struct {
 	CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`
 	Photo                 []PhotoSize           `json:"photo,omitempty"`
 	Document              *Document             `json:"document,omitempty"`
+	Animation             *Animation            `json:"animation,omitempty"`
 	Video                 *Video                `json:"video,omitempty"`
 	Audio                 *Audio                `json:"audio,omitempty"`
 	Voice                 *Voice                `json:"voice,omitempty"`
+	Sticker               *Sticker              `json:"sticker,omitempty"`
 	VideoNote             *VideoNote            `json:"video_note,omitempty"`
 	Contact               *Contact              `json:"contact,omitempty"`
 	Location              *Location             `json:"location,omitempty"`

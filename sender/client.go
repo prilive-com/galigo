@@ -584,19 +584,46 @@ func (c *Client) executeRequest(ctx context.Context, method string, payload any)
 }
 
 func (c *Client) doRequest(ctx context.Context, method string, payload any) (*apiResponse, error) {
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
 	url := fmt.Sprintf("%s/bot%s/%s", c.config.BaseURL, c.config.Token.Value(), method)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
+	// Check if this request needs multipart encoding (has file uploads)
+	multipartReq, err := BuildMultipartRequest(payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	var req *http.Request
+
+	if multipartReq.HasUploads() {
+		// Use multipart/form-data for file uploads
+		var body bytes.Buffer
+		encoder := NewMultipartEncoder(&body)
+		if err := encoder.Encode(multipartReq); err != nil {
+			return nil, fmt.Errorf("failed to encode multipart request: %w", err)
+		}
+		if err := encoder.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close multipart encoder: %w", err)
+		}
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", encoder.ContentType())
+	} else {
+		// Use JSON for simple requests (no file uploads)
+		jsonData, err := json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	}
+
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)

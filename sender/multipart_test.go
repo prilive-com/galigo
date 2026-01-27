@@ -116,9 +116,10 @@ func TestBuildMultipartRequest_Upload(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, result.HasUploads())
-	assert.Equal(t, "attach://file0", result.Params["document"])
+	// For single file uploads, the file goes directly in the field (no attach://)
+	assert.NotContains(t, result.Params, "document") // File is in Files, not Params
 	require.Len(t, result.Files, 1)
-	assert.Equal(t, "file0", result.Files[0].FieldName)
+	assert.Equal(t, "document", result.Files[0].FieldName) // Field name matches JSON tag
 	assert.Equal(t, "test.txt", result.Files[0].FileName)
 
 	// Verify reader is passed correctly
@@ -143,9 +144,12 @@ func TestBuildMultipartRequest_MultipleUploads(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, result.HasUploads())
-	assert.Equal(t, "attach://file0", result.Params["photo"])
-	assert.Equal(t, "attach://file1", result.Params["thumbnail"])
+	// For single file uploads, files go directly in their fields (no attach://)
+	assert.NotContains(t, result.Params, "photo")
+	assert.NotContains(t, result.Params, "thumbnail")
 	require.Len(t, result.Files, 2)
+	assert.Equal(t, "photo", result.Files[0].FieldName)
+	assert.Equal(t, "thumbnail", result.Files[1].FieldName)
 }
 
 func TestBuildMultipartRequest_InputFileSlice(t *testing.T) {

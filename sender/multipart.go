@@ -167,16 +167,15 @@ func handleInputFile(req *MultipartRequest, fieldName string, file InputFile, at
 		req.Params[fieldName] = file.URL
 
 	case file.Reader != nil:
-		// Generate attach:// reference
-		attachName := fmt.Sprintf("file%d", *attachIdx)
-		*attachIdx++
-
-		req.Params[fieldName] = "attach://" + attachName
+		// For single file uploads (sendDocument, sendPhoto, etc.),
+		// put file directly in field with the correct name.
+		// The attach:// syntax is only for sendMediaGroup.
 		req.Files = append(req.Files, FilePart{
-			FieldName: attachName,
+			FieldName: fieldName, // Use actual field name: "document", "photo", etc.
 			FileName:  file.FileName,
 			Reader:    file.Reader,
 		})
+		// Don't add to Params - the file IS the value
 
 	default:
 		return fmt.Errorf("InputFile must have FileID, URL, or Reader set")

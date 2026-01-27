@@ -55,7 +55,8 @@ galigo/
 │       ├── suites/     # Test scenario definitions
 │       │   ├── tier1.go     # Phase A: core scenarios (S0-S5)
 │       │   ├── media.go     # Phase B: media scenarios (S6-S9)
-│       │   └── keyboards.go # Phase C: keyboard scenarios (S10+)
+│       │   ├── keyboards.go   # Phase C: keyboard scenarios (S10+)
+│       │   └── interactive.go # Interactive scenarios (S12+, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
 │       │   ├── photo.jpg      # 100x100 JPEG
 │       │   ├── animation.gif  # 100x100 2-frame GIF
@@ -97,9 +98,11 @@ go vet ./...
 
 # Run acceptance tests (requires TELEGRAM_BOT_TOKEN and TESTBOT_CHAT_ID)
 go run ./cmd/galigo-testbot --run all
-go run ./cmd/galigo-testbot --run core     # Phase A only
-go run ./cmd/galigo-testbot --run media    # Phase B only
-go run ./cmd/galigo-testbot --status       # Show method coverage
+go run ./cmd/galigo-testbot --run core        # Phase A only
+go run ./cmd/galigo-testbot --run media       # Phase B only
+go run ./cmd/galigo-testbot --run keyboards   # Phase C only
+go run ./cmd/galigo-testbot --run interactive # Interactive (requires user click)
+go run ./cmd/galigo-testbot --status          # Show method coverage
 ```
 
 ## Architecture
@@ -321,6 +324,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
 | B (Media) | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
 | C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
+| Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
 
 ### Running Tests
 
@@ -344,7 +348,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `interactive`, `callback`, `all`
 
 ### Test Fixtures
 

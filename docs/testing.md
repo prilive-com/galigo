@@ -642,6 +642,9 @@ go run ./cmd/galigo-testbot --run get-file             # S9: File download info
 go run ./cmd/galigo-testbot --run edit-message-media   # S11: Edit message media
 go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + edit markup
 
+# Interactive scenarios (requires user interaction, excluded from "all")
+go run ./cmd/galigo-testbot --run interactive           # S12: Callback query (click button)
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -684,13 +687,21 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 |----------|---------|-------------|
 | S10-InlineKeyboard | sendMessage (with markup), editMessageReplyMarkup | Send, edit, and remove inline keyboard |
 
+#### Interactive (opt-in, excluded from `--run all`)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S12-CallbackQuery | sendMessage, answerCallbackQuery | Send inline keyboard, wait for user click, answer callback |
+
+Interactive scenarios require a human to click buttons in the chat. They are excluded from `--run all` to keep CI pipelines non-interactive. Run explicitly with `--run interactive`.
+
 ### Method Coverage
 
-Current coverage: **20/25 methods** (80%)
+Current coverage: **21/25 methods** (84%)
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup, answerCallbackQuery
 
-**Not yet covered:** answerCallbackQuery, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+**Not yet covered:** getUpdates, getWebhookInfo, setWebhook, deleteWebhook
 
 ### Test Fixtures
 
@@ -746,9 +757,10 @@ cmd/galigo-testbot/
 │   ├── runner.go   # Scenario executor with timing and error handling
 │   └── adapter.go  # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
-│   ├── tier1.go      # Phase A scenarios (S0-S5)
-│   ├── media.go      # Phase B scenarios (S6-S9)
-│   └── keyboards.go  # Phase C scenarios (S10+)
+│   ├── tier1.go       # Phase A scenarios (S0-S5)
+│   ├── media.go       # Phase B scenarios (S6-S11)
+│   ├── keyboards.go   # Phase C scenarios (S10+)
+│   └── interactive.go # Interactive scenarios (S12+, opt-in)
 ├── fixtures/
 │   ├── fixtures.go # go:embed declarations and accessor functions
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg

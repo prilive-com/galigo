@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	runSuite        = flag.String("run", "", "Run a suite: smoke, tier1, all, or scenario name (S0, S1, etc.)")
+	runSuite        = flag.String("run", "", "Run a test suite: smoke, messages, forward, actions, core, all")
 	skipInteractive = flag.Bool("skip-interactive", false, "Skip interactive scenarios")
 	showStatus      = flag.Bool("status", false, "Show method coverage status")
 )
@@ -111,21 +111,21 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	var scenarios []engine.Scenario
 
 	switch strings.ToLower(suite) {
-	case "smoke", "s0":
+	case "smoke":
 		scenarios = []engine.Scenario{suites.S0_Smoke()}
-	case "s1":
+	case "identity":
 		scenarios = []engine.Scenario{suites.S1_Identity()}
-	case "s2":
+	case "messages":
 		scenarios = []engine.Scenario{suites.S2_MessageLifecycle()}
-	case "s4":
+	case "forward":
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
-	case "s5":
+	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
-	case "tier1", "all":
+	case "core", "all":
 		scenarios = suites.AllPhaseAScenarios()
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, s0, s1, s2, s4, s5, tier1, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, all")
 		os.Exit(1)
 	}
 
@@ -259,7 +259,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, s1, s2, s4, s5, tier1, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, all")
 		return
 	}
 
@@ -269,17 +269,17 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	var scenarios []engine.Scenario
 
 	switch strings.ToLower(suite) {
-	case "smoke", "s0":
+	case "smoke":
 		scenarios = []engine.Scenario{suites.S0_Smoke()}
-	case "s1":
+	case "identity":
 		scenarios = []engine.Scenario{suites.S1_Identity()}
-	case "s2":
+	case "messages":
 		scenarios = []engine.Scenario{suites.S2_MessageLifecycle()}
-	case "s4":
+	case "forward":
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
-	case "s5":
+	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
-	case "tier1", "all":
+	case "core", "all":
 		scenarios = suites.AllPhaseAScenarios()
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
@@ -340,18 +340,17 @@ func handleHelp(ctx context.Context, adapter *engine.SenderAdapter, chatID int64
 	help := `galigo-testbot Commands:
 
 /run <suite> - Run test suite
-  Suites: smoke, s1, s2, s4, s5, tier1, all
+  smoke    - Quick sanity check
+  identity - Bot identity (getMe)
+  messages - Send, edit, delete
+  forward  - Forward and copy
+  actions  - Chat actions (typing)
+  core     - All core tests
+  all      - Everything
 
 /status - Show method coverage
 
-/help - Show this help
-
-Phase A covers:
-- S0: Smoke (getMe, sendMessage)
-- S1: Identity (getMe)
-- S2: Message Lifecycle (send, edit, delete)
-- S4: Forward/Copy
-- S5: Chat Action`
+/help - Show this help`
 
 	sendMessage(ctx, adapter, chatID, help)
 }

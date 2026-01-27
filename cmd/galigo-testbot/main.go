@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	runSuite        = flag.String("run", "", "Run a test suite: smoke, messages, forward, actions, core, all")
+	runSuite        = flag.String("run", "", "Run a test suite: smoke, messages, forward, actions, core, media, keyboards, all")
 	skipInteractive = flag.Bool("skip-interactive", false, "Skip interactive scenarios")
 	showStatus      = flag.Bool("status", false, "Show method coverage status")
 )
@@ -83,6 +83,7 @@ func main() {
 func showCoverageStatus(logger *slog.Logger) {
 	// Combine all scenarios from all phases
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
+	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -92,8 +93,8 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (All Phases)")
-	fmt.Println("===================================")
+	fmt.Println("Method Coverage Status (All Phases: A, B, C)")
+	fmt.Println("=============================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
 		fmt.Printf("  + %s\n", m)
@@ -135,11 +136,17 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S8_EditMedia()}
 	case "get-file":
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	// Phase C: Keyboards
+	case "keyboards":
+		scenarios = suites.AllPhaseCScenarios()
+	case "inline-keyboard":
+		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
+		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, keyboards, inline-keyboard, all")
 		os.Exit(1)
 	}
 
@@ -273,7 +280,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, keyboards, inline-keyboard, all")
 		return
 	}
 
@@ -306,8 +313,14 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S8_EditMedia()}
 	case "get-file":
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	// Phase C: Keyboards
+	case "keyboards":
+		scenarios = suites.AllPhaseCScenarios()
+	case "inline-keyboard":
+		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
+		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
 		return
@@ -340,6 +353,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 
 func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int64) {
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
+	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -378,10 +392,14 @@ Phase A (Core):
 
 Phase B (Media):
   media         - All media tests
-  media-uploads - Photo, document, animation
+  media-uploads - Photo, document, animation, audio, voice
   media-groups  - Albums
   edit-media    - Edit captions
   get-file      - File download info
+
+Phase C (Keyboards):
+  keyboards       - All keyboard tests
+  inline-keyboard - Inline keyboard + edit markup
 
   all      - All tests
 

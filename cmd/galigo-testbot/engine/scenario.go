@@ -118,6 +118,7 @@ type SenderClient interface {
 	SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error)
 	GetFile(ctx context.Context, fileID string) (*tg.File, error)
 	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)
+	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) (*tg.Message, error)
 }
 
 // MediaInput represents a file input for media uploads.

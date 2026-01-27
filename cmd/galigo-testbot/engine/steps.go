@@ -3,6 +3,8 @@ package engine
 import (
 	"context"
 	"fmt"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 // GetMeStep verifies bot identity.
@@ -250,6 +252,94 @@ func (s *CleanupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, er
 	}
 
 	return result, nil
+}
+
+// ================= Phase C: Keyboard Steps =================
+
+// SendMessageWithKeyboardStep sends a message with an inline keyboard.
+type SendMessageWithKeyboardStep struct {
+	Text    string
+	Buttons []ButtonDef
+}
+
+// ButtonDef defines a button for inline keyboards.
+type ButtonDef struct {
+	Text         string
+	CallbackData string
+}
+
+func (s *SendMessageWithKeyboardStep) Name() string { return "sendMessage (keyboard)" }
+
+func (s *SendMessageWithKeyboardStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	markup := buildKeyboard(s.Buttons)
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithReplyMarkup(markup))
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	return &StepResult{
+		Method:     "sendMessage",
+		MessageIDs: []int{msg.MessageID},
+		Evidence: map[string]any{
+			"message_id":   msg.MessageID,
+			"text":         s.Text,
+			"has_keyboard": msg.ReplyMarkup != nil,
+		},
+	}, nil
+}
+
+// EditMessageReplyMarkupStep edits the reply markup of the last message.
+type EditMessageReplyMarkupStep struct {
+	Buttons []ButtonDef // nil = remove keyboard
+}
+
+func (s *EditMessageReplyMarkupStep) Name() string { return "editMessageReplyMarkup" }
+
+func (s *EditMessageReplyMarkupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	if rt.LastMessage == nil {
+		return nil, fmt.Errorf("no message to edit")
+	}
+
+	var markup *tg.InlineKeyboardMarkup
+	if len(s.Buttons) > 0 {
+		markup = buildKeyboard(s.Buttons)
+	} else {
+		// Empty keyboard removes it
+		markup = &tg.InlineKeyboardMarkup{
+			InlineKeyboard: [][]tg.InlineKeyboardButton{},
+		}
+	}
+
+	msg, err := rt.Sender.EditMessageReplyMarkup(ctx, rt.ChatID, rt.LastMessage.MessageID, markup)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+
+	return &StepResult{
+		Method: "editMessageReplyMarkup",
+		Evidence: map[string]any{
+			"message_id":      msg.MessageID,
+			"keyboard_remove": len(s.Buttons) == 0,
+		},
+	}, nil
+}
+
+func buildKeyboard(buttons []ButtonDef) *tg.InlineKeyboardMarkup {
+	var row []tg.InlineKeyboardButton
+	for _, b := range buttons {
+		row = append(row, tg.InlineKeyboardButton{
+			Text:         b.Text,
+			CallbackData: b.CallbackData,
+		})
+	}
+	return &tg.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tg.InlineKeyboardButton{row},
+	}
 }
 
 // ================= Phase B: Media Steps =================

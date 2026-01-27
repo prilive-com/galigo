@@ -187,5 +187,14 @@ func (a *SenderAdapter) EditMessageCaption(ctx context.Context, chatID int64, me
 	})
 }
 
+// EditMessageReplyMarkup edits a message's reply markup.
+func (a *SenderAdapter) EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) (*tg.Message, error) {
+	return a.client.EditMessageReplyMarkup(ctx, sender.EditMessageReplyMarkupRequest{
+		ChatID:      chatID,
+		MessageID:   messageID,
+		ReplyMarkup: markup,
+	})
+}
+
 // Ensure SenderAdapter implements SenderClient.
 var _ SenderClient = (*SenderAdapter)(nil)

@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"encoding/json"
 	"io"
 )
 
@@ -96,4 +97,10 @@ func (f InputFile) WithParseMode(mode string) InputFile {
 func (f InputFile) WithMediaType(mediaType string) InputFile {
 	f.MediaType = mediaType
 	return f
+}
+
+// MarshalJSON returns the string value (URL or FileID) for JSON encoding.
+// For uploads (Reader-based), this returns empty string as those use multipart.
+func (f InputFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(f.Value())
 }

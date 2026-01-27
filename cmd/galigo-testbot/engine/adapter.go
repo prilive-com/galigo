@@ -98,16 +98,10 @@ func mediaInputToInputFile(m MediaInput) sender.InputFile {
 }
 
 // SendPhoto sends a photo.
-// Note: SendPhotoRequest.Photo is a string (URL or file_id), not InputFile.
 func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo MediaInput, caption string) (*tg.Message, error) {
-	// Get the string value (URL or file_id)
-	photoValue := photo.URL
-	if photoValue == "" {
-		photoValue = photo.FileID
-	}
 	return a.client.SendPhoto(ctx, sender.SendPhotoRequest{
 		ChatID:  chatID,
-		Photo:   photoValue,
+		Photo:   mediaInputToInputFile(photo),
 		Caption: caption,
 	})
 }

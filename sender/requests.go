@@ -19,7 +19,7 @@ type SendMessageRequest struct {
 // SendPhotoRequest represents a request to send a photo.
 type SendPhotoRequest struct {
 	ChatID              tg.ChatID   `json:"chat_id"`
-	Photo               string      `json:"photo"` // URL, file_id, or file path
+	Photo               InputFile   `json:"photo"` // file_id, URL, or upload
 	Caption             string      `json:"caption,omitempty"`
 	ParseMode           tg.ParseMode `json:"parse_mode,omitempty"`
 	DisableNotification bool        `json:"disable_notification,omitempty"`

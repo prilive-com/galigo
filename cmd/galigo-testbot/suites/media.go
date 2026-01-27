@@ -8,23 +8,22 @@ import (
 )
 
 // S6_MediaUploads tests basic media upload methods.
-// Focuses on document upload (multipart) since photo requires URL/file_id only.
 func S6_MediaUploads() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S6_MediaUploads",
-		ScenarioDescription: "Test media upload methods (document with multipart upload)",
-		CoveredMethods:      []string{"sendDocument"},
+		ScenarioDescription: "Test media upload methods (photo and document)",
+		CoveredMethods:      []string{"sendPhoto", "sendDocument"},
 		ScenarioTimeout:     60 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send document with file upload (tests multipart encoding)
+			// Send photo with file upload (tests multipart encoding)
+			&engine.SendPhotoStep{
+				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "galigo-test.jpg", "photo"),
+				Caption: "galigo test photo (multipart upload)",
+			},
+			// Send document with file upload
 			&engine.SendDocumentStep{
 				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "galigo-test.txt", "document"),
 				Caption:  "galigo test document (multipart upload)",
-			},
-			// Send another document to verify consistency
-			&engine.SendDocumentStep{
-				Document: engine.MediaFromBytes(fixtures.PhotoBytes(), "galigo-test.jpg", "document"),
-				Caption:  "galigo test image as document",
 			},
 			// Cleanup
 			&engine.CleanupStep{},
@@ -59,13 +58,13 @@ func S8_EditMedia() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S8_EditMedia",
 		ScenarioDescription: "Test editing media message captions",
-		CoveredMethods:      []string{"sendDocument", "editMessageCaption"},
+		CoveredMethods:      []string{"sendPhoto", "editMessageCaption"},
 		ScenarioTimeout:     30 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send document with caption
-			&engine.SendDocumentStep{
-				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "caption-test.txt", "document"),
-				Caption:  "Original caption",
+			// Send photo with caption
+			&engine.SendPhotoStep{
+				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "caption-test.jpg", "photo"),
+				Caption: "Original caption",
 			},
 			// Edit caption
 			&engine.EditMessageCaptionStep{

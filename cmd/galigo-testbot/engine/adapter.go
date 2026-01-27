@@ -204,5 +204,14 @@ func (a *SenderAdapter) EditMessageReplyMarkup(ctx context.Context, chatID int64
 	})
 }
 
+// EditMessageMedia edits a message's media content.
+func (a *SenderAdapter) EditMessageMedia(ctx context.Context, chatID int64, messageID int, media sender.InputMedia) (*tg.Message, error) {
+	return a.client.EditMessageMedia(ctx, sender.EditMessageMediaRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Media:     media,
+	})
+}
+
 // Ensure SenderAdapter implements SenderClient.
 var _ SenderClient = (*SenderAdapter)(nil)

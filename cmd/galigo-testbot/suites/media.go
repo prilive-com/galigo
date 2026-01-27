@@ -5,6 +5,7 @@ import (
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
+	"github.com/prilive-com/galigo/sender"
 )
 
 // S6_MediaUploads tests basic media upload methods.
@@ -127,6 +128,31 @@ func S9_GetFile() engine.Scenario {
 	}
 }
 
+// S11_EditMessageMedia tests editing message media content.
+func S11_EditMessageMedia() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S11_EditMessageMedia",
+		ScenarioDescription: "Test editing message media (replace photo with document)",
+		CoveredMethods:      []string{"sendPhoto", "editMessageMedia"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			// Send photo as initial media
+			&engine.SendPhotoStep{
+				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "original.jpg", "photo"),
+				Caption: "Original photo - will be replaced",
+			},
+			// Replace with a document upload
+			&engine.EditMessageMediaStep{
+				Media: sender.NewInputMediaDocument(
+					sender.FromReader(fixtures.Document(), "replaced.txt"),
+				).WithCaption("Replaced via editMessageMedia"),
+			},
+			// Cleanup
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllPhaseBScenarios returns all Phase B (media) scenarios.
 func AllPhaseBScenarios() []engine.Scenario {
 	return []engine.Scenario{
@@ -134,5 +160,6 @@ func AllPhaseBScenarios() []engine.Scenario {
 		S7_MediaGroups(),
 		S8_EditMedia(),
 		S9_GetFile(),
+		S11_EditMessageMedia(),
 	}
 }

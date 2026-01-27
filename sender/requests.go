@@ -57,6 +57,15 @@ type EditMessageReplyMarkupRequest struct {
 	ReplyMarkup     any       `json:"reply_markup,omitempty"`
 }
 
+// EditMessageMediaRequest represents a request to edit message media.
+type EditMessageMediaRequest struct {
+	ChatID          tg.ChatID  `json:"chat_id,omitempty"`
+	MessageID       int        `json:"message_id,omitempty"`
+	InlineMessageID string     `json:"inline_message_id,omitempty"`
+	Media           InputMedia `json:"media"`
+	ReplyMarkup     any        `json:"reply_markup,omitempty"`
+}
+
 // DeleteMessageRequest represents a request to delete a message.
 type DeleteMessageRequest struct {
 	ChatID    tg.ChatID `json:"chat_id"`

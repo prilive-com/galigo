@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -120,6 +121,7 @@ type SenderClient interface {
 	GetFile(ctx context.Context, fileID string) (*tg.File, error)
 	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)
 	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) (*tg.Message, error)
+	EditMessageMedia(ctx context.Context, chatID int64, messageID int, media sender.InputMedia) (*tg.Message, error)
 }
 
 // MediaInput represents a file input for media uploads.

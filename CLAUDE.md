@@ -319,7 +319,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | Phase | Scenarios | Methods Covered |
 |-------|-----------|-----------------|
 | A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
-| B (Media) | S6-S9: Media Uploads, Media Groups, Edit Media, Get File | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, getFile |
+| B (Media) | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
 | C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
 
 ### Running Tests
@@ -344,7 +344,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `keyboards`, `inline-keyboard`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `all`
 
 ### Test Fixtures
 

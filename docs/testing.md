@@ -638,8 +638,9 @@ go run ./cmd/galigo-testbot --run actions          # S5: Chat actions
 go run ./cmd/galigo-testbot --run media-uploads    # S6: Photo, document, animation, audio, voice
 go run ./cmd/galigo-testbot --run media-groups     # S7: Albums
 go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
-go run ./cmd/galigo-testbot --run get-file         # S9: File download info
-go run ./cmd/galigo-testbot --run inline-keyboard  # S10: Inline keyboard + edit markup
+go run ./cmd/galigo-testbot --run get-file             # S9: File download info
+go run ./cmd/galigo-testbot --run edit-message-media   # S11: Edit message media
+go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + edit markup
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -675,6 +676,7 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 | S7-MediaGroups | sendMediaGroup | Album with multiple documents |
 | S8-EditMedia | sendPhoto, editMessageCaption | Caption editing |
 | S9-GetFile | sendDocument, getFile | File metadata retrieval |
+| S11-EditMessageMedia | sendPhoto, editMessageMedia | Replace media content (photo → document) |
 
 #### Phase C: Keyboards (S10+)
 
@@ -684,11 +686,11 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 
 ### Method Coverage
 
-Current coverage: **19/25 methods** (76%)
+Current coverage: **20/25 methods** (80%)
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, getFile, editMessageReplyMarkup
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup
 
-**Not yet covered:** answerCallbackQuery, editMessageMedia, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+**Not yet covered:** answerCallbackQuery, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
 
 ### Test Fixtures
 

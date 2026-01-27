@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -715,6 +716,34 @@ func (s *EditMessageCaptionStep) Execute(ctx context.Context, rt *Runtime) (*Ste
 		Evidence: map[string]any{
 			"message_id":  msg.MessageID,
 			"new_caption": s.Caption,
+		},
+	}, nil
+}
+
+// EditMessageMediaStep edits the media content of the last message.
+type EditMessageMediaStep struct {
+	Media sender.InputMedia
+}
+
+func (s *EditMessageMediaStep) Name() string { return "editMessageMedia" }
+
+func (s *EditMessageMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	if rt.LastMessage == nil {
+		return nil, fmt.Errorf("no message to edit")
+	}
+
+	msg, err := rt.Sender.EditMessageMedia(ctx, rt.ChatID, rt.LastMessage.MessageID, s.Media)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+
+	return &StepResult{
+		Method: "editMessageMedia",
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
+			"media_type": s.Media.Type,
 		},
 	}, nil
 }

@@ -22,7 +22,7 @@ func TestSendPhoto_Success(t *testing.T) {
 
 	msg, err := client.SendPhoto(context.Background(), sender.SendPhotoRequest{
 		ChatID: testutil.TestChatID,
-		Photo:  "https://example.com/photo.jpg",
+		Photo:  sender.FromURL("https://example.com/photo.jpg"),
 	})
 
 	require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestSendPhoto_WithCaption(t *testing.T) {
 
 	msg, err := client.SendPhoto(context.Background(), sender.SendPhotoRequest{
 		ChatID:    testutil.TestChatID,
-		Photo:     "photo_file_id",
+		Photo:     sender.FromFileID("photo_file_id"),
 		Caption:   "Nice photo!",
 		ParseMode: "HTML",
 	})

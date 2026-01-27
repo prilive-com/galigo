@@ -248,8 +248,25 @@ func (b *Bot) SendMessage(ctx context.Context, chatID tg.ChatID, text string, op
 	return b.sender.SendMessage(ctx, req)
 }
 
-// SendPhoto sends a photo.
+// SendPhoto sends a photo from URL or file_id.
+// For uploading files, use SendPhotoFile.
 func (b *Bot) SendPhoto(ctx context.Context, chatID tg.ChatID, photo string, opts ...PhotoOption) (*tg.Message, error) {
+	req := sender.SendPhotoRequest{
+		ChatID: chatID,
+		Photo:  sender.FromURL(photo), // Auto-detect: works for both URL and file_id
+	}
+	// Override with file_id if it doesn't look like a URL
+	if !isURL(photo) {
+		req.Photo = sender.FromFileID(photo)
+	}
+	for _, opt := range opts {
+		opt(&req)
+	}
+	return b.sender.SendPhoto(ctx, req)
+}
+
+// SendPhotoFile sends a photo from InputFile (supports upload).
+func (b *Bot) SendPhotoFile(ctx context.Context, chatID tg.ChatID, photo sender.InputFile, opts ...PhotoOption) (*tg.Message, error) {
 	req := sender.SendPhotoRequest{
 		ChatID: chatID,
 		Photo:  photo,
@@ -258,6 +275,11 @@ func (b *Bot) SendPhoto(ctx context.Context, chatID tg.ChatID, photo string, opt
 		opt(&req)
 	}
 	return b.sender.SendPhoto(ctx, req)
+}
+
+// isURL checks if a string looks like a URL.
+func isURL(s string) bool {
+	return len(s) > 8 && (s[:7] == "http://" || s[:8] == "https://")
 }
 
 // Edit edits a message text.

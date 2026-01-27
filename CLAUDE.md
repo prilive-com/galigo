@@ -61,7 +61,9 @@ galigo/
 │       │   ├── animation.gif  # 100x100 2-frame GIF
 │       │   ├── sticker.png    # 512x512 PNG
 │       │   ├── audio.mp3      # Minimal MP3 (5 silent frames)
-│       │   └── voice.ogg      # Minimal OGG Opus (1 silent frame)
+│       │   ├── voice.ogg      # Minimal OGG Opus (1 silent frame)
+│       │   ├── video.mp4      # Minimal H.264 MP4 (320x240)
+│       │   └── videonote.mp4  # Minimal H.264 MP4 (240x240, square)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
 │       ├── registry/   # Method coverage tracking (25 target methods)
@@ -317,7 +319,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | Phase | Scenarios | Methods Covered |
 |-------|-----------|-----------------|
 | A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
-| B (Media) | S6-S9: Media Uploads, Media Groups, Edit Media, Get File | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile |
+| B (Media) | S6-S9: Media Uploads, Media Groups, Edit Media, Get File | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, getFile |
 | C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
 
 ### Running Tests
@@ -353,6 +355,8 @@ All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`
 - `sticker.png` — 512x512 gradient PNG (image/png)
 - `audio.mp3` — 5 silent MPEG1 Layer3 frames
 - `voice.ogg` — Minimal OGG Opus with 1 silent frame
+- `video.mp4` — Minimal H.264 MP4 (320x240, 1 black frame)
+- `videonote.mp4` — Minimal H.264 MP4 (240x240, square, 1 black frame)
 
 ### Adding a New Test Scenario
 

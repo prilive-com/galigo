@@ -11,8 +11,8 @@ import (
 func S6_MediaUploads() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S6_MediaUploads",
-		ScenarioDescription: "Test media upload methods (photo, document, animation, audio, voice)",
-		CoveredMethods:      []string{"sendPhoto", "sendDocument", "sendAnimation", "sendAudio", "sendVoice"},
+		ScenarioDescription: "Test media upload methods (photo, document, animation, audio, voice, video, sticker, video note)",
+		CoveredMethods:      []string{"sendPhoto", "sendDocument", "sendAnimation", "sendAudio", "sendVoice", "sendVideo", "sendSticker", "sendVideoNote"},
 		ScenarioTimeout:     120 * time.Second,
 		ScenarioSteps: []engine.Step{
 			// Send photo
@@ -39,6 +39,19 @@ func S6_MediaUploads() engine.Scenario {
 			&engine.SendVoiceStep{
 				Voice:   engine.MediaFromBytes(fixtures.VoiceBytes(), "galigo-test.ogg", "voice"),
 				Caption: "galigo test voice",
+			},
+			// Send video (MP4)
+			&engine.SendVideoStep{
+				Video:   engine.MediaFromBytes(fixtures.VideoBytes(), "galigo-test.mp4", "video"),
+				Caption: "galigo test video",
+			},
+			// Send sticker (PNG)
+			&engine.SendStickerStep{
+				Sticker: engine.MediaFromBytes(fixtures.StickerBytes(), "galigo-test.png", "sticker"),
+			},
+			// Send video note (round MP4)
+			&engine.SendVideoNoteStep{
+				VideoNote: engine.MediaFromBytes(fixtures.VideoNoteBytes(), "galigo-test-note.mp4", "video_note"),
 			},
 			// Cleanup
 			&engine.CleanupStep{},

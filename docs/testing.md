@@ -671,7 +671,7 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
-| S6-MediaUploads | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice | File upload via multipart |
+| S6-MediaUploads | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote | File upload via multipart |
 | S7-MediaGroups | sendMediaGroup | Album with multiple documents |
 | S8-EditMedia | sendPhoto, editMessageCaption | Caption editing |
 | S9-GetFile | sendDocument, getFile | File metadata retrieval |
@@ -684,11 +684,11 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 
 ### Method Coverage
 
-Current coverage: **16/25 methods** (64%)
+Current coverage: **19/25 methods** (76%)
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile, editMessageReplyMarkup
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, getFile, editMessageReplyMarkup
 
-**Not yet covered:** answerCallbackQuery, sendSticker, sendVideo, sendVideoNote, editMessageMedia, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+**Not yet covered:** answerCallbackQuery, editMessageMedia, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
 
 ### Test Fixtures
 
@@ -701,6 +701,8 @@ All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`
 | `sticker.png` | PNG | 1.9KB | 512x512 color gradient (`image/png`) |
 | `audio.mp3` | MP3 | 2.1KB | 5 silent MPEG1 Layer3 frames (raw bytes) |
 | `voice.ogg` | OGG Opus | 124B | 3 OGG pages with 1 silent Opus frame (raw bytes) |
+| `video.mp4` | MP4/H.264 | 663B | 320x240 single black frame (minimal ftyp+moov+mdat) |
+| `videonote.mp4` | MP4/H.264 | 663B | 240x240 square single black frame (for video notes) |
 
 ### Evidence Reports
 

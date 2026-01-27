@@ -159,6 +159,14 @@ func (a *SenderAdapter) SendSticker(ctx context.Context, chatID int64, sticker M
 	})
 }
 
+// SendVideoNote sends a video note (round video).
+func (a *SenderAdapter) SendVideoNote(ctx context.Context, chatID int64, videoNote MediaInput) (*tg.Message, error) {
+	return a.client.SendVideoNote(ctx, sender.SendVideoNoteRequest{
+		ChatID:    chatID,
+		VideoNote: mediaInputToInputFile(videoNote),
+	})
+}
+
 // SendMediaGroup sends a media group (album).
 func (a *SenderAdapter) SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error) {
 	inputFiles := make([]sender.InputFile, len(media))

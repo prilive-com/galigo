@@ -595,6 +595,39 @@ func (s *SendStickerStep) Execute(ctx context.Context, rt *Runtime) (*StepResult
 	}, nil
 }
 
+// SendVideoNoteStep sends a video note (round video).
+type SendVideoNoteStep struct {
+	VideoNote MediaInput
+}
+
+func (s *SendVideoNoteStep) Name() string { return "sendVideoNote" }
+
+func (s *SendVideoNoteStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendVideoNote(ctx, rt.ChatID, s.VideoNote)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	var fileID string
+	if msg.VideoNote != nil {
+		fileID = msg.VideoNote.FileID
+		rt.CapturedFileIDs["video_note"] = fileID
+	}
+
+	return &StepResult{
+		Method:     "sendVideoNote",
+		MessageIDs: []int{msg.MessageID},
+		FileIDs:    []string{fileID},
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
+			"file_id":    fileID,
+		},
+	}, nil
+}
+
 // SendMediaGroupStep sends a media group (album).
 type SendMediaGroupStep struct {
 	Media []MediaInput

@@ -115,6 +115,7 @@ type SenderClient interface {
 	SendAudio(ctx context.Context, chatID int64, audio MediaInput, caption string) (*tg.Message, error)
 	SendVoice(ctx context.Context, chatID int64, voice MediaInput, caption string) (*tg.Message, error)
 	SendSticker(ctx context.Context, chatID int64, sticker MediaInput) (*tg.Message, error)
+	SendVideoNote(ctx context.Context, chatID int64, videoNote MediaInput) (*tg.Message, error)
 	SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error)
 	GetFile(ctx context.Context, fileID string) (*tg.File, error)
 	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)

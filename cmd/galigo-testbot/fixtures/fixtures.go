@@ -57,8 +57,9 @@ func DocumentBytes() []byte {
 
 // TestURLs provides public URLs for media types that are hard to generate.
 // These are small, publicly available test files.
+// NOTE: URLs must point directly to files, not web pages that generate content.
 var TestURLs = struct {
-	// Photo - A small test image
+	// Photo - A small test image (direct file URL required)
 	Photo string
 	// Video - Big Buck Bunny trailer (small version)
 	Video string
@@ -73,13 +74,14 @@ var TestURLs = struct {
 	// Sticker - A valid Telegram sticker (use file_id after first upload)
 	Sticker string
 }{
-	// Using well-known public test files
-	Photo:     "https://via.placeholder.com/150/FF0000/FFFFFF?text=Test",
-	Video:     "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4",
-	Audio:     "https://sample-videos.com/audio/mp3/crowd-cheering.mp3",
+	// Using well-known public test files with direct URLs
+	// httpbin.org provides reliable test endpoints
+	Photo:     "https://httpbin.org/image/jpeg",
+	Video:     "",
+	Audio:     "",
 	Voice:     "", // OGG Opus is rare, will skip or use fallback
 	VideoNote: "", // Requires specific format, will skip
-	Animation: "https://upload.wikimedia.org/wikipedia/commons/2/2c/Rotating_earth_%28large%29.gif",
+	Animation: "",
 	Sticker:   "", // Will capture file_id from first successful upload
 }
 

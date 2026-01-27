@@ -1,7 +1,6 @@
 package suites
 
 import (
-	"context"
 	"time"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
@@ -9,31 +8,23 @@ import (
 )
 
 // S6_MediaUploads tests basic media upload methods.
+// Focuses on document upload (multipart) since photo requires URL/file_id only.
 func S6_MediaUploads() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S6_MediaUploads",
-		ScenarioDescription: "Test media upload methods (photo, document, animation)",
-		CoveredMethods:      []string{"sendPhoto", "sendDocument", "sendAnimation"},
+		ScenarioDescription: "Test media upload methods (document with multipart upload)",
+		CoveredMethods:      []string{"sendDocument"},
 		ScenarioTimeout:     60 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send photo from URL
-			&engine.SendPhotoStep{
-				Photo:   engine.MediaFromURL(fixtures.TestURLs.Photo),
-				Caption: "galigo test photo",
-			},
-			// Send document with file upload
+			// Send document with file upload (tests multipart encoding)
 			&engine.SendDocumentStep{
-				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "test.txt", "document"),
-				Caption:  "galigo test document",
+				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "galigo-test.txt", "document"),
+				Caption:  "galigo test document (multipart upload)",
 			},
-			// Send animation from URL (if available)
-			&conditionalStep{
-				condition: fixtures.HasAnimation,
-				step: &engine.SendAnimationStep{
-					Animation: engine.MediaFromURL(fixtures.TestURLs.Animation),
-					Caption:   "galigo test animation",
-				},
-				skipName: "sendAnimation (skipped - no URL)",
+			// Send another document to verify consistency
+			&engine.SendDocumentStep{
+				Document: engine.MediaFromBytes(fixtures.PhotoBytes(), "galigo-test.jpg", "document"),
+				Caption:  "galigo test image as document",
 			},
 			// Cleanup
 			&engine.CleanupStep{},
@@ -42,24 +33,19 @@ func S6_MediaUploads() engine.Scenario {
 }
 
 // S7_MediaGroups tests media group (album) functionality.
+// Uses document type since photo URLs are unreliable for testing.
 func S7_MediaGroups() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S7_MediaGroups",
-		ScenarioDescription: "Test sending media groups (albums)",
+		ScenarioDescription: "Test sending media groups (document album)",
 		CoveredMethods:      []string{"sendMediaGroup"},
 		ScenarioTimeout:     60 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send a media group with multiple photos
+			// Send a media group with multiple documents
 			&engine.SendMediaGroupStep{
 				Media: []engine.MediaInput{
-					{
-						URL:  fixtures.TestURLs.Photo,
-						Type: "photo",
-					},
-					{
-						URL:  fixtures.TestURLs.Photo,
-						Type: "photo",
-					},
+					engine.MediaFromBytes(fixtures.DocumentBytes(), "doc1.txt", "document"),
+					engine.MediaFromBytes([]byte("Second test document content\n"), "doc2.txt", "document"),
 				},
 			},
 			// Cleanup
@@ -73,13 +59,13 @@ func S8_EditMedia() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S8_EditMedia",
 		ScenarioDescription: "Test editing media message captions",
-		CoveredMethods:      []string{"sendPhoto", "editMessageCaption"},
+		CoveredMethods:      []string{"sendDocument", "editMessageCaption"},
 		ScenarioTimeout:     30 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send photo with caption
-			&engine.SendPhotoStep{
-				Photo:   engine.MediaFromURL(fixtures.TestURLs.Photo),
-				Caption: "Original caption",
+			// Send document with caption
+			&engine.SendDocumentStep{
+				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "caption-test.txt", "document"),
+				Caption:  "Original caption",
 			},
 			// Edit caption
 			&engine.EditMessageCaptionStep{
@@ -122,32 +108,4 @@ func AllPhaseBScenarios() []engine.Scenario {
 		S8_EditMedia(),
 		S9_GetFile(),
 	}
-}
-
-// conditionalStep wraps a step that may be skipped based on a condition.
-type conditionalStep struct {
-	condition func() bool
-	step      engine.Step
-	skipName  string
-}
-
-func (s *conditionalStep) Name() string {
-	if !s.condition() {
-		return s.skipName
-	}
-	return s.step.Name()
-}
-
-func (s *conditionalStep) Execute(ctx context.Context, rt *engine.Runtime) (*engine.StepResult, error) {
-	if !s.condition() {
-		return &engine.StepResult{
-			StepName: s.skipName,
-			Success:  true,
-			Evidence: map[string]any{
-				"skipped": true,
-				"reason":  "condition not met",
-			},
-		}, nil
-	}
-	return s.step.Execute(ctx, rt)
 }

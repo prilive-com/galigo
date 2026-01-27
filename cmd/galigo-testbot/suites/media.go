@@ -11,19 +11,34 @@ import (
 func S6_MediaUploads() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S6_MediaUploads",
-		ScenarioDescription: "Test media upload methods (photo and document)",
-		CoveredMethods:      []string{"sendPhoto", "sendDocument"},
-		ScenarioTimeout:     60 * time.Second,
+		ScenarioDescription: "Test media upload methods (photo, document, animation, audio, voice)",
+		CoveredMethods:      []string{"sendPhoto", "sendDocument", "sendAnimation", "sendAudio", "sendVoice"},
+		ScenarioTimeout:     120 * time.Second,
 		ScenarioSteps: []engine.Step{
-			// Send photo with file upload (tests multipart encoding)
+			// Send photo
 			&engine.SendPhotoStep{
 				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "galigo-test.jpg", "photo"),
-				Caption: "galigo test photo (multipart upload)",
+				Caption: "galigo test photo",
 			},
-			// Send document with file upload
+			// Send document
 			&engine.SendDocumentStep{
 				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "galigo-test.txt", "document"),
-				Caption:  "galigo test document (multipart upload)",
+				Caption:  "galigo test document",
+			},
+			// Send animation (GIF)
+			&engine.SendAnimationStep{
+				Animation: engine.MediaFromBytes(fixtures.AnimationBytes(), "galigo-test.gif", "animation"),
+				Caption:   "galigo test animation",
+			},
+			// Send audio (MP3)
+			&engine.SendAudioStep{
+				Audio:   engine.MediaFromBytes(fixtures.AudioBytes(), "galigo-test.mp3", "audio"),
+				Caption: "galigo test audio",
+			},
+			// Send voice (OGG Opus)
+			&engine.SendVoiceStep{
+				Voice:   engine.MediaFromBytes(fixtures.VoiceBytes(), "galigo-test.ogg", "voice"),
+				Caption: "galigo test voice",
 			},
 			// Cleanup
 			&engine.CleanupStep{},

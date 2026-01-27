@@ -10,41 +10,63 @@ Unified Go library for Telegram Bot API combining receiving and sending function
 - **tg/**: Shared Telegram types, `Editable` interface, `SecretToken`, keyboard builders, canonical errors
 - **receiver/**: Dual-mode update receiving (webhook + long polling) with circuit breaker and delivery policies
 - **sender/**: Resilient message sending with rate limiting, retries, circuit breaker, and file uploads
-- **internal/**: HTTP client, resilience utilities, validation, test utilities
+- **internal/**: HTTP client, resilience utilities, sync utilities, validation, test utilities
+- **cmd/galigo-testbot/**: Acceptance test bot for real Telegram API validation
 
 ## Package Structure
 
 ```
 galigo/
-├── bot.go           # Unified Bot type with options
-├── tg/              # Shared Telegram types
-│   ├── types.go     # Message, User, Chat, File, Editable interface
-│   ├── update.go    # Update, CallbackQuery
-│   ├── keyboard.go  # Fluent inline keyboard builder with generics
-│   ├── errors.go    # Canonical error types and sentinels
-│   ├── config.go    # Configuration helpers
-│   ├── parse_mode.go # ParseMode constants
-│   └── secret.go    # SecretToken (auto-redacts in logs)
-├── receiver/        # Update receiving (webhook/polling)
-│   ├── polling.go   # Long polling with circuit breaker + delivery policies
-│   ├── webhook.go   # Webhook HTTP handler
-│   ├── api.go       # Webhook management API (set/delete/get)
-│   ├── config.go    # Receiver configuration + delivery policy
-│   └── errors.go    # Receiver error types
-├── sender/          # Message sending
-│   ├── client.go    # Sender client with retry and rate limiting
-│   ├── methods.go   # API methods (GetMe, SendDocument, SendVideo, etc.)
-│   ├── requests.go  # Request types (SendMessage, SendDocument, etc.)
-│   ├── inputfile.go # InputFile for file uploads (FileID, URL, Reader)
-│   ├── multipart.go # Multipart encoder for file uploads
-│   ├── options.go   # Functional options for requests
-│   ├── config.go    # Sender configuration
-│   └── errors.go    # Error aliases (backward compatible with tg.Err*)
-└── internal/        # Internal packages
-    ├── httpclient/  # HTTP client with TLS 1.2+
-    ├── resilience/  # Circuit breaker, rate limiting, retry
-    ├── testutil/    # Test utilities and mocks
-    └── validate/    # Validation utilities
+├── bot.go              # Unified Bot type with options
+├── doc.go              # Package documentation
+├── tg/                 # Shared Telegram types
+│   ├── types.go        # Message, User, Chat, File, Editable interface
+│   ├── update.go       # Update, CallbackQuery
+│   ├── keyboard.go     # Fluent inline keyboard builder with generics
+│   ├── errors.go       # Canonical error types and sentinels
+│   ├── config.go       # Configuration helpers
+│   ├── parse_mode.go   # ParseMode constants
+│   └── secret.go       # SecretToken (auto-redacts in logs)
+├── receiver/           # Update receiving (webhook/polling)
+│   ├── polling.go      # Long polling with circuit breaker + delivery policies
+│   ├── webhook.go      # Webhook HTTP handler
+│   ├── api.go          # Webhook management API (set/delete/get)
+│   ├── config.go       # Receiver configuration + delivery policy
+│   └── errors.go       # Receiver error types
+├── sender/             # Message sending
+│   ├── client.go       # Sender client with retry, rate limiting, multipart detection
+│   ├── methods.go      # API methods (GetMe, SendDocument, SendVideo, etc.)
+│   ├── requests.go     # Request types (SendMessage, SendDocument, etc.)
+│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader)
+│   ├── multipart.go    # Multipart encoder for file uploads
+│   ├── options.go      # Functional options for requests
+│   ├── config.go       # Sender configuration
+│   └── errors.go       # Error aliases (backward compatible with tg.Err*)
+├── internal/           # Internal packages
+│   ├── httpclient/     # HTTP client with TLS 1.2+
+│   ├── resilience/     # Circuit breaker, rate limiting, retry
+│   ├── syncutil/       # WaitGroup utilities
+│   ├── testutil/       # Test utilities, mock server, fixtures
+│   └── validate/       # Token and input validation
+├── cmd/
+│   └── galigo-testbot/ # Acceptance test bot
+│       ├── main.go     # CLI entry point (--run, --status flags)
+│       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter
+│       ├── suites/     # Test scenario definitions
+│       │   ├── tier1.go  # Phase A: core scenarios (S0-S5)
+│       │   └── media.go  # Phase B: media scenarios (S6-S9)
+│       ├── fixtures/   # Embedded test media files (go:embed)
+│       │   ├── photo.jpg      # 100x100 JPEG
+│       │   ├── animation.gif  # 100x100 2-frame GIF
+│       │   ├── sticker.png    # 512x512 PNG
+│       │   ├── audio.mp3      # Minimal MP3 (5 silent frames)
+│       │   └── voice.ogg      # Minimal OGG Opus (1 silent frame)
+│       ├── config/     # Environment config + .env loader
+│       ├── evidence/   # JSON report generation
+│       ├── registry/   # Method coverage tracking (25 target methods)
+│       └── cleanup/    # Message cleanup utilities
+└── examples/
+    └── echo/           # Echo bot example
 ```
 
 ## Build and Test Commands
@@ -53,7 +75,7 @@ galigo/
 # Build all packages
 go build ./...
 
-# Run tests
+# Run unit tests
 go test ./...
 
 # Run with verbose output
@@ -62,7 +84,7 @@ go test -v ./...
 # Run with race detector
 go test -race ./...
 
-# Run with coverage (80% threshold)
+# Run with coverage
 go test -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
 
@@ -70,8 +92,11 @@ go tool cover -func=coverage.out
 go fmt ./...
 go vet ./...
 
-# Full CI check
-make ci
+# Run acceptance tests (requires TELEGRAM_BOT_TOKEN and TESTBOT_CHAT_ID)
+go run ./cmd/galigo-testbot --run all
+go run ./cmd/galigo-testbot --run core     # Phase A only
+go run ./cmd/galigo-testbot --run media    # Phase B only
+go run ./cmd/galigo-testbot --status       # Show method coverage
 ```
 
 ## Architecture
@@ -96,7 +121,7 @@ User Application
            └── Per-chat rate limiting
            └── Global rate limiting
            └── Retry with jitter
-           └── File uploads (streaming)
+           └── File uploads (streaming multipart)
                    │
                    ▼
            Telegram Bot API
@@ -139,7 +164,14 @@ type InputFile struct {
 func FromReader(r io.Reader, filename string) InputFile
 func FromFileID(fileID string) InputFile
 func FromURL(url string) InputFile
+func (f InputFile) MarshalJSON() ([]byte, error)  // Returns Value() for JSON (FileID or URL)
 ```
+
+### Multipart Upload Detection
+
+`sender.Client.doRequest()` automatically detects whether a request contains file uploads (InputFile with Reader set). If uploads are found, it uses `multipart/form-data` encoding; otherwise, it uses standard JSON encoding. This is transparent to the caller.
+
+For single-file methods (sendPhoto, sendDocument, etc.), the file is placed directly in the multipart field named after the parameter (e.g., `photo`, `document`). The `attach://` reference syntax is only used for `sendMediaGroup`.
 
 ### Concurrency Patterns
 
@@ -237,6 +269,12 @@ func (b *Bot) SendDocument(ctx context.Context, chatID tg.ChatID, doc InputFile,
 }
 ```
 
+4. Add acceptance test coverage in `cmd/galigo-testbot/`:
+   - Add step in `engine/steps.go`
+   - Add adapter method in `engine/adapter.go`
+   - Add to scenario in `suites/media.go`
+   - Register in `registry/registry.go` target methods
+
 ### Adding New Telegram Types
 
 Add to `tg/types.go`:
@@ -268,6 +306,67 @@ case strings.Contains(descLower, "file is too big"):
 ```go
 var ErrDocumentTooLarge = tg.ErrDocumentTooLarge
 ```
+
+## Acceptance Testing (galigo-testbot)
+
+The testbot validates API methods against real Telegram servers. It runs scenarios that exercise each method and generates JSON evidence reports.
+
+### Test Phases
+
+| Phase | Scenarios | Methods Covered |
+|-------|-----------|-----------------|
+| A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
+| B (Media) | S6-S9: Media Uploads, Media Groups, Edit Media, Get File | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile |
+
+### Running Tests
+
+```bash
+# Set environment
+export TELEGRAM_BOT_TOKEN="your-token"
+export TESTBOT_CHAT_ID="your-chat-id"
+
+# Run all tests
+go run ./cmd/galigo-testbot --run all
+
+# Run specific phase or scenario
+go run ./cmd/galigo-testbot --run core
+go run ./cmd/galigo-testbot --run media
+go run ./cmd/galigo-testbot --run media-uploads
+
+# Check coverage
+go run ./cmd/galigo-testbot --status
+```
+
+### Available Suites
+
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `all`
+
+### Test Fixtures
+
+All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`. Generated with pure Go (no external tools like ffmpeg):
+
+- `photo.jpg` — 100x100 red JPEG (image/jpeg)
+- `animation.gif` — 100x100 2-frame red/blue GIF (image/gif)
+- `sticker.png` — 512x512 gradient PNG (image/png)
+- `audio.mp3` — 5 silent MPEG1 Layer3 frames
+- `voice.ogg` — Minimal OGG Opus with 1 silent frame
+
+### Adding a New Test Scenario
+
+1. Add step type in `engine/steps.go`:
+```go
+type SendVoiceStep struct {
+    Voice   MediaInput
+    Caption string
+}
+func (s *SendVoiceStep) Name() string { return "sendVoice" }
+func (s *SendVoiceStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) { ... }
+```
+
+2. Add adapter method in `engine/adapter.go`
+3. Add to `SenderClient` interface in `engine/scenario.go`
+4. Create or update scenario in `suites/media.go`
+5. Register method in `registry/registry.go`
 
 ## Resilience Configuration
 
@@ -362,7 +461,7 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
 
 ### Messages
 - `SendMessage` - Send text messages
-- `SendPhoto` - Send photos
+- `SendPhoto` - Send photos (InputFile: file upload, URL, or file_id)
 - `SendDocument` - Send documents
 - `SendVideo` - Send videos
 - `SendAudio` - Send audio files
@@ -392,6 +491,11 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
 - `ForwardMessage` - Forward a message
 - `CopyMessage` - Copy a message
 
+### Callback Queries
+- `AnswerCallbackQuery` - Answer callback queries
+- `Answer` - Answer with options (convenience)
+- `Acknowledge` - Silently acknowledge
+
 ### Bulk Operations
 - `ForwardMessages` - Forward multiple messages
 - `CopyMessages` - Copy multiple messages
@@ -412,6 +516,7 @@ import "github.com/prilive-com/galigo/receiver"
 // Internal (not importable)
 // github.com/prilive-com/galigo/internal/httpclient
 // github.com/prilive-com/galigo/internal/resilience
+// github.com/prilive-com/galigo/internal/syncutil
 // github.com/prilive-com/galigo/internal/testutil
 // github.com/prilive-com/galigo/internal/validate
 ```
@@ -436,6 +541,7 @@ require (
 - Table-driven tests with testify
 - TLS 1.2+ for all HTTP clients
 - Constant-time comparison for secrets (`crypto/subtle`)
+- Test fixtures embedded via `go:embed`, no external tool dependencies
 
 ## Security Considerations
 

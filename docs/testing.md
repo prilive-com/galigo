@@ -590,3 +590,199 @@ go test -race ./...
 - Use `FakeSleeper` instead of real time
 - Use atomic operations for counters in handlers
 - Avoid `time.Sleep` in tests when possible
+
+## Acceptance Tests (galigo-testbot)
+
+The testbot validates API methods against the real Telegram Bot API. It sends actual messages, uploads files, and verifies responses. All created messages are cleaned up after each scenario.
+
+### Prerequisites
+
+1. A Telegram bot token (from [@BotFather](https://t.me/BotFather))
+2. A chat ID where the bot can send messages (send `/start` to your bot first)
+
+### Configuration
+
+Set environment variables or create a `.env` file in the project root:
+
+```bash
+# Required
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TESTBOT_CHAT_ID=123456789
+
+# Optional
+TESTBOT_MODE=polling              # polling (default) or webhook
+TESTBOT_ADMINS=123456789          # Comma-separated user IDs for interactive mode
+TESTBOT_SEND_INTERVAL=1s          # Delay between API calls (default: 1s)
+TESTBOT_MAX_MESSAGES=100          # Max messages per run (default: 100)
+TESTBOT_STORAGE_DIR=var/reports   # Report output directory
+TESTBOT_LOG_LEVEL=info            # info or debug
+```
+
+### Running Acceptance Tests
+
+```bash
+# Run all scenarios (Phase A + B)
+go run ./cmd/galigo-testbot --run all
+
+# Run by phase
+go run ./cmd/galigo-testbot --run core     # Phase A: core messaging
+go run ./cmd/galigo-testbot --run media    # Phase B: media uploads
+
+# Run individual scenarios
+go run ./cmd/galigo-testbot --run smoke          # S0: Quick sanity check
+go run ./cmd/galigo-testbot --run identity       # S1: Bot identity
+go run ./cmd/galigo-testbot --run messages       # S2: Send, edit, delete
+go run ./cmd/galigo-testbot --run forward        # S4: Forward and copy
+go run ./cmd/galigo-testbot --run actions        # S5: Chat actions
+go run ./cmd/galigo-testbot --run media-uploads  # S6: Photo, document, animation, audio, voice
+go run ./cmd/galigo-testbot --run media-groups   # S7: Albums
+go run ./cmd/galigo-testbot --run edit-media     # S8: Edit captions
+go run ./cmd/galigo-testbot --run get-file       # S9: File download info
+
+# Show method coverage
+go run ./cmd/galigo-testbot --status
+```
+
+### Interactive Mode
+
+Run without `--run` to start interactive mode. The bot listens for Telegram commands:
+
+```
+/run <suite>  - Run a test suite
+/status       - Show method coverage
+/help         - Show available commands
+```
+
+### Test Phases
+
+#### Phase A: Core Messaging (S0-S5)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S0-Smoke | getMe, sendMessage, deleteMessage | Quick sanity check |
+| S1-Identity | getMe | Verify bot identity |
+| S2-MessageLifecycle | sendMessage, editMessageText, deleteMessage | Full message lifecycle |
+| S4-ForwardCopy | sendMessage, forwardMessage, copyMessage | Forward and copy operations |
+| S5-ChatAction | sendChatAction | Typing indicators |
+
+#### Phase B: Media (S6-S9)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S6-MediaUploads | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice | File upload via multipart |
+| S7-MediaGroups | sendMediaGroup | Album with multiple documents |
+| S8-EditMedia | sendPhoto, editMessageCaption | Caption editing |
+| S9-GetFile | sendDocument, getFile | File metadata retrieval |
+
+### Method Coverage
+
+Current coverage: **15/25 methods** (60%)
+
+**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendMediaGroup, editMessageCaption, getFile
+
+**Not yet covered:** answerCallbackQuery, sendSticker, sendVideo, sendVideoNote, editMessageMedia, editMessageReplyMarkup, getUpdates, getWebhookInfo, setWebhook, deleteWebhook
+
+### Test Fixtures
+
+All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`. Generated with pure Go standard library (no external dependencies like ffmpeg):
+
+| File | Format | Size | Description |
+|------|--------|------|-------------|
+| `photo.jpg` | JPEG | 791B | 100x100 red square (`image/jpeg`) |
+| `animation.gif` | GIF | 317B | 100x100 2-frame red/blue (`image/gif`) |
+| `sticker.png` | PNG | 1.9KB | 512x512 color gradient (`image/png`) |
+| `audio.mp3` | MP3 | 2.1KB | 5 silent MPEG1 Layer3 frames (raw bytes) |
+| `voice.ogg` | OGG Opus | 124B | 3 OGG pages with 1 silent Opus frame (raw bytes) |
+
+### Evidence Reports
+
+Each test run generates a JSON report in `var/reports/`:
+
+```json
+{
+  "run_id": "20260127-153819",
+  "start_time": "2026-01-27T15:38:19Z",
+  "success": true,
+  "scenarios": [
+    {
+      "scenario_name": "S0-Smoke",
+      "covers": ["getMe", "sendMessage", "deleteMessage"],
+      "success": true,
+      "duration": "3.755s",
+      "steps": [
+        {
+          "step_name": "getMe",
+          "method": "getMe",
+          "success": true,
+          "duration": "83ms",
+          "evidence": {"username": "my_bot", "id": 123456789}
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Testbot Architecture
+
+```
+cmd/galigo-testbot/
+├── main.go         # CLI entry, flag parsing, suite dispatch
+├── engine/
+│   ├── scenario.go # Scenario, Step, Runtime, SenderClient interface, MediaInput
+│   ├── steps.go    # Step implementations (GetMeStep, SendPhotoStep, etc.)
+│   ├── runner.go   # Scenario executor with timing and error handling
+│   └── adapter.go  # SenderAdapter: wraps sender.Client to SenderClient interface
+├── suites/
+│   ├── tier1.go    # Phase A scenarios (S0-S5)
+│   └── media.go    # Phase B scenarios (S6-S9)
+├── fixtures/
+│   ├── fixtures.go # go:embed declarations and accessor functions
+│   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
+├── config/         # Environment variable loading + .env parser
+├── evidence/       # JSON report generation and formatting
+├── registry/       # Target method list and coverage checking
+└── cleanup/        # Message cleanup utilities
+```
+
+### Adding a New Acceptance Test Scenario
+
+1. **Add step** in `engine/steps.go`:
+   ```go
+   type SendLocationStep struct {
+       Latitude, Longitude float64
+   }
+   func (s *SendLocationStep) Name() string { return "sendLocation" }
+   func (s *SendLocationStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+       // Call rt.Sender, track message, return evidence
+   }
+   ```
+
+2. **Add interface method** in `engine/scenario.go` `SenderClient` interface
+
+3. **Add adapter** in `engine/adapter.go`
+
+4. **Create scenario** in `suites/`:
+   ```go
+   func S10_Location() engine.Scenario {
+       return &engine.BaseScenario{
+           ScenarioName:   "S10_Location",
+           CoveredMethods: []string{"sendLocation"},
+           ScenarioSteps:  []engine.Step{&engine.SendLocationStep{...}, &engine.CleanupStep{}},
+       }
+   }
+   ```
+
+5. **Register suite** in `main.go` switch cases and help text
+
+6. **Add target method** in `registry/registry.go` if not already listed
+
+### Adding a New Test Fixture
+
+For formats with Go stdlib support (image/jpeg, image/gif, image/png):
+1. Write a generator script (see project history for examples)
+2. Run it to generate the binary file
+3. Place in `cmd/galigo-testbot/fixtures/`
+4. Add `//go:embed` directive and accessor functions in `fixtures.go`
+
+For binary formats without Go stdlib support (MP3, OGG), construct minimal valid files using raw byte sequences by studying the format specification to find the smallest valid structure.

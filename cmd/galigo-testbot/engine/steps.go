@@ -343,9 +343,12 @@ func (s *SendAnimationStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	rt.LastMessage = msg
 	rt.TrackMessage(rt.ChatID, msg.MessageID)
 
-	// Capture file_id for reuse (Animation is stored as Document in API response)
+	// Capture file_id for reuse
 	var fileID string
-	if msg.Document != nil {
+	if msg.Animation != nil {
+		fileID = msg.Animation.FileID
+		rt.CapturedFileIDs["animation"] = fileID
+	} else if msg.Document != nil {
 		fileID = msg.Document.FileID
 		rt.CapturedFileIDs["animation"] = fileID
 	}
@@ -429,6 +432,74 @@ func (s *SendAudioStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, 
 		Evidence: map[string]any{
 			"message_id": msg.MessageID,
 			"caption":    s.Caption,
+			"file_id":    fileID,
+		},
+	}, nil
+}
+
+// SendVoiceStep sends a voice message.
+type SendVoiceStep struct {
+	Voice   MediaInput
+	Caption string
+}
+
+func (s *SendVoiceStep) Name() string { return "sendVoice" }
+
+func (s *SendVoiceStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendVoice(ctx, rt.ChatID, s.Voice, s.Caption)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	var fileID string
+	if msg.Voice != nil {
+		fileID = msg.Voice.FileID
+		rt.CapturedFileIDs["voice"] = fileID
+	}
+
+	return &StepResult{
+		Method:     "sendVoice",
+		MessageIDs: []int{msg.MessageID},
+		FileIDs:    []string{fileID},
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
+			"caption":    s.Caption,
+			"file_id":    fileID,
+		},
+	}, nil
+}
+
+// SendStickerStep sends a sticker.
+type SendStickerStep struct {
+	Sticker MediaInput
+}
+
+func (s *SendStickerStep) Name() string { return "sendSticker" }
+
+func (s *SendStickerStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendSticker(ctx, rt.ChatID, s.Sticker)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	var fileID string
+	if msg.Sticker != nil {
+		fileID = msg.Sticker.FileID
+		rt.CapturedFileIDs["sticker"] = fileID
+	}
+
+	return &StepResult{
+		Method:     "sendSticker",
+		MessageIDs: []int{msg.MessageID},
+		FileIDs:    []string{fileID},
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
 			"file_id":    fileID,
 		},
 	}, nil

@@ -8,10 +8,11 @@ A unified Go library for Telegram Bot API with built-in resilience features.
 - **Circuit breaker**: Fault tolerance with sony/gobreaker/v2
 - **Rate limiting**: Per-chat and global rate limiting with golang.org/x/time/rate
 - **Retry with backoff**: Exponential backoff with cryptographic jitter (crypto/rand)
-- **File uploads**: InputFile abstraction with streaming support (no memory buffering)
+- **File uploads**: InputFile abstraction with streaming multipart support (no memory buffering)
 - **TLS 1.2+**: Secure connections by default
 - **Secret token protection**: Auto-redacts tokens in logs (slog.LogValuer)
 - **Modern Go**: Built for Go 1.25+ with generics and iter.Seq iterators
+- **Acceptance testing**: Built-in testbot for real Telegram API validation
 
 ## Installation
 
@@ -69,35 +70,49 @@ func main() {
 
 ```
 galigo/
-├── bot.go           # Unified Bot type with options
-├── tg/              # Shared Telegram types
-│   ├── types.go     # Message, User, Chat, File, Editable interface
-│   ├── update.go    # Update, CallbackQuery
-│   ├── keyboard.go  # Fluent inline keyboard builder with generics
-│   ├── errors.go    # Canonical error types and sentinels
-│   ├── config.go    # Configuration helpers
-│   ├── parse_mode.go # ParseMode constants
-│   └── secret.go    # SecretToken (auto-redacts in logs)
-├── receiver/        # Update receiving (webhook/polling)
-│   ├── polling.go   # Long polling with circuit breaker + delivery policies
-│   ├── webhook.go   # Webhook HTTP handler
-│   ├── api.go       # Webhook management API (set/delete/get)
-│   ├── config.go    # Receiver configuration + delivery policy
-│   └── errors.go    # Receiver error types
-├── sender/          # Message sending
-│   ├── client.go    # Sender client with retry and rate limiting
-│   ├── methods.go   # API methods (GetMe, SendDocument, SendVideo, etc.)
-│   ├── requests.go  # Request types (SendMessage, SendDocument, etc.)
-│   ├── inputfile.go # InputFile for file uploads (FileID, URL, Reader)
-│   ├── multipart.go # Multipart encoder for file uploads
-│   ├── options.go   # Functional options for requests
-│   ├── config.go    # Sender configuration
-│   └── errors.go    # Error aliases (backward compatible with tg.Err*)
-└── internal/        # Internal packages
-    ├── httpclient/  # HTTP client with TLS 1.2+
-    ├── resilience/  # Circuit breaker, rate limiting, retry
-    ├── testutil/    # Test utilities and mocks
-    └── validate/    # Validation utilities
+├── bot.go              # Unified Bot type with functional options
+├── doc.go              # Package documentation
+├── tg/                 # Shared Telegram types
+│   ├── types.go        # Message, User, Chat, File, Editable interface
+│   ├── update.go       # Update, CallbackQuery
+│   ├── keyboard.go     # Fluent inline keyboard builder with generics
+│   ├── errors.go       # Canonical error types and sentinels
+│   ├── config.go       # Configuration helpers
+│   ├── parse_mode.go   # ParseMode constants
+│   └── secret.go       # SecretToken (auto-redacts in logs)
+├── receiver/           # Update receiving (webhook/polling)
+│   ├── polling.go      # Long polling with circuit breaker + delivery policies
+│   ├── webhook.go      # Webhook HTTP handler
+│   ├── api.go          # Webhook management API (set/delete/get)
+│   ├── config.go       # Receiver configuration + delivery policy
+│   └── errors.go       # Receiver error types
+├── sender/             # Message sending
+│   ├── client.go       # Sender client with retry and rate limiting
+│   ├── methods.go      # API methods (GetMe, SendDocument, SendVideo, etc.)
+│   ├── requests.go     # Request types (SendMessage, SendDocument, etc.)
+│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader)
+│   ├── multipart.go    # Multipart encoder for file uploads
+│   ├── options.go      # Functional options for requests
+│   ├── config.go       # Sender configuration
+│   └── errors.go       # Error aliases (backward compatible with tg.Err*)
+├── internal/           # Internal packages
+│   ├── httpclient/     # HTTP client with TLS 1.2+
+│   ├── resilience/     # Circuit breaker, rate limiting, retry
+│   ├── syncutil/       # WaitGroup utilities
+│   ├── testutil/       # Test utilities, mock server, fixtures
+│   └── validate/       # Token and input validation
+├── cmd/
+│   └── galigo-testbot/ # Acceptance test bot (see docs/testing.md)
+│       ├── main.go     # CLI entry point
+│       ├── engine/     # Scenario runner, steps, adapter
+│       ├── suites/     # Test scenario definitions (Phase A, B)
+│       ├── fixtures/   # Embedded test media files (JPEG, GIF, PNG, MP3, OGG)
+│       ├── config/     # Environment config + .env loader
+│       ├── evidence/   # JSON report generation
+│       ├── registry/   # Method coverage tracking
+│       └── cleanup/    # Message cleanup utilities
+└── examples/
+    └── echo/           # Echo bot example
 ```
 
 ## Modular Usage
@@ -131,11 +146,11 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 
 ### Messages
 - `SendMessage` - Send text messages
-- `SendPhoto` - Send photos
+- `SendPhoto` - Send photos (file upload, URL, or file_id)
 - `SendDocument` - Send documents
 - `SendVideo` - Send videos
 - `SendAudio` - Send audio files
-- `SendVoice` - Send voice messages
+- `SendVoice` - Send voice messages (OGG Opus)
 - `SendAnimation` - Send GIFs/animations
 - `SendVideoNote` - Send video notes
 - `SendSticker` - Send stickers
@@ -161,6 +176,11 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `ForwardMessage` - Forward a message
 - `CopyMessage` - Copy a message
 
+### Callback Queries
+- `AnswerCallbackQuery` - Answer callback queries
+- `Answer` - Answer with options (convenience)
+- `Acknowledge` - Silently acknowledge
+
 ### Bulk Operations
 - `ForwardMessages` - Forward multiple messages
 - `CopyMessages` - Copy multiple messages
@@ -168,6 +188,8 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `SetMessageReaction` - Set message reaction
 
 ## File Uploads
+
+All media methods support three input modes via `InputFile`:
 
 ```go
 import "github.com/prilive-com/galigo/sender"
@@ -178,7 +200,7 @@ doc := sender.FromFileID("AgACAgIAAxkBAAI...")
 // From URL (Telegram will download)
 doc := sender.FromURL("https://example.com/file.pdf")
 
-// From io.Reader (streamed, no memory buffering)
+// From io.Reader (streamed via multipart/form-data, no memory buffering)
 file, _ := os.Open("document.pdf")
 defer file.Close()
 doc := sender.FromReader(file, "document.pdf")
@@ -190,6 +212,8 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
     Caption:  "Here's your document",
 })
 ```
+
+When using `FromReader`, the library automatically switches from JSON to `multipart/form-data` encoding. For `FromFileID` and `FromURL`, standard JSON encoding is used.
 
 ## Inline Keyboards
 
@@ -406,12 +430,33 @@ Automatically retries transient failures:
 - Respects `retry_after` from JSON response (primary) or HTTP header (fallback)
 - Only retries network errors and 5xx responses
 
+## Testing
+
+### Unit Tests
+
+```bash
+go test ./...
+go test -race ./...
+go test -coverprofile=coverage.out ./...
+```
+
+### Acceptance Tests (galigo-testbot)
+
+The library includes a built-in acceptance test bot that validates all API methods against the real Telegram API. See [docs/testing.md](docs/testing.md) for details.
+
+```bash
+# Quick run
+export TELEGRAM_BOT_TOKEN="your-token"
+export TESTBOT_CHAT_ID="your-chat-id"
+go run ./cmd/galigo-testbot --run all
+```
+
 ## Security
 
 - **TLS 1.2+**: All HTTP clients enforce minimum TLS 1.2
 - **Secret token protection**: `tg.SecretToken` type prevents accidental logging
 - **Webhook validation**: Constant-time comparison of webhook secrets
-- **Input validation**: Request parameters validated before sending
+- **Input validation**: Token format and request parameters validated before sending
 - **Response size limits**: Prevents memory exhaustion from large responses
 
 ## Dependencies

@@ -33,3 +33,10 @@ Thumbs.db
 
 # Vendor (optional, uncomment if not committing vendor)
 # /vendor/
+
+# Environment files (contain secrets)
+.env
+*.env.local
+
+# Testbot storage
+/var/

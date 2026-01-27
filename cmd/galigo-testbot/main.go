@@ -30,6 +30,10 @@ var (
 func main() {
 	flag.Parse()
 
+	// Load .env file if present (doesn't override existing env vars)
+	_ = config.LoadDotEnv(".env")
+	_ = config.LoadDotEnv("cmd/galigo-testbot/.env") // Also check in subdir
+
 	// Setup logging
 	logLevel := slog.LevelInfo
 	if os.Getenv("TESTBOT_LOG_LEVEL") == "debug" {

@@ -136,6 +136,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S8_EditMedia()}
 	case "get-file":
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	case "edit-message-media":
+		scenarios = []engine.Scenario{suites.S11_EditMessageMedia()}
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()
@@ -313,6 +315,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S8_EditMedia()}
 	case "get-file":
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
+	case "edit-message-media":
+		scenarios = []engine.Scenario{suites.S11_EditMessageMedia()}
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()

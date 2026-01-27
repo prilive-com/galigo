@@ -130,6 +130,11 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 				return result, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
+		case InputMedia:
+			if err := handleInputMedia(&result, fieldName, v, &attachIdx); err != nil {
+				return result, fmt.Errorf("field %s: %w", fieldName, err)
+			}
+
 		case string:
 			result.Params[fieldName] = v
 
@@ -156,6 +161,49 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 	}
 
 	return result, nil
+}
+
+func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia, attachIdx *int) error {
+	item := map[string]any{
+		"type": media.Type,
+	}
+
+	switch {
+	case media.Media.FileID != "":
+		item["media"] = media.Media.FileID
+
+	case media.Media.URL != "":
+		item["media"] = media.Media.URL
+
+	case media.Media.Reader != nil:
+		attachName := fmt.Sprintf("file%d", *attachIdx)
+		*attachIdx++
+
+		item["media"] = "attach://" + attachName
+		req.Files = append(req.Files, FilePart{
+			FieldName: attachName,
+			FileName:  media.Media.FileName,
+			Reader:    media.Media.Reader,
+		})
+
+	default:
+		return fmt.Errorf("InputMedia.Media must have FileID, URL, or Reader set")
+	}
+
+	if media.Caption != "" {
+		item["caption"] = media.Caption
+	}
+	if media.ParseMode != "" {
+		item["parse_mode"] = media.ParseMode
+	}
+
+	data, err := json.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("JSON marshal InputMedia: %w", err)
+	}
+	req.Params[fieldName] = string(data)
+
+	return nil
 }
 
 func handleInputFile(req *MultipartRequest, fieldName string, file InputFile, attachIdx *int) error {

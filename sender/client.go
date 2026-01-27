@@ -411,6 +411,15 @@ func (c *Client) EditMessageReplyMarkup(ctx context.Context, req EditMessageRepl
 	return parseMessage(resp)
 }
 
+// EditMessageMedia edits the media content of a message.
+func (c *Client) EditMessageMedia(ctx context.Context, req EditMessageMediaRequest) (*tg.Message, error) {
+	resp, err := c.executeRequest(ctx, "editMessageMedia", req)
+	if err != nil {
+		return nil, err
+	}
+	return parseMessage(resp)
+}
+
 // DeleteMessage deletes a message.
 func (c *Client) DeleteMessage(ctx context.Context, req DeleteMessageRequest) error {
 	_, err := c.executeRequest(ctx, "deleteMessage", req)

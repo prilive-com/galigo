@@ -21,6 +21,12 @@ var audioData []byte
 //go:embed voice.ogg
 var voiceData []byte
 
+//go:embed video.mp4
+var videoData []byte
+
+//go:embed videonote.mp4
+var videoNoteData []byte
+
 // Photo returns a minimal valid JPEG image for testing.
 func Photo() io.Reader {
 	return bytes.NewReader(photoData)
@@ -69,6 +75,26 @@ func Voice() io.Reader {
 // VoiceBytes returns the voice as bytes.
 func VoiceBytes() []byte {
 	return voiceData
+}
+
+// Video returns a minimal valid MP4 video for testing.
+func Video() io.Reader {
+	return bytes.NewReader(videoData)
+}
+
+// VideoBytes returns the video as bytes.
+func VideoBytes() []byte {
+	return videoData
+}
+
+// VideoNote returns a minimal valid MP4 video note (square) for testing.
+func VideoNote() io.Reader {
+	return bytes.NewReader(videoNoteData)
+}
+
+// VideoNoteBytes returns the video note as bytes.
+func VideoNoteBytes() []byte {
+	return videoNoteData
 }
 
 // Document returns a simple text document for testing.

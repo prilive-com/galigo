@@ -814,3 +814,155 @@ func (s *AnswerCallbackQueryStep) Execute(ctx context.Context, rt *Runtime) (*St
 		},
 	}, nil
 }
+
+// ================= Webhook & Polling Steps =================
+
+// GetWebhookInfoStep retrieves webhook info and optionally stores the URL for restore.
+type GetWebhookInfoStep struct {
+	StoreAs string // If set, stores the webhook URL in CapturedFileIDs[StoreAs]
+}
+
+func (s *GetWebhookInfoStep) Name() string { return "getWebhookInfo" }
+
+func (s *GetWebhookInfoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	info, err := rt.Sender.GetWebhookInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.StoreAs != "" {
+		rt.CapturedFileIDs[s.StoreAs] = info.URL
+	}
+
+	return &StepResult{
+		Method: "getWebhookInfo",
+		Evidence: map[string]any{
+			"url":                  info.URL,
+			"pending_update_count": info.PendingUpdateCount,
+			"has_custom_cert":      info.HasCustomCert,
+		},
+	}, nil
+}
+
+// SetWebhookStep sets a webhook URL.
+type SetWebhookStep struct {
+	URL string
+}
+
+func (s *SetWebhookStep) Name() string { return "setWebhook" }
+
+func (s *SetWebhookStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	err := rt.Sender.SetWebhook(ctx, s.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StepResult{
+		Method: "setWebhook",
+		Evidence: map[string]any{
+			"url": s.URL,
+		},
+	}, nil
+}
+
+// DeleteWebhookStep removes the webhook.
+type DeleteWebhookStep struct{}
+
+func (s *DeleteWebhookStep) Name() string { return "deleteWebhook" }
+
+func (s *DeleteWebhookStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	err := rt.Sender.DeleteWebhook(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StepResult{
+		Method: "deleteWebhook",
+	}, nil
+}
+
+// VerifyWebhookURLStep checks that the current webhook URL matches the expected value.
+type VerifyWebhookURLStep struct {
+	ExpectedURL string
+}
+
+func (s *VerifyWebhookURLStep) Name() string { return "getWebhookInfo (verify)" }
+
+func (s *VerifyWebhookURLStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	info, err := rt.Sender.GetWebhookInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if info.URL != s.ExpectedURL {
+		return nil, fmt.Errorf("expected webhook URL %q, got %q", s.ExpectedURL, info.URL)
+	}
+
+	return &StepResult{
+		Method: "getWebhookInfo",
+		Evidence: map[string]any{
+			"url":      info.URL,
+			"expected": s.ExpectedURL,
+			"match":    true,
+		},
+	}, nil
+}
+
+// RestoreWebhookStep restores a previously saved webhook URL.
+// If the stored URL is empty, it deletes the webhook instead.
+type RestoreWebhookStep struct {
+	StoredKey string // Key in CapturedFileIDs to read the original URL from
+}
+
+func (s *RestoreWebhookStep) Name() string { return "restoreWebhook" }
+
+func (s *RestoreWebhookStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	originalURL := rt.CapturedFileIDs[s.StoredKey]
+
+	if originalURL == "" {
+		// No webhook was set before — just delete
+		err := rt.Sender.DeleteWebhook(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &StepResult{
+			Method: "deleteWebhook",
+			Evidence: map[string]any{
+				"action": "deleted (no previous webhook)",
+			},
+		}, nil
+	}
+
+	// Restore the original webhook
+	err := rt.Sender.SetWebhook(ctx, originalURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StepResult{
+		Method: "setWebhook",
+		Evidence: map[string]any{
+			"action":       "restored",
+			"restored_url": originalURL,
+		},
+	}, nil
+}
+
+// GetUpdatesStep calls getUpdates with timeout=0 (non-blocking).
+type GetUpdatesStep struct{}
+
+func (s *GetUpdatesStep) Name() string { return "getUpdates" }
+
+func (s *GetUpdatesStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	updates, err := rt.Sender.GetUpdates(ctx, -1, 1, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StepResult{
+		Method: "getUpdates",
+		Evidence: map[string]any{
+			"update_count": len(updates),
+		},
+	}, nil
+}

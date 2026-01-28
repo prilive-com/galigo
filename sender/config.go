@@ -3,7 +3,6 @@ package sender
 import (
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/prilive-com/galigo/tg"
@@ -41,13 +40,6 @@ type Config struct {
 	// Content limits
 	MaxTextLength    int
 	MaxCaptionLength int
-	MaxFileSize      int64
-
-	// Security
-	AllowedPhotoDirs []string
-
-	// Logging
-	LogFilePath string
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -71,7 +63,6 @@ func DefaultConfig() Config {
 		RetryFactor:        2.0,
 		MaxTextLength:      4096,
 		MaxCaptionLength:   1024,
-		MaxFileSize:        10 << 20, // 10MB
 	}
 }
 
@@ -140,20 +131,6 @@ func LoadConfig() (*Config, error) {
 	if i, err := strconv.Atoi(getEnv("MAX_CAPTION_LENGTH", "1024")); err == nil {
 		cfg.MaxCaptionLength = i
 	}
-
-	if i, err := strconv.ParseInt(getEnv("MAX_FILE_SIZE", "10485760"), 10, 64); err == nil {
-		cfg.MaxFileSize = i
-	}
-
-	if dirs := getEnv("ALLOWED_PHOTO_DIRS", ""); dirs != "" {
-		for _, d := range strings.Split(dirs, ",") {
-			if trimmed := strings.TrimSpace(d); trimmed != "" {
-				cfg.AllowedPhotoDirs = append(cfg.AllowedPhotoDirs, trimmed)
-			}
-		}
-	}
-
-	cfg.LogFilePath = getEnv("LOG_FILE_PATH", "logs/galigo.log")
 
 	return &cfg, nil
 }

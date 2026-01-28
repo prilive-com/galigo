@@ -96,9 +96,6 @@ galigo/
 │   ├── config.go       # Sender configuration
 │   └── errors.go       # Error aliases (backward compatible with tg.Err*)
 ├── internal/           # Internal packages
-│   ├── httpclient/     # HTTP client with TLS 1.2+
-│   ├── resilience/     # Circuit breaker, rate limiting, retry
-│   ├── syncutil/       # WaitGroup utilities
 │   ├── testutil/       # Test utilities, mock server, fixtures
 │   └── validate/       # Token and input validation
 ├── cmd/
@@ -409,6 +406,8 @@ Prevents cascading failures when Telegram API is unavailable:
 // Default settings (configurable)
 // - Opens after 50% failure rate (min 3 requests)
 // - Half-open after 30s timeout
+// - Only server errors (5xx) and network errors trip the breaker
+// - Client errors (4xx) do NOT trip the breaker (prevents self-DOS)
 // - Logs state changes
 ```
 
@@ -454,6 +453,7 @@ go run ./cmd/galigo-testbot --run all
 ## Security
 
 - **TLS 1.2+**: All HTTP clients enforce minimum TLS 1.2
+- **Token scrubbing**: Bot tokens are scrubbed from HTTP error messages to prevent leakage
 - **Secret token protection**: `tg.SecretToken` type prevents accidental logging
 - **Webhook validation**: Constant-time comparison of webhook secrets
 - **Input validation**: Token format and request parameters validated before sending

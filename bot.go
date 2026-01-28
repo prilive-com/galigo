@@ -215,6 +215,7 @@ func (b *Bot) Stop() {
 // Close releases all resources.
 func (b *Bot) Close() error {
 	b.Stop()
+	close(b.updates)
 	return b.sender.Close()
 }
 

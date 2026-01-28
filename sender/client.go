@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,7 +84,7 @@ type Client struct {
 	httpClient     *http.Client
 	logger         *slog.Logger
 	globalLimiter  *rate.Limiter
-	chatLimiters   map[int64]*chatLimiterEntry // P1.2: Track last used time
+	chatLimiters   map[string]*chatLimiterEntry // P1.2: Track last used time
 	limiterMu      sync.RWMutex
 	breaker        *gobreaker.CircuitBreaker[*apiResponse]
 	breakerSettings CircuitBreakerSettings
@@ -185,10 +186,11 @@ func createHTTPClient(cfg Config) *http.Client {
 				Timeout:   10 * time.Second,
 				KeepAlive: cfg.KeepAlive,
 			}).DialContext,
-			MaxIdleConns:        cfg.MaxIdleConns,
-			IdleConnTimeout:     cfg.IdleTimeout,
-			TLSHandshakeTimeout: 10 * time.Second,
-			ForceAttemptHTTP2:   true,
+			MaxIdleConns:          cfg.MaxIdleConns,
+			IdleConnTimeout:       cfg.IdleTimeout,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: cfg.RequestTimeout,
+			ForceAttemptHTTP2:     true,
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
 			},
@@ -207,7 +209,7 @@ func New(token string, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		config:       cfg,
-		chatLimiters: make(map[int64]*chatLimiterEntry), // P1.2: Use entry type
+		chatLimiters: make(map[string]*chatLimiterEntry), // P1.2: Use entry type
 	}
 
 	// Apply options
@@ -247,6 +249,7 @@ func New(token string, opts ...Option) (*Client, error) {
 		Interval:    c.breakerSettings.Interval,
 		Timeout:     c.breakerSettings.Timeout,
 		ReadyToTrip: c.breakerSettings.ReadyToTrip,
+		IsSuccessful: isBreakerSuccess,
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			c.logger.Info("circuit breaker state changed",
 				"name", name,
@@ -270,7 +273,7 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 
 	c := &Client{
 		config:       cfg,
-		chatLimiters: make(map[int64]*chatLimiterEntry), // P1.2: Use entry type
+		chatLimiters: make(map[string]*chatLimiterEntry), // P1.2: Use entry type
 	}
 
 	for _, opt := range opts {
@@ -306,6 +309,7 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 		Interval:    c.breakerSettings.Interval,
 		Timeout:     c.breakerSettings.Timeout,
 		ReadyToTrip: c.breakerSettings.ReadyToTrip,
+		IsSuccessful: isBreakerSuccess,
 	})
 
 	// P1.2: Start chat limiter cleanup goroutine
@@ -604,21 +608,31 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	var req *http.Request
 
 	if multipartReq.HasUploads() {
-		// Use multipart/form-data for file uploads
-		var body bytes.Buffer
-		encoder := NewMultipartEncoder(&body)
-		if err := encoder.Encode(multipartReq); err != nil {
-			return nil, fmt.Errorf("failed to encode multipart request: %w", err)
-		}
-		if err := encoder.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close multipart encoder: %w", err)
-		}
+		// Use multipart/form-data for file uploads — streamed via io.Pipe
+		pr, pw := io.Pipe()
+		encoder := NewMultipartEncoder(pw)
+		contentType := encoder.ContentType()
 
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
+		// Encode in a goroutine so the HTTP request streams as data is written
+		go func() {
+			var encErr error
+			if encErr = encoder.Encode(multipartReq); encErr != nil {
+				pw.CloseWithError(fmt.Errorf("failed to encode multipart request: %w", encErr))
+				return
+			}
+			if encErr = encoder.Close(); encErr != nil {
+				pw.CloseWithError(fmt.Errorf("failed to close multipart encoder: %w", encErr))
+				return
+			}
+			pw.Close()
+		}()
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, pr)
 		if err != nil {
+			pr.Close() // Ensure pipe is cleaned up
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
-		req.Header.Set("Content-Type", encoder.ContentType())
+		req.Header.Set("Content-Type", contentType)
 	} else {
 		// Use JSON for simple requests (no file uploads)
 		jsonData, err := json.Marshal(payload)
@@ -637,7 +651,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", scrubTokenFromError(err, c.config.Token))
 	}
 	defer resp.Body.Close()
 
@@ -669,7 +683,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	return &apiResp, nil
 }
 
-func (c *Client) waitForRateLimit(ctx context.Context, chatID int64) error {
+func (c *Client) waitForRateLimit(ctx context.Context, chatID string) error {
 	limiter := c.getChatLimiter(chatID)
 	if err := limiter.Wait(ctx); err != nil {
 		return err
@@ -677,7 +691,7 @@ func (c *Client) waitForRateLimit(ctx context.Context, chatID int64) error {
 	return c.globalLimiter.Wait(ctx)
 }
 
-func (c *Client) getChatLimiter(chatID int64) *rate.Limiter {
+func (c *Client) getChatLimiter(chatID string) *rate.Limiter {
 	now := time.Now()
 
 	c.limiterMu.RLock()
@@ -789,14 +803,16 @@ func calculateBackoff(cfg Config, attempt int, err error) time.Duration {
 	return time.Duration(backoff)
 }
 
-func extractChatID(chatID tg.ChatID) int64 {
+func extractChatID(chatID tg.ChatID) string {
 	switch v := chatID.(type) {
 	case int64:
-		return v
+		return strconv.FormatInt(v, 10)
 	case int:
-		return int64(v)
+		return strconv.Itoa(v)
+	case string:
+		return v
 	default:
-		return 0
+		return fmt.Sprint(v)
 	}
 }
 
@@ -806,6 +822,49 @@ func parseMessage(resp *apiResponse) (*tg.Message, error) {
 		return nil, fmt.Errorf("failed to parse message: %w", err)
 	}
 	return &msg, nil
+}
+
+// isBreakerSuccess determines if an error should count as a circuit breaker failure.
+// Only server errors (5xx) and network errors trip the breaker.
+// Client errors (4xx like "bot blocked", "chat not found") are NOT breaker failures.
+func isBreakerSuccess(err error) bool {
+	if err == nil {
+		return true
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		// 4xx = client error, not a server problem → don't trip breaker
+		return apiErr.Code >= 400 && apiErr.Code < 500
+	}
+	// Network errors, timeouts → breaker failure
+	return false
+}
+
+// scrubbedError wraps an error with a token-scrubbed message while preserving the error chain.
+type scrubbedError struct {
+	msg string
+	err error
+}
+
+func (e *scrubbedError) Error() string { return e.msg }
+func (e *scrubbedError) Unwrap() error { return e.err }
+
+// scrubTokenFromError removes the bot token from error messages.
+// Go's http.Client.Do() includes the request URL (containing the token) in error strings.
+// Preserves the error chain for errors.Is/As.
+func scrubTokenFromError(err error, token tg.SecretToken) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	tokenVal := token.Value()
+	if tokenVal != "" && strings.Contains(msg, tokenVal) {
+		return &scrubbedError{
+			msg: strings.ReplaceAll(msg, tokenVal, "[REDACTED]"),
+			err: err,
+		}
+	}
+	return err
 }
 
 // parseRetryAfter extracts retry_after from JSON body (primary) or HTTP header (fallback).

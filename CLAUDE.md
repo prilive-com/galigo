@@ -10,7 +10,7 @@ Unified Go library for Telegram Bot API combining receiving and sending function
 - **tg/**: Shared Telegram types, `Editable` interface, `SecretToken`, keyboard builders, canonical errors
 - **receiver/**: Dual-mode update receiving (webhook + long polling) with circuit breaker and delivery policies
 - **sender/**: Resilient message sending with rate limiting, retries, circuit breaker, and file uploads
-- **internal/**: HTTP client, resilience utilities, sync utilities, validation, test utilities
+- **internal/**: Test utilities, validation
 - **cmd/galigo-testbot/**: Acceptance test bot for real Telegram API validation
 
 ## Package Structure
@@ -43,9 +43,6 @@ galigo/
 │   ├── config.go       # Sender configuration
 │   └── errors.go       # Error aliases (backward compatible with tg.Err*)
 ├── internal/           # Internal packages
-│   ├── httpclient/     # HTTP client with TLS 1.2+
-│   ├── resilience/     # Circuit breaker, rate limiting, retry
-│   ├── syncutil/       # WaitGroup utilities
 │   ├── testutil/       # Test utilities, mock server, fixtures
 │   └── validate/       # Token and input validation
 ├── cmd/
@@ -397,6 +394,7 @@ gobreaker.Settings{
         }
         return float64(counts.TotalFailures)/float64(counts.Requests) >= 0.5
     },
+    IsSuccessful: isBreakerSuccess,  // Only 5xx/network errors trip the breaker; 4xx are client errors
 }
 ```
 
@@ -527,9 +525,6 @@ import "github.com/prilive-com/galigo/sender"
 import "github.com/prilive-com/galigo/receiver"
 
 // Internal (not importable)
-// github.com/prilive-com/galigo/internal/httpclient
-// github.com/prilive-com/galigo/internal/resilience
-// github.com/prilive-com/galigo/internal/syncutil
 // github.com/prilive-com/galigo/internal/testutil
 // github.com/prilive-com/galigo/internal/validate
 ```
@@ -559,7 +554,10 @@ require (
 ## Security Considerations
 
 - Never log raw tokens - use `tg.SecretToken`
+- Token scrubbing: HTTP error messages are scrubbed to remove bot tokens (preserves error chain via `Unwrap()`)
 - Validate webhook secrets with constant-time comparison
 - Enforce TLS 1.2+ minimum
 - Limit response body sizes to prevent memory exhaustion
 - Use `http.MaxBytesReader` for request body limits
+- `ResponseHeaderTimeout` on sender HTTP transport prevents hung connections
+- Circuit breaker `IsSuccessful` callback prevents 4xx client errors from tripping the breaker (self-DOS prevention)

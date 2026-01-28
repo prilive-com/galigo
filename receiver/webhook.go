@@ -67,6 +67,10 @@ func NewWebhookHandler(
 	cfg Config,
 	opts ...WebhookOption,
 ) *WebhookHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	h := &WebhookHandler{
 		logger:        logger,
 		webhookSecret: cfg.WebhookSecret,

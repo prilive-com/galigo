@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -156,6 +157,10 @@ func NewPollingClient(
 		baseURL = telegramAPIBaseURL
 	}
 
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	c := &PollingClient{
 		token:              token,
 		baseURL:            baseURL,
@@ -186,6 +191,17 @@ func NewPollingClient(
 			}
 			failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
 			return failureRatio >= 0.6
+		},
+		IsSuccessful: func(err error) bool {
+			if err == nil {
+				return true
+			}
+			// 4xx API errors are client issues, not server failures
+			var apiErr *APIError
+			if errors.As(err, &apiErr) && apiErr.Code >= 400 && apiErr.Code < 500 {
+				return true
+			}
+			return false
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			logger.Info("circuit breaker state changed",
@@ -524,7 +540,7 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 	respBody, err := c.breaker.Execute(func() ([]byte, error) {
 		resp, err := c.client.Do(req)
 		if err != nil {
-			return nil, err
+			return nil, scrubTokenFromError(err, c.token)
 		}
 		defer func() {
 			io.Copy(io.Discard, resp.Body)
@@ -566,6 +582,32 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 	}
 
 	return response.Result, nil
+}
+
+// scrubbedError wraps an error with a token-scrubbed message while preserving the error chain.
+type scrubbedError struct {
+	msg string
+	err error
+}
+
+func (e *scrubbedError) Error() string { return e.msg }
+func (e *scrubbedError) Unwrap() error { return e.err }
+
+// scrubTokenFromError removes the bot token from error messages.
+// Preserves the error chain for errors.Is/As.
+func scrubTokenFromError(err error, token tg.SecretToken) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	tokenVal := token.Value()
+	if tokenVal != "" && strings.Contains(msg, tokenVal) {
+		return &scrubbedError{
+			msg: strings.ReplaceAll(msg, tokenVal, "[REDACTED]"),
+			err: err,
+		}
+	}
+	return err
 }
 
 func (c *PollingClient) calculateBackoff(attempt int32) time.Duration {

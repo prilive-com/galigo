@@ -282,30 +282,6 @@ kb := testutil.TestInlineKeyboard(
 )
 ```
 
-### syncutil.Go
-
-Helper for spawning goroutines tracked by WaitGroup:
-
-```go
-import "github.com/prilive-com/galigo/internal/syncutil"
-
-var wg sync.WaitGroup
-
-// Instead of:
-wg.Add(1)
-go func() {
-    defer wg.Done()
-    doWork()
-}()
-
-// Use:
-syncutil.Go(&wg, func() {
-    doWork()
-})
-
-wg.Wait()
-```
-
 ## Test Patterns
 
 ### Testing Retry Logic
@@ -490,8 +466,6 @@ make check-coverage
 | `receiver/` | 85% | Critical |
 | `tg/` | 90% | High |
 | `internal/validate/` | 100% | High |
-| `internal/resilience/` | 80% | Medium |
-| `internal/httpclient/` | 75% | Medium |
 | `bot.go` | 80% | Medium |
 
 ### Cross-Package Coverage

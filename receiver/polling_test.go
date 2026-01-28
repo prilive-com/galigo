@@ -767,10 +767,13 @@ func TestPollingOption_WithPollingMaxErrors(t *testing.T) {
 }
 
 func TestPollingOption_WithPollingAllowedUpdates(t *testing.T) {
-	var capturedQuery string
+	queryCh := make(chan string, 1)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedQuery = r.URL.Query().Get("allowed_updates")
+		select {
+		case queryCh <- r.URL.Query().Get("allowed_updates"):
+		default:
+		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":     true,
 			"result": []any{},
@@ -797,7 +800,7 @@ func TestPollingOption_WithPollingAllowedUpdates(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Stop()
 
-	time.Sleep(50 * time.Millisecond)
+	capturedQuery := <-queryCh
 
 	assert.Contains(t, capturedQuery, "message")
 	assert.Contains(t, capturedQuery, "callback_query")
@@ -854,7 +857,7 @@ func TestPollingOption_WithDeliveryTimeout(t *testing.T) {
 }
 
 func TestPollingOption_WithUpdateDroppedCallback(t *testing.T) {
-	var calledWith int
+	droppedCh := make(chan int, 1)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
@@ -877,7 +880,10 @@ func TestPollingOption_WithUpdateDroppedCallback(t *testing.T) {
 		pollingTestLogger(),
 		cfg,
 		receiver.WithUpdateDroppedCallback(func(id int, reason string) {
-			calledWith = id
+			select {
+			case droppedCh <- id:
+			default:
+			}
 		}),
 	)
 
@@ -888,9 +894,12 @@ func TestPollingOption_WithUpdateDroppedCallback(t *testing.T) {
 	require.NoError(t, err)
 	defer client.Stop()
 
-	time.Sleep(100 * time.Millisecond)
-
-	assert.Equal(t, 123, calledWith)
+	select {
+	case calledWith := <-droppedCh:
+		assert.Equal(t, 123, calledWith)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for dropped callback")
+	}
 }
 
 func TestPollingOption_WithPollingHTTPClient(t *testing.T) {

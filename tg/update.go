@@ -1,5 +1,10 @@
 package tg
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // Update represents an incoming update from Telegram.
 type Update struct {
 	UpdateID           int                 `json:"update_id"`
@@ -112,19 +117,46 @@ type PollAnswer struct {
 
 // ChatMemberUpdated represents changes in the status of a chat member.
 type ChatMemberUpdated struct {
-	Chat                    *Chat            `json:"chat"`
-	From                    *User            `json:"from"`
-	Date                    int64            `json:"date"`
-	OldChatMember           *ChatMember      `json:"old_chat_member"`
-	NewChatMember           *ChatMember      `json:"new_chat_member"`
-	InviteLink              *ChatInviteLink  `json:"invite_link,omitempty"`
-	ViaChatFolderInviteLink bool             `json:"via_chat_folder_invite_link,omitempty"`
+	Chat                    *Chat           `json:"chat"`
+	From                    *User           `json:"from"`
+	Date                    int64           `json:"date"`
+	OldChatMember           ChatMember      `json:"-"`
+	NewChatMember           ChatMember      `json:"-"`
+	InviteLink              *ChatInviteLink `json:"invite_link,omitempty"`
+	ViaChatFolderInviteLink bool            `json:"via_chat_folder_invite_link,omitempty"`
 }
 
-// ChatMember represents a chat member.
-type ChatMember struct {
-	Status string `json:"status"`
-	User   *User  `json:"user"`
+// UnmarshalJSON implements custom unmarshaling for ChatMemberUpdated.
+// The OldChatMember and NewChatMember fields are ChatMember interfaces
+// that require discriminated union parsing.
+func (u *ChatMemberUpdated) UnmarshalJSON(data []byte) error {
+	// Alias to avoid infinite recursion
+	type Alias ChatMemberUpdated
+	var raw struct {
+		Alias
+		OldChatMember json.RawMessage `json:"old_chat_member"`
+		NewChatMember json.RawMessage `json:"new_chat_member"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*u = ChatMemberUpdated(raw.Alias)
+
+	if len(raw.OldChatMember) > 0 {
+		m, err := UnmarshalChatMember(raw.OldChatMember)
+		if err != nil {
+			return fmt.Errorf("old_chat_member: %w", err)
+		}
+		u.OldChatMember = m
+	}
+	if len(raw.NewChatMember) > 0 {
+		m, err := UnmarshalChatMember(raw.NewChatMember)
+		if err != nil {
+			return fmt.Errorf("new_chat_member: %w", err)
+		}
+		u.NewChatMember = m
+	}
+	return nil
 }
 
 // ChatInviteLink represents an invite link for a chat.

@@ -21,9 +21,14 @@ galigo/
 ├── doc.go              # Package documentation
 ├── tg/                 # Shared Telegram types
 │   ├── types.go        # Message, User, Chat, File, Editable interface
-│   ├── update.go       # Update, CallbackQuery
+│   ├── update.go       # Update, CallbackQuery, Poll, PollAnswer
 │   ├── keyboard.go     # Fluent inline keyboard builder with generics
 │   ├── errors.go       # Canonical error types and sentinels
+│   ├── chat_full_info.go   # ChatFullInfo for getChat response
+│   ├── chat_member.go      # ChatMember with polymorphic unmarshal
+│   ├── chat_permissions.go # ChatPermissions type
+│   ├── chat_admin_rights.go # ChatAdministratorRights type
+│   ├── forum.go            # Sticker, ForumTopic types
 │   ├── config.go       # Configuration helpers
 │   ├── parse_mode.go   # ParseMode constants
 │   └── secret.go       # SecretToken (auto-redacts in logs)
@@ -35,10 +40,17 @@ galigo/
 │   └── errors.go       # Receiver error types
 ├── sender/             # Message sending
 │   ├── client.go       # Sender client with retry, rate limiting, multipart detection
-│   ├── methods.go      # API methods (GetMe, SendDocument, SendVideo, etc.)
 │   ├── requests.go     # Request types (SendMessage, SendDocument, etc.)
-│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader)
+│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader, FromBytes)
 │   ├── multipart.go    # Multipart encoder for file uploads
+│   ├── call.go         # Generic callJSON helper for non-retry methods
+│   ├── chat_info.go    # Chat info methods (GetChat, GetChatMember, etc.)
+│   ├── chat_settings.go # Chat settings (SetChatTitle, SetChatDescription)
+│   ├── chat_pin.go     # Pin/unpin message methods
+│   ├── chat_admin.go   # Chat admin methods (BanChatMember, etc.)
+│   ├── polls.go        # Poll methods (SendPoll, StopPoll)
+│   ├── forum.go        # Forum topic methods
+│   ├── validate.go     # Input validation helpers
 │   ├── options.go      # Functional options for requests
 │   ├── config.go       # Sender configuration
 │   └── errors.go       # Error aliases (backward compatible with tg.Err*)
@@ -50,10 +62,11 @@ galigo/
 │       ├── main.go     # CLI entry point (--run, --status flags)
 │       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter
 │       ├── suites/     # Test scenario definitions
-│       │   ├── tier1.go     # Phase A: core scenarios (S0-S5)
-│       │   ├── media.go     # Phase B: media scenarios (S6-S9)
-│       │   ├── keyboards.go   # Phase C: keyboard scenarios (S10+)
-│       │   ├── interactive.go # Interactive scenarios (S12+, opt-in)
+│       │   ├── tier1.go       # Core messaging scenarios (S0-S5)
+│       │   ├── media.go       # Media scenarios (S6-S11)
+│       │   ├── keyboards.go   # Keyboard scenarios (S10)
+│       │   ├── chat_admin.go  # Chat administration scenarios (S15-S19)
+│       │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │       │   └── webhook.go    # Webhook scenarios (S13-S14, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
 │       │   ├── photo.jpg      # 100x100 JPEG
@@ -65,7 +78,7 @@ galigo/
 │       │   └── videonote.mp4  # Minimal H.264 MP4 (240x240, square)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
-│       ├── registry/   # Method coverage tracking (25 target methods)
+│       ├── registry/   # Method coverage tracking (37 target methods)
 │       └── cleanup/    # Message cleanup utilities
 └── examples/
     └── echo/           # Echo bot example
@@ -96,9 +109,10 @@ go vet ./...
 
 # Run acceptance tests (requires TELEGRAM_BOT_TOKEN and TESTBOT_CHAT_ID)
 go run ./cmd/galigo-testbot --run all
-go run ./cmd/galigo-testbot --run core        # Phase A only
-go run ./cmd/galigo-testbot --run media       # Phase B only
-go run ./cmd/galigo-testbot --run keyboards   # Phase C only
+go run ./cmd/galigo-testbot --run core        # Core messaging
+go run ./cmd/galigo-testbot --run media       # Media uploads
+go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards
+go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (requires supergroup)
 go run ./cmd/galigo-testbot --run interactive # Interactive (requires user click)
 go run ./cmd/galigo-testbot --status          # Show method coverage
 ```
@@ -158,16 +172,20 @@ func (s SecretToken) MarshalText() ([]byte, error)  // encoding.TextMarshaler
 
 // InputFile for file uploads (sender/inputfile.go)
 type InputFile struct {
-    FileID, URL string
-    Reader      io.Reader
-    FileName    string
-    MediaType   string  // "photo", "video", "document", etc.
-    Caption     string
-    ParseMode   string
+    FileID    string
+    URL       string
+    Reader    io.Reader       // Single-use (not retry-safe)
+    Source    func() io.Reader // Factory for retry-safe uploads
+    FileName  string
+    MediaType string  // "photo", "video", "document", etc.
+    Caption   string
+    ParseMode string
 }
-func FromReader(r io.Reader, filename string) InputFile
+func FromReader(r io.Reader, filename string) InputFile  // Single-use, not retry-safe
+func FromBytes(data []byte, filename string) InputFile   // Retry-safe (factory-based)
 func FromFileID(fileID string) InputFile
 func FromURL(url string) InputFile
+func (f InputFile) OpenReader() io.Reader  // Returns Source() if set, else Reader
 func (f InputFile) MarshalJSON() ([]byte, error)  // Returns Value() for JSON (FileID or URL)
 ```
 
@@ -319,9 +337,10 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 
 | Phase | Scenarios | Methods Covered |
 |-------|-----------|-----------------|
-| A (Core) | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
-| B (Media) | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
-| C (Keyboards) | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
+| Core | S0-S5: Smoke, Identity, Messages, Forward, Actions | getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction |
+| Media | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
+| Keyboards | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
+| Chat Admin | S15-S19: Chat Info, Chat Settings, Pin Messages, Polls, Forum Stickers | getChat, getChatAdministrators, getChatMemberCount, getChatMember, setChatTitle, setChatDescription, pinChatMessage, unpinChatMessage, unpinAllChatMessages, sendPoll, stopPoll, getForumTopicIconStickers |
 | Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
 | Webhook | S13-S14: Webhook Lifecycle, GetUpdates (opt-in) | setWebhook, getWebhookInfo, deleteWebhook, getUpdates |
 
@@ -347,7 +366,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `interactive`, `callback`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
 
 ### Test Fixtures
 
@@ -450,7 +469,10 @@ doc := sender.FromFileID("AgACAgIAAxkBAAI...")
 // From URL (Telegram will download)
 doc := sender.FromURL("https://example.com/file.pdf")
 
-// From io.Reader (streamed, no memory buffering)
+// From bytes (retry-safe — recommended for in-memory data)
+doc := sender.FromBytes(data, "document.pdf")
+
+// From io.Reader (streamed, no memory buffering — single-use, not retry-safe)
 file, _ := os.Open("document.pdf")
 defer file.Close()
 doc := sender.FromReader(file, "document.pdf")
@@ -462,6 +484,12 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
     Caption:  "Here's your document",
 })
 ```
+
+### Retry Safety
+
+`FromBytes` creates a `Source` factory that provides a fresh `io.Reader` on each retry attempt via `OpenReader()`. `FromReader` passes the reader directly — on retry, the reader is at EOF and sends an empty file. Always use `FromBytes` when data is in memory and retries are enabled (the default).
+
+The multipart encoder calls `InputFile.OpenReader()` which returns `Source()` if set, falling back to `Reader`. This ensures `BuildMultipartRequest` produces a fresh reader per attempt.
 
 ## Supported API Methods
 
@@ -482,6 +510,28 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
 - `SendSticker` - Send stickers
 - `SendMediaGroup` - Send albums
 
+### Chat Information
+- `GetChat` - Get full chat info
+- `GetChatAdministrators` - List chat admins
+- `GetChatMemberCount` - Get member count
+- `GetChatMember` - Get specific member info
+
+### Chat Settings
+- `SetChatTitle` - Set chat title
+- `SetChatDescription` - Set chat description
+
+### Pin Messages
+- `PinChatMessage` - Pin a message
+- `UnpinChatMessage` - Unpin a specific message
+- `UnpinAllChatMessages` - Unpin all messages
+
+### Polls
+- `SendPoll` - Send native polls (regular and quiz)
+- `StopPoll` - Stop a running poll
+
+### Forum Topics
+- `GetForumTopicIconStickers` - Get available topic icon stickers
+
 ### Utilities
 - `GetFile` - Get file info for download
 - `SendChatAction` - Send typing indicator, etc.
@@ -491,7 +541,6 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
 - `SendLocation` - Send location
 - `SendVenue` - Send venue
 - `SendContact` - Send phone contact
-- `SendPoll` - Send native polls
 - `SendDice` - Send animated dice
 
 ### Message Operations

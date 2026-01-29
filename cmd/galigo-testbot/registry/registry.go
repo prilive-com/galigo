@@ -2,12 +2,13 @@ package registry
 
 import "slices"
 
-// MethodCategory groups methods by implementation phase.
+// MethodCategory groups methods by functional area.
 type MethodCategory string
 
 const (
-	CategoryTier1  MethodCategory = "tier1"
-	CategoryLegacy MethodCategory = "legacy"
+	CategoryMessaging MethodCategory = "messaging"
+	CategoryChatAdmin MethodCategory = "chat-admin"
+	CategoryLegacy    MethodCategory = "legacy"
 )
 
 // Method represents a galigo API method.
@@ -19,45 +20,68 @@ type Method struct {
 
 // AllMethods is the complete list of galigo API methods.
 var AllMethods = []Method{
-	// === Tier 1 Methods ===
+	// === Messaging Methods ===
 	// Core
-	{Name: "getMe", Category: CategoryTier1},
-	{Name: "sendMessage", Category: CategoryTier1},
-	{Name: "editMessageText", Category: CategoryTier1},
-	{Name: "deleteMessage", Category: CategoryTier1},
+	{Name: "getMe", Category: CategoryMessaging},
+	{Name: "sendMessage", Category: CategoryMessaging},
+	{Name: "editMessageText", Category: CategoryMessaging},
+	{Name: "deleteMessage", Category: CategoryMessaging},
 
 	// Callbacks
-	{Name: "answerCallbackQuery", Category: CategoryTier1},
-	{Name: "editMessageReplyMarkup", Category: CategoryTier1},
+	{Name: "answerCallbackQuery", Category: CategoryMessaging},
+	{Name: "editMessageReplyMarkup", Category: CategoryMessaging},
 
 	// Forward/Copy
-	{Name: "forwardMessage", Category: CategoryTier1},
-	{Name: "copyMessage", Category: CategoryTier1},
+	{Name: "forwardMessage", Category: CategoryMessaging},
+	{Name: "copyMessage", Category: CategoryMessaging},
 
 	// Chat action
-	{Name: "sendChatAction", Category: CategoryTier1},
+	{Name: "sendChatAction", Category: CategoryMessaging},
 
 	// Media uploads (multipart)
-	{Name: "sendPhoto", Category: CategoryTier1},
-	{Name: "sendDocument", Category: CategoryTier1},
-	{Name: "sendVideo", Category: CategoryTier1},
-	{Name: "sendAudio", Category: CategoryTier1},
-	{Name: "sendAnimation", Category: CategoryTier1},
-	{Name: "sendVoice", Category: CategoryTier1},
-	{Name: "sendVideoNote", Category: CategoryTier1},
-	{Name: "sendSticker", Category: CategoryTier1},
+	{Name: "sendPhoto", Category: CategoryMessaging},
+	{Name: "sendDocument", Category: CategoryMessaging},
+	{Name: "sendVideo", Category: CategoryMessaging},
+	{Name: "sendAudio", Category: CategoryMessaging},
+	{Name: "sendAnimation", Category: CategoryMessaging},
+	{Name: "sendVoice", Category: CategoryMessaging},
+	{Name: "sendVideoNote", Category: CategoryMessaging},
+	{Name: "sendSticker", Category: CategoryMessaging},
 
 	// Albums
-	{Name: "sendMediaGroup", Category: CategoryTier1},
+	{Name: "sendMediaGroup", Category: CategoryMessaging},
 
 	// Media edit
-	{Name: "editMessageMedia", Category: CategoryTier1},
-	{Name: "editMessageCaption", Category: CategoryTier1},
+	{Name: "editMessageMedia", Category: CategoryMessaging},
+	{Name: "editMessageCaption", Category: CategoryMessaging},
 
 	// Files
-	{Name: "getFile", Category: CategoryTier1},
+	{Name: "getFile", Category: CategoryMessaging},
 
-	// === Legacy Methods (pre-Tier-1) ===
+	// === Chat Administration Methods ===
+	// Chat info
+	{Name: "getChat", Category: CategoryChatAdmin},
+	{Name: "getChatAdministrators", Category: CategoryChatAdmin},
+	{Name: "getChatMemberCount", Category: CategoryChatAdmin},
+	{Name: "getChatMember", Category: CategoryChatAdmin},
+
+	// Chat settings
+	{Name: "setChatTitle", Category: CategoryChatAdmin},
+	{Name: "setChatDescription", Category: CategoryChatAdmin},
+
+	// Pin messages
+	{Name: "pinChatMessage", Category: CategoryChatAdmin},
+	{Name: "unpinChatMessage", Category: CategoryChatAdmin},
+	{Name: "unpinAllChatMessages", Category: CategoryChatAdmin},
+
+	// Polls
+	{Name: "sendPoll", Category: CategoryChatAdmin},
+	{Name: "stopPoll", Category: CategoryChatAdmin},
+
+	// Forum
+	{Name: "getForumTopicIconStickers", Category: CategoryChatAdmin},
+
+	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},
 	{Name: "deleteWebhook", Category: CategoryLegacy},
@@ -76,11 +100,22 @@ func MethodNames() []string {
 	return names
 }
 
-// Tier1Methods returns only Tier-1 methods.
-func Tier1Methods() []Method {
+// MessagingMethods returns only messaging methods.
+func MessagingMethods() []Method {
 	var methods []Method
 	for _, m := range AllMethods {
-		if m.Category == CategoryTier1 {
+		if m.Category == CategoryMessaging {
+			methods = append(methods, m)
+		}
+	}
+	return methods
+}
+
+// ChatAdminMethods returns only chat administration methods.
+func ChatAdminMethods() []Method {
+	var methods []Method
+	for _, m := range AllMethods {
+		if m.Category == CategoryChatAdmin {
 			methods = append(methods, m)
 		}
 	}

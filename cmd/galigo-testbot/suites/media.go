@@ -134,7 +134,7 @@ func S11_EditMessageMedia() engine.Scenario {
 		ScenarioName:        "S11_EditMessageMedia",
 		ScenarioDescription: "Test editing message media (replace photo with document)",
 		CoveredMethods:      []string{"sendPhoto", "editMessageMedia"},
-		ScenarioTimeout:     30 * time.Second,
+		ScenarioTimeout:     60 * time.Second,
 		ScenarioSteps: []engine.Step{
 			// Send photo as initial media
 			&engine.SendPhotoStep{

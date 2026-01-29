@@ -2,27 +2,46 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"time"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 // Runner executes scenarios with safety limits.
 type Runner struct {
-	runtime      *Runtime
-	sendInterval time.Duration
-	maxMessages  int
-	messageCount int
-	logger       *slog.Logger
+	runtime       *Runtime
+	baseDelay     time.Duration
+	jitter        time.Duration
+	maxMessages   int
+	messageCount  int
+	retryOn429    bool
+	max429Retries int
+	logger        *slog.Logger
+}
+
+// RunnerConfig holds runner configuration.
+type RunnerConfig struct {
+	BaseDelay     time.Duration
+	Jitter        time.Duration
+	MaxMessages   int
+	RetryOn429    bool
+	Max429Retries int
 }
 
 // NewRunner creates a new scenario runner.
-func NewRunner(rt *Runtime, sendInterval time.Duration, maxMessages int, logger *slog.Logger) *Runner {
+func NewRunner(rt *Runtime, cfg RunnerConfig, logger *slog.Logger) *Runner {
 	return &Runner{
-		runtime:      rt,
-		sendInterval: sendInterval,
-		maxMessages:  maxMessages,
-		logger:       logger,
+		runtime:       rt,
+		baseDelay:     cfg.BaseDelay,
+		jitter:        cfg.Jitter,
+		maxMessages:   cfg.MaxMessages,
+		retryOn429:    cfg.RetryOn429,
+		max429Retries: cfg.Max429Retries,
+		logger:        logger,
 	}
 }
 
@@ -61,8 +80,8 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 			break
 		}
 
-		// Execute step
-		stepResult, err := r.runStep(ctx, step)
+		// Execute step with 429 retry
+		stepResult, err := r.runStepWithRetry(ctx, step)
 		result.Steps = append(result.Steps, *stepResult)
 
 		if err != nil {
@@ -71,12 +90,10 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 			break
 		}
 
-		// Rate limiting between steps (only if more steps remain)
-		select {
-		case <-ctx.Done():
-			result.Error = ctx.Err().Error()
-		case <-time.After(r.sendInterval):
-			// Continue
+		// Pace between steps: base delay + random jitter
+		if err := r.pace(ctx); err != nil {
+			result.Error = err.Error()
+			break
 		}
 	}
 
@@ -94,6 +111,54 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 		"messages", r.messageCount)
 
 	return result
+}
+
+// runStepWithRetry executes a step, retrying on 429 errors.
+func (r *Runner) runStepWithRetry(ctx context.Context, step Step) (*StepResult, error) {
+	maxAttempts := 1
+	if r.retryOn429 {
+		maxAttempts = 1 + r.max429Retries
+	}
+
+	var stepResult *StepResult
+	var err error
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		stepResult, err = r.runStep(ctx, step)
+		if err == nil {
+			return stepResult, nil
+		}
+
+		// Check for 429 rate limit
+		var apiErr *tg.APIError
+		if !errors.As(err, &apiErr) || apiErr.Code != 429 {
+			return stepResult, err // Not a 429, fail immediately
+		}
+
+		// 429 — wait and retry
+		retryAfter := apiErr.RetryAfter
+		if retryAfter == 0 {
+			retryAfter = 5 * time.Second
+		}
+		// Add 500ms safety margin
+		waitTime := retryAfter + 500*time.Millisecond
+
+		r.logger.Warn("rate limited, retrying step",
+			"step", step.Name(),
+			"attempt", attempt+1,
+			"max_attempts", maxAttempts,
+			"retry_after", retryAfter,
+			"wait", waitTime)
+
+		select {
+		case <-time.After(waitTime):
+			continue
+		case <-ctx.Done():
+			return stepResult, ctx.Err()
+		}
+	}
+
+	return stepResult, err
 }
 
 func (r *Runner) runStep(ctx context.Context, step Step) (*StepResult, error) {
@@ -124,6 +189,25 @@ func (r *Runner) runStep(ctx context.Context, step Step) (*StepResult, error) {
 		"messages", len(stepResult.MessageIDs))
 
 	return stepResult, nil
+}
+
+// pace waits for base delay + random jitter between steps.
+func (r *Runner) pace(ctx context.Context) error {
+	if r.baseDelay == 0 && r.jitter == 0 {
+		return nil
+	}
+
+	delay := r.baseDelay
+	if r.jitter > 0 {
+		delay += time.Duration(rand.Int64N(int64(r.jitter)))
+	}
+
+	select {
+	case <-time.After(delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Runtime returns the runner's runtime for access to state.

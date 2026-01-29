@@ -23,6 +23,9 @@ type Config struct {
 	// Safety limits
 	MaxMessagesPerRun int
 	SendInterval      time.Duration
+	JitterInterval    time.Duration
+	RetryOn429        bool
+	Max429Retries     int
 	AllowStress       bool
 
 	// Webhook (for future use)
@@ -42,7 +45,10 @@ func Load() (*Config, error) {
 		StorageDir:        getEnvDefault("TESTBOT_STORAGE_DIR", "./var"),
 		LogLevel:          getEnvDefault("TESTBOT_LOG_LEVEL", "info"),
 		MaxMessagesPerRun: getEnvIntDefault("TESTBOT_MAX_MESSAGES_PER_RUN", 40),
-		SendInterval:      getEnvDurationDefault("TESTBOT_SEND_INTERVAL", 1200*time.Millisecond),
+		SendInterval:      getEnvDurationDefault("TESTBOT_SEND_INTERVAL", 350*time.Millisecond),
+		JitterInterval:    getEnvDurationDefault("TESTBOT_JITTER_INTERVAL", 150*time.Millisecond),
+		RetryOn429:        getEnvDefault("TESTBOT_RETRY_429", "true") == "true",
+		Max429Retries:     getEnvIntDefault("TESTBOT_MAX_429_RETRIES", 2),
 		AllowStress:       os.Getenv("TESTBOT_ALLOW_STRESS") == "true",
 		ListenAddr:        getEnvDefault("TESTBOT_LISTEN_ADDR", ":8080"),
 		Timeout:           30 * time.Second,

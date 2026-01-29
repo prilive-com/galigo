@@ -825,16 +825,25 @@ func parseMessage(resp *apiResponse) (*tg.Message, error) {
 }
 
 // isBreakerSuccess determines if an error should count as a circuit breaker failure.
-// Only server errors (5xx) and network errors trip the breaker.
-// Client errors (4xx like "bot blocked", "chat not found") are NOT breaker failures.
+// Only server errors (5xx), 429 (rate limit), and network errors trip the breaker.
+// Client errors (4xx except 429) are NOT breaker failures — they indicate caller
+// mistakes, not service degradation.
 func isBreakerSuccess(err error) bool {
 	if err == nil {
 		return true
 	}
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
-		// 4xx = client error, not a server problem → don't trip breaker
+		// 429 = rate limited, treat as server-side pressure → trip breaker
+		if apiErr.Code == 429 {
+			return false
+		}
+		// Other 4xx = client error, not a server problem → don't trip breaker
 		return apiErr.Code >= 400 && apiErr.Code < 500
+	}
+	// Context cancellation is not a service failure
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 	// Network errors, timeouts → breaker failure
 	return false

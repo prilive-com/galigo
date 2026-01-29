@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -113,7 +112,7 @@ func mediaInputToInputFile(m MediaInput) sender.InputFile {
 		return sender.FromURL(m.URL)
 	}
 	if m.Reader != nil {
-		return sender.FromReader(bytes.NewReader(m.Reader()), m.FileName)
+		return sender.FromBytes(m.Reader(), m.FileName)
 	}
 	return sender.InputFile{}
 }
@@ -241,6 +240,85 @@ func (a *SenderAdapter) AnswerCallbackQuery(ctx context.Context, callbackQueryID
 		Text:            text,
 		ShowAlert:       showAlert,
 	})
+}
+
+// ================= Tier 2: Chat Info =================
+
+// GetChat gets full chat info.
+func (a *SenderAdapter) GetChat(ctx context.Context, chatID int64) (*tg.ChatFullInfo, error) {
+	return a.client.GetChat(ctx, chatID)
+}
+
+// GetChatAdministrators returns chat admins.
+func (a *SenderAdapter) GetChatAdministrators(ctx context.Context, chatID int64) ([]tg.ChatMember, error) {
+	return a.client.GetChatAdministrators(ctx, chatID)
+}
+
+// GetChatMemberCount returns the member count.
+func (a *SenderAdapter) GetChatMemberCount(ctx context.Context, chatID int64) (int, error) {
+	return a.client.GetChatMemberCount(ctx, chatID)
+}
+
+// GetChatMember returns info about a member.
+func (a *SenderAdapter) GetChatMember(ctx context.Context, chatID int64, userID int64) (tg.ChatMember, error) {
+	return a.client.GetChatMember(ctx, chatID, userID)
+}
+
+// ================= Tier 2: Chat Settings =================
+
+// SetChatTitle sets the chat title.
+func (a *SenderAdapter) SetChatTitle(ctx context.Context, chatID int64, title string) error {
+	return a.client.SetChatTitle(ctx, chatID, title)
+}
+
+// SetChatDescription sets the chat description.
+func (a *SenderAdapter) SetChatDescription(ctx context.Context, chatID int64, description string) error {
+	return a.client.SetChatDescription(ctx, chatID, description)
+}
+
+// ================= Tier 2: Pin Messages =================
+
+// PinChatMessage pins a message.
+func (a *SenderAdapter) PinChatMessage(ctx context.Context, chatID int64, messageID int, silent bool) error {
+	var opts []sender.PinOption
+	if silent {
+		opts = append(opts, sender.WithSilentPin())
+	}
+	return a.client.PinChatMessage(ctx, chatID, messageID, opts...)
+}
+
+// UnpinChatMessage unpins a message.
+func (a *SenderAdapter) UnpinChatMessage(ctx context.Context, chatID int64, messageID int) error {
+	return a.client.UnpinChatMessage(ctx, chatID, messageID)
+}
+
+// UnpinAllChatMessages unpins all messages.
+func (a *SenderAdapter) UnpinAllChatMessages(ctx context.Context, chatID int64) error {
+	return a.client.UnpinAllChatMessages(ctx, chatID)
+}
+
+// ================= Tier 2: Polls =================
+
+// SendPollSimple sends a simple poll.
+func (a *SenderAdapter) SendPollSimple(ctx context.Context, chatID int64, question string, options []string) (*tg.Message, error) {
+	return a.client.SendPollSimple(ctx, chatID, question, options)
+}
+
+// SendQuiz sends a quiz poll.
+func (a *SenderAdapter) SendQuiz(ctx context.Context, chatID int64, question string, options []string, correctOptionID int) (*tg.Message, error) {
+	return a.client.SendQuiz(ctx, chatID, question, options, correctOptionID)
+}
+
+// StopPoll stops a poll.
+func (a *SenderAdapter) StopPoll(ctx context.Context, chatID int64, messageID int) (*tg.Poll, error) {
+	return a.client.StopPoll(ctx, chatID, messageID)
+}
+
+// ================= Tier 2: Forum =================
+
+// GetForumTopicIconStickers gets available forum topic icon stickers.
+func (a *SenderAdapter) GetForumTopicIconStickers(ctx context.Context) ([]*tg.Sticker, error) {
+	return a.client.GetForumTopicIconStickers(ctx)
 }
 
 // SetWebhook sets a webhook URL.

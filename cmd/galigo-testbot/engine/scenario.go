@@ -129,6 +129,29 @@ type SenderClient interface {
 	// Callback query methods (interactive scenarios)
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 
+	// Tier 2: Chat info
+	GetChat(ctx context.Context, chatID int64) (*tg.ChatFullInfo, error)
+	GetChatAdministrators(ctx context.Context, chatID int64) ([]tg.ChatMember, error)
+	GetChatMemberCount(ctx context.Context, chatID int64) (int, error)
+	GetChatMember(ctx context.Context, chatID int64, userID int64) (tg.ChatMember, error)
+
+	// Tier 2: Chat settings
+	SetChatTitle(ctx context.Context, chatID int64, title string) error
+	SetChatDescription(ctx context.Context, chatID int64, description string) error
+
+	// Tier 2: Pin messages
+	PinChatMessage(ctx context.Context, chatID int64, messageID int, silent bool) error
+	UnpinChatMessage(ctx context.Context, chatID int64, messageID int) error
+	UnpinAllChatMessages(ctx context.Context, chatID int64) error
+
+	// Tier 2: Polls
+	SendPollSimple(ctx context.Context, chatID int64, question string, options []string) (*tg.Message, error)
+	SendQuiz(ctx context.Context, chatID int64, question string, options []string, correctOptionID int) (*tg.Message, error)
+	StopPoll(ctx context.Context, chatID int64, messageID int) (*tg.Poll, error)
+
+	// Tier 2: Forum
+	GetForumTopicIconStickers(ctx context.Context) ([]*tg.Sticker, error)
+
 	// Webhook management methods
 	SetWebhook(ctx context.Context, url string) error
 	DeleteWebhook(ctx context.Context) error

@@ -947,7 +947,11 @@ func TestSendPoll_Success(t *testing.T) {
 	msg, err := client.SendPoll(context.Background(), sender.SendPollRequest{
 		ChatID:   testutil.TestChatID,
 		Question: "What's your favorite color?",
-		Options:  []string{"Red", "Blue", "Green"},
+		Options: []sender.InputPollOption{
+			{Text: "Red"},
+			{Text: "Blue"},
+			{Text: "Green"},
+		},
 	})
 
 	require.NoError(t, err)

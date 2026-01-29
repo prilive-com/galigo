@@ -84,6 +84,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	// Combine all scenarios from all phases (including interactive)
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+	scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 
@@ -95,7 +96,7 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (All Phases + Interactive + Webhook)")
+	fmt.Println("Method Coverage Status (All Phases + Tier 2 + Interactive + Webhook)")
 	fmt.Println("============================================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
@@ -110,7 +111,13 @@ func showCoverageStatus(logger *slog.Logger) {
 func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
 	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
 	rt := engine.NewRuntime(adapter, cfg.ChatID)
-	runner := engine.NewRunner(rt, cfg.SendInterval, cfg.MaxMessagesPerRun, logger)
+	runner := engine.NewRunner(rt, engine.RunnerConfig{
+		BaseDelay:     cfg.SendInterval,
+		Jitter:        cfg.JitterInterval,
+		MaxMessages:   cfg.MaxMessagesPerRun,
+		RetryOn429:    cfg.RetryOn429,
+		Max429Retries: cfg.Max429Retries,
+	}, logger)
 
 	var scenarios []engine.Scenario
 
@@ -145,6 +152,19 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = suites.AllPhaseCScenarios()
 	case "inline-keyboard":
 		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
+	// Tier 2: Chat Administration
+	case "chat-admin":
+		scenarios = suites.AllChatAdminScenarios()
+	case "chat-info":
+		scenarios = []engine.Scenario{suites.S15_ChatInfo()}
+	case "chat-settings":
+		scenarios = []engine.Scenario{suites.S16_ChatSettings()}
+	case "pin-messages":
+		scenarios = []engine.Scenario{suites.S17_PinMessages()}
+	case "polls":
+		scenarios = []engine.Scenario{suites.S18_Polls()}
+	case "forum-stickers":
+		scenarios = []engine.Scenario{suites.S19_ForumStickers()}
 	// Interactive (opt-in, excluded from "all")
 	case "interactive":
 		runInteractiveSuite(cfg, senderClient, logger)
@@ -162,9 +182,10 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+		scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
 		os.Exit(1)
 	}
 
@@ -231,7 +252,13 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 	callbackChan := make(chan *tg.CallbackQuery, 10)
 	rt := engine.NewRuntime(adapter, cfg.ChatID)
 	rt.CallbackChan = callbackChan
-	runner := engine.NewRunner(rt, cfg.SendInterval, cfg.MaxMessagesPerRun, logger)
+	runner := engine.NewRunner(rt, engine.RunnerConfig{
+		BaseDelay:     cfg.SendInterval,
+		Jitter:        cfg.JitterInterval,
+		MaxMessages:   cfg.MaxMessagesPerRun,
+		RetryOn429:    cfg.RetryOn429,
+		Max429Retries: cfg.Max429Retries,
+	}, logger)
 
 	// Forward callback queries from polling to the runtime channel
 	go func() {
@@ -385,7 +412,13 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	}
 
 	rt := engine.NewRuntime(adapter, chatID)
-	runner := engine.NewRunner(rt, cfg.SendInterval, cfg.MaxMessagesPerRun, logger)
+	runner := engine.NewRunner(rt, engine.RunnerConfig{
+		BaseDelay:     cfg.SendInterval,
+		Jitter:        cfg.JitterInterval,
+		MaxMessages:   cfg.MaxMessagesPerRun,
+		RetryOn429:    cfg.RetryOn429,
+		Max429Retries: cfg.Max429Retries,
+	}, logger)
 
 	var scenarios []engine.Scenario
 
@@ -443,9 +476,23 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S13_WebhookLifecycle()}
 	case "get-updates":
 		scenarios = []engine.Scenario{suites.S14_GetUpdates()}
+	// Tier 2
+	case "chat-admin":
+		scenarios = suites.AllChatAdminScenarios()
+	case "chat-info":
+		scenarios = []engine.Scenario{suites.S15_ChatInfo()}
+	case "chat-settings":
+		scenarios = []engine.Scenario{suites.S16_ChatSettings()}
+	case "pin-messages":
+		scenarios = []engine.Scenario{suites.S17_PinMessages()}
+	case "polls":
+		scenarios = []engine.Scenario{suites.S18_Polls()}
+	case "forum-stickers":
+		scenarios = []engine.Scenario{suites.S19_ForumStickers()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+		scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
 		return
@@ -479,6 +526,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int64) {
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
+	scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 

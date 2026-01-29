@@ -1,8 +1,10 @@
 package sender_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"sync/atomic"
 	"testing"
@@ -480,4 +482,96 @@ func TestRetry_RetryableStatusCodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetry_FileUpload_FromBytes_RetrySafe(t *testing.T) {
+	// Verifies that FromBytes creates retry-safe uploads: on retry after a
+	// transient error (502), the file content is re-read from the factory,
+	// not from a consumed io.Reader.
+	var attempts atomic.Int32
+	var secondAttemptBytes int64
+
+	photoData := []byte("fake-photo-data-for-retry-test")
+
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendPhoto", func(w http.ResponseWriter, r *http.Request) {
+		attempt := attempts.Add(1)
+
+		// Read the uploaded file to check its size
+		file, _, err := r.FormFile("photo")
+		if err == nil {
+			data, _ := io.ReadAll(file)
+			if attempt == 2 {
+				secondAttemptBytes = int64(len(data))
+			}
+			file.Close()
+		}
+
+		if attempt == 1 {
+			// First attempt: transient server error (retryable)
+			testutil.ReplyError(w, 502, "Bad Gateway", nil)
+			return
+		}
+		// Second attempt: success
+		testutil.ReplyMessage(w, 123)
+	})
+
+	sleeper := &testutil.FakeSleeper{}
+	client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, sender.WithRetries(3))
+
+	msg, err := client.SendPhoto(context.Background(), sender.SendPhotoRequest{
+		ChatID: testutil.TestChatID,
+		Photo:  sender.FromBytes(photoData, "test.jpg"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 123, msg.MessageID)
+	assert.Equal(t, int32(2), attempts.Load(), "should have retried once")
+	assert.Equal(t, int64(len(photoData)), secondAttemptBytes,
+		"retry must send full file content, not empty (consumed reader)")
+}
+
+func TestRetry_FileUpload_FromReader_EmptyOnRetry(t *testing.T) {
+	// Documents the known limitation: FromReader is NOT retry-safe.
+	// On retry, the reader is at EOF and sends 0 bytes.
+	// This test exists to document the behavior; use FromBytes for retry safety.
+	var attempts atomic.Int32
+	var secondAttemptBytes int64
+
+	photoData := []byte("fake-photo-data-for-retry-test")
+
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendPhoto", func(w http.ResponseWriter, r *http.Request) {
+		attempt := attempts.Add(1)
+
+		file, _, err := r.FormFile("photo")
+		if err == nil {
+			data, _ := io.ReadAll(file)
+			if attempt == 2 {
+				secondAttemptBytes = int64(len(data))
+			}
+			file.Close()
+		}
+
+		if attempt == 1 {
+			testutil.ReplyError(w, 502, "Bad Gateway", nil)
+			return
+		}
+		testutil.ReplyMessage(w, 123)
+	})
+
+	sleeper := &testutil.FakeSleeper{}
+	client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper, sender.WithRetries(3))
+
+	msg, err := client.SendPhoto(context.Background(), sender.SendPhotoRequest{
+		ChatID: testutil.TestChatID,
+		Photo:  sender.FromReader(bytes.NewReader(photoData), "test.jpg"),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), attempts.Load())
+	// FromReader is NOT retry-safe: second attempt sends 0 bytes
+	assert.Equal(t, int64(0), secondAttemptBytes,
+		"FromReader sends empty file on retry (known limitation, use FromBytes)")
+	_ = msg
 }

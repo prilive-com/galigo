@@ -74,9 +74,14 @@ galigo/
 ├── doc.go              # Package documentation
 ├── tg/                 # Shared Telegram types
 │   ├── types.go        # Message, User, Chat, File, Editable interface
-│   ├── update.go       # Update, CallbackQuery
+│   ├── update.go       # Update, CallbackQuery, Poll, PollAnswer
 │   ├── keyboard.go     # Fluent inline keyboard builder with generics
 │   ├── errors.go       # Canonical error types and sentinels
+│   ├── chat_full_info.go   # ChatFullInfo for getChat response
+│   ├── chat_member.go      # ChatMember with polymorphic unmarshal
+│   ├── chat_permissions.go # ChatPermissions type
+│   ├── chat_admin_rights.go # ChatAdministratorRights type
+│   ├── forum.go            # Sticker, ForumTopic types
 │   ├── config.go       # Configuration helpers
 │   ├── parse_mode.go   # ParseMode constants
 │   └── secret.go       # SecretToken (auto-redacts in logs)
@@ -87,11 +92,18 @@ galigo/
 │   ├── config.go       # Receiver configuration + delivery policy
 │   └── errors.go       # Receiver error types
 ├── sender/             # Message sending
-│   ├── client.go       # Sender client with retry and rate limiting
-│   ├── methods.go      # API methods (GetMe, SendDocument, SendVideo, etc.)
+│   ├── client.go       # Sender client with retry, rate limiting, multipart detection
 │   ├── requests.go     # Request types (SendMessage, SendDocument, etc.)
-│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader)
+│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader, FromBytes)
 │   ├── multipart.go    # Multipart encoder for file uploads
+│   ├── call.go         # Generic callJSON helper for non-retry methods
+│   ├── chat_info.go    # Chat info methods (GetChat, GetChatMember, etc.)
+│   ├── chat_settings.go # Chat settings (SetChatTitle, SetChatDescription)
+│   ├── chat_pin.go     # Pin/unpin message methods
+│   ├── chat_admin.go   # Chat admin methods (BanChatMember, etc.)
+│   ├── polls.go        # Poll methods (SendPoll, StopPoll)
+│   ├── forum.go        # Forum topic methods
+│   ├── validate.go     # Input validation helpers
 │   ├── options.go      # Functional options for requests
 │   ├── config.go       # Sender configuration
 │   └── errors.go       # Error aliases (backward compatible with tg.Err*)
@@ -102,7 +114,7 @@ galigo/
 │   └── galigo-testbot/ # Acceptance test bot (see docs/testing.md)
 │       ├── main.go     # CLI entry point
 │       ├── engine/     # Scenario runner, steps, adapter
-│       ├── suites/     # Test scenario definitions (Phase A, B, C)
+│       ├── suites/     # Test scenario definitions (core, media, keyboards, chat-admin)
 │       ├── fixtures/   # Embedded test media files (JPEG, GIF, PNG, MP3, OGG)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
@@ -153,6 +165,28 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `SendSticker` - Send stickers
 - `SendMediaGroup` - Send albums
 
+### Chat Information
+- `GetChat` - Get full chat info
+- `GetChatAdministrators` - List chat admins
+- `GetChatMemberCount` - Get member count
+- `GetChatMember` - Get specific member info
+
+### Chat Settings
+- `SetChatTitle` - Set chat title
+- `SetChatDescription` - Set chat description
+
+### Pin Messages
+- `PinChatMessage` - Pin a message
+- `UnpinChatMessage` - Unpin a specific message
+- `UnpinAllChatMessages` - Unpin all messages
+
+### Polls
+- `SendPoll` - Send native polls (regular and quiz)
+- `StopPoll` - Stop a running poll
+
+### Forum Topics
+- `GetForumTopicIconStickers` - Get available topic icon stickers
+
 ### Utilities
 - `GetFile` - Get file info for download
 - `SendChatAction` - Send typing indicator, etc.
@@ -162,7 +196,6 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `SendLocation` - Send location
 - `SendVenue` - Send venue
 - `SendContact` - Send phone contact
-- `SendPoll` - Send native polls
 - `SendDice` - Send animated dice
 
 ### Message Operations
@@ -186,7 +219,7 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 
 ## File Uploads
 
-All media methods support three input modes via `InputFile`:
+All media methods support four input modes via `InputFile`:
 
 ```go
 import "github.com/prilive-com/galigo/sender"
@@ -197,7 +230,10 @@ doc := sender.FromFileID("AgACAgIAAxkBAAI...")
 // From URL (Telegram will download)
 doc := sender.FromURL("https://example.com/file.pdf")
 
-// From io.Reader (streamed via multipart/form-data, no memory buffering)
+// From bytes (retry-safe — recommended for in-memory data)
+doc := sender.FromBytes(data, "document.pdf")
+
+// From io.Reader (streamed, no memory buffering — single-use, not retry-safe)
 file, _ := os.Open("document.pdf")
 defer file.Close()
 doc := sender.FromReader(file, "document.pdf")
@@ -210,7 +246,9 @@ client.SendDocument(ctx, sender.SendDocumentRequest{
 })
 ```
 
-When using `FromReader`, the library automatically switches from JSON to `multipart/form-data` encoding. For `FromFileID` and `FromURL`, standard JSON encoding is used.
+When using `FromReader` or `FromBytes`, the library automatically switches from JSON to `multipart/form-data` encoding. For `FromFileID` and `FromURL`, standard JSON encoding is used.
+
+**Retry safety:** `FromBytes` creates a factory that provides a fresh reader on each retry attempt. `FromReader` passes the reader directly — if the request is retried (e.g., on 429/5xx), the reader is already at EOF and the retry sends an empty file. Use `FromBytes` when data is in memory and retries are enabled.
 
 ## Inline Keyboards
 
@@ -448,6 +486,15 @@ The library includes a built-in acceptance test bot that validates all API metho
 export TELEGRAM_BOT_TOKEN="your-token"
 export TESTBOT_CHAT_ID="your-chat-id"
 go run ./cmd/galigo-testbot --run all
+
+# Run specific suites
+go run ./cmd/galigo-testbot --run core        # Core messaging (S0-S5)
+go run ./cmd/galigo-testbot --run media       # Media uploads (S6-S11)
+go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards (S10)
+go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (S15-S19)
+
+# Check method coverage
+go run ./cmd/galigo-testbot --status
 ```
 
 ## Security

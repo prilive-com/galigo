@@ -175,7 +175,7 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 	case media.Media.URL != "":
 		item["media"] = media.Media.URL
 
-	case media.Media.Reader != nil:
+	case media.Media.Reader != nil || media.Media.Source != nil:
 		attachName := fmt.Sprintf("file%d", *attachIdx)
 		*attachIdx++
 
@@ -183,7 +183,7 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 		req.Files = append(req.Files, FilePart{
 			FieldName: attachName,
 			FileName:  media.Media.FileName,
-			Reader:    media.Media.Reader,
+			Reader:    media.Media.OpenReader(),
 		})
 
 	default:
@@ -214,14 +214,14 @@ func handleInputFile(req *MultipartRequest, fieldName string, file InputFile, at
 	case file.URL != "":
 		req.Params[fieldName] = file.URL
 
-	case file.Reader != nil:
+	case file.Reader != nil || file.Source != nil:
 		// For single file uploads (sendDocument, sendPhoto, etc.),
 		// put file directly in field with the correct name.
 		// The attach:// syntax is only for sendMediaGroup.
 		req.Files = append(req.Files, FilePart{
 			FieldName: fieldName, // Use actual field name: "document", "photo", etc.
 			FileName:  file.FileName,
-			Reader:    file.Reader,
+			Reader:    file.OpenReader(),
 		})
 		// Don't add to Params - the file IS the value
 
@@ -248,7 +248,7 @@ func handleInputFileSlice(req *MultipartRequest, fieldName string, files []Input
 		case file.URL != "":
 			item["media"] = file.URL
 
-		case file.Reader != nil:
+		case file.Reader != nil || file.Source != nil:
 			attachName := fmt.Sprintf("file%d", *attachIdx)
 			*attachIdx++
 
@@ -256,7 +256,7 @@ func handleInputFileSlice(req *MultipartRequest, fieldName string, files []Input
 			req.Files = append(req.Files, FilePart{
 				FieldName: attachName,
 				FileName:  file.FileName,
-				Reader:    file.Reader,
+				Reader:    file.OpenReader(),
 			})
 
 		default:

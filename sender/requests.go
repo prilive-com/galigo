@@ -306,26 +306,6 @@ type SendContactRequest struct {
 	ReplyMarkup         any       `json:"reply_markup,omitempty"`
 }
 
-// SendPollRequest represents a request to send a poll.
-type SendPollRequest struct {
-	ChatID                tg.ChatID `json:"chat_id"`
-	Question              string    `json:"question"`
-	Options               []string  `json:"options"`
-	IsAnonymous           *bool     `json:"is_anonymous,omitempty"`
-	Type                  string    `json:"type,omitempty"`
-	AllowsMultipleAnswers bool      `json:"allows_multiple_answers,omitempty"`
-	CorrectOptionID       int       `json:"correct_option_id,omitempty"`
-	Explanation           string    `json:"explanation,omitempty"`
-	ExplanationParseMode  string    `json:"explanation_parse_mode,omitempty"`
-	OpenPeriod            int       `json:"open_period,omitempty"`
-	CloseDate             int64     `json:"close_date,omitempty"`
-	IsClosed              bool      `json:"is_closed,omitempty"`
-	DisableNotification   bool      `json:"disable_notification,omitempty"`
-	ProtectContent        bool      `json:"protect_content,omitempty"`
-	ReplyToMessageID      int       `json:"reply_to_message_id,omitempty"`
-	ReplyMarkup           any       `json:"reply_markup,omitempty"`
-}
-
 // SendDiceRequest represents a request to send a dice.
 type SendDiceRequest struct {
 	ChatID              tg.ChatID `json:"chat_id"`

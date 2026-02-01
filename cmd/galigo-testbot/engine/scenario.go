@@ -73,23 +73,29 @@ type Runtime struct {
 	Sender SenderClient
 	ChatID int64
 
+	// AdminUserID is a human user ID for operations that require a real user (e.g. createNewStickerSet).
+	AdminUserID int64
+
 	// State shared between steps
-	CreatedMessages []CreatedMessage
-	LastMessage     *tg.Message
-	LastMessageID   *tg.MessageID
-	CapturedFileIDs map[string]string // name -> file_id for reuse
+	CreatedMessages    []CreatedMessage
+	LastMessage        *tg.Message
+	LastMessageID      *tg.MessageID
+	CapturedFileIDs    map[string]string // name -> file_id for reuse
+	CreatedStickerSets []string          // sticker set names to clean up
 
 	// CallbackChan receives callback queries from polling (interactive scenarios only).
 	CallbackChan chan *tg.CallbackQuery
 }
 
 // NewRuntime creates a new runtime for scenario execution.
-func NewRuntime(sender SenderClient, chatID int64) *Runtime {
+func NewRuntime(sender SenderClient, chatID int64, adminUserID int64) *Runtime {
 	return &Runtime{
-		Sender:          sender,
-		ChatID:          chatID,
-		CreatedMessages: make([]CreatedMessage, 0),
-		CapturedFileIDs: make(map[string]string),
+		Sender:             sender,
+		ChatID:             chatID,
+		AdminUserID:        adminUserID,
+		CreatedMessages:    make([]CreatedMessage, 0),
+		CapturedFileIDs:    make(map[string]string),
+		CreatedStickerSets: make([]string, 0),
 	}
 }
 
@@ -99,6 +105,11 @@ func (rt *Runtime) TrackMessage(chatID int64, messageID int) {
 		ChatID:    chatID,
 		MessageID: messageID,
 	})
+}
+
+// TrackStickerSet adds a sticker set name to the cleanup list.
+func (rt *Runtime) TrackStickerSet(name string) {
+	rt.CreatedStickerSets = append(rt.CreatedStickerSets, name)
 }
 
 // SenderClient is the interface for sending messages (allows mocking).
@@ -151,6 +162,30 @@ type SenderClient interface {
 
 	// Tier 2: Forum
 	GetForumTopicIconStickers(ctx context.Context) ([]*tg.Sticker, error)
+
+	// Extended: Stickers
+	GetStickerSet(ctx context.Context, name string) (*tg.StickerSet, error)
+	UploadStickerFile(ctx context.Context, userID int64, sticker MediaInput, stickerFormat string) (*tg.File, error)
+	CreateNewStickerSet(ctx context.Context, userID int64, name, title string, stickers []StickerInput) error
+	AddStickerToSet(ctx context.Context, userID int64, name string, sticker StickerInput) error
+	SetStickerPositionInSet(ctx context.Context, sticker string, position int) error
+	DeleteStickerFromSet(ctx context.Context, sticker string) error
+	SetStickerSetTitle(ctx context.Context, name, title string) error
+	DeleteStickerSet(ctx context.Context, name string) error
+	SetStickerEmojiList(ctx context.Context, sticker string, emojiList []string) error
+	ReplaceStickerInSet(ctx context.Context, userID int64, name, oldSticker string, sticker StickerInput) error
+
+	// Extended: Stars & Payments
+	GetMyStarBalance(ctx context.Context) (*tg.StarAmount, error)
+	GetStarTransactions(ctx context.Context, limit int) (*tg.StarTransactions, error)
+	SendInvoice(ctx context.Context, chatID int64, title, description, payload, currency string, prices []tg.LabeledPrice) (*tg.Message, error)
+
+	// Extended: Gifts
+	GetAvailableGifts(ctx context.Context) (*tg.Gifts, error)
+
+	// Extended: Checklists
+	SendChecklist(ctx context.Context, chatID int64, title string, tasks []string) (*tg.Message, error)
+	EditChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error)
 
 	// Webhook management methods
 	SetWebhook(ctx context.Context, url string) error
@@ -222,4 +257,18 @@ func MediaFromFileID(fileID string) MediaInput {
 // MediaFromURL creates a MediaInput from a URL.
 func MediaFromURL(url string) MediaInput {
 	return MediaInput{URL: url}
+}
+
+// StickerInput represents a sticker for creating/adding to sticker sets.
+type StickerInput struct {
+	Sticker   MediaInput
+	Format    string   // "static", "animated", "video"
+	EmojiList []string // e.g., ["😀"]
+}
+
+// ChecklistTaskInput represents a task in a checklist edit.
+type ChecklistTaskInput struct {
+	ID   int
+	Text string
+	Done bool
 }

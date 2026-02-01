@@ -299,19 +299,49 @@ type UserProfilePhotos struct {
 
 // Sticker represents a sticker.
 type Sticker struct {
-	FileID           string     `json:"file_id"`
-	FileUniqueID     string     `json:"file_unique_id"`
-	Type             string     `json:"type"`
-	Width            int        `json:"width"`
-	Height           int        `json:"height"`
-	IsAnimated       bool       `json:"is_animated"`
-	IsVideo          bool       `json:"is_video"`
-	Thumbnail        *PhotoSize `json:"thumbnail,omitempty"`
-	Emoji            string     `json:"emoji,omitempty"`
-	SetName          string     `json:"set_name,omitempty"`
-	PremiumAnimation *File      `json:"premium_animation,omitempty"`
-	CustomEmojiID    string     `json:"custom_emoji_id,omitempty"`
-	FileSize         int64      `json:"file_size,omitempty"`
+	FileID           string        `json:"file_id"`
+	FileUniqueID     string        `json:"file_unique_id"`
+	Type             string        `json:"type"` // "regular", "mask", "custom_emoji"
+	Width            int           `json:"width"`
+	Height           int           `json:"height"`
+	IsAnimated       bool          `json:"is_animated"`
+	IsVideo          bool          `json:"is_video"`
+	Thumbnail        *PhotoSize    `json:"thumbnail,omitempty"`
+	Emoji            string        `json:"emoji,omitempty"`
+	SetName          string        `json:"set_name,omitempty"`
+	PremiumAnimation *File         `json:"premium_animation,omitempty"`
+	MaskPosition     *MaskPosition `json:"mask_position,omitempty"`
+	CustomEmojiID    string        `json:"custom_emoji_id,omitempty"`
+	NeedsRepainting  bool          `json:"needs_repainting,omitempty"`
+	FileSize         int64         `json:"file_size,omitempty"`
+}
+
+// ReplyParameters describes reply behavior for a message.
+type ReplyParameters struct {
+	MessageID                int             `json:"message_id"`
+	ChatID                   any             `json:"chat_id,omitempty"`
+	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply,omitempty"`
+	Quote                    string          `json:"quote,omitempty"`
+	QuoteParseMode           string          `json:"quote_parse_mode,omitempty"`
+	QuoteEntities            []MessageEntity `json:"quote_entities,omitempty"`
+	QuotePosition            int             `json:"quote_position,omitempty"`
+}
+
+// LinkPreviewOptions describes options for link preview generation.
+type LinkPreviewOptions struct {
+	IsDisabled       bool   `json:"is_disabled,omitempty"`
+	URL              string `json:"url,omitempty"`
+	PreferSmallMedia bool   `json:"prefer_small_media,omitempty"`
+	PreferLargeMedia bool   `json:"prefer_large_media,omitempty"`
+	ShowAboveText    bool   `json:"show_above_text,omitempty"`
+}
+
+// MaskPosition describes the position of a mask on a face.
+type MaskPosition struct {
+	Point  string  `json:"point"` // "forehead", "eyes", "mouth", "chin"
+	XShift float64 `json:"x_shift"`
+	YShift float64 `json:"y_shift"`
+	Scale  float64 `json:"scale"`
 }
 
 // Animation represents an animation file (GIF or H.264/MPEG-4 AVC video without sound).

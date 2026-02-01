@@ -321,6 +321,165 @@ func (a *SenderAdapter) GetForumTopicIconStickers(ctx context.Context) ([]*tg.St
 	return a.client.GetForumTopicIconStickers(ctx)
 }
 
+// ================= Extended: Stickers =================
+
+// GetStickerSet returns a sticker set by name.
+func (a *SenderAdapter) GetStickerSet(ctx context.Context, name string) (*tg.StickerSet, error) {
+	return a.client.GetStickerSet(ctx, name)
+}
+
+// UploadStickerFile uploads a sticker file.
+func (a *SenderAdapter) UploadStickerFile(ctx context.Context, userID int64, sticker MediaInput, stickerFormat string) (*tg.File, error) {
+	return a.client.UploadStickerFile(ctx, sender.UploadStickerFileRequest{
+		UserID:        userID,
+		Sticker:       mediaInputToInputFile(sticker),
+		StickerFormat: stickerFormat,
+	})
+}
+
+// CreateNewStickerSet creates a new sticker set.
+func (a *SenderAdapter) CreateNewStickerSet(ctx context.Context, userID int64, name, title string, stickers []StickerInput) error {
+	inputStickers := make([]sender.InputSticker, len(stickers))
+	for i, s := range stickers {
+		inputStickers[i] = sender.InputSticker{
+			Sticker:   mediaInputToInputFile(s.Sticker),
+			Format:    s.Format,
+			EmojiList: s.EmojiList,
+		}
+	}
+	return a.client.CreateNewStickerSet(ctx, sender.CreateNewStickerSetRequest{
+		UserID:   userID,
+		Name:     name,
+		Title:    title,
+		Stickers: inputStickers,
+	})
+}
+
+// AddStickerToSet adds a sticker to an existing set.
+func (a *SenderAdapter) AddStickerToSet(ctx context.Context, userID int64, name string, sticker StickerInput) error {
+	return a.client.AddStickerToSet(ctx, sender.AddStickerToSetRequest{
+		UserID: userID,
+		Name:   name,
+		Sticker: sender.InputSticker{
+			Sticker:   mediaInputToInputFile(sticker.Sticker),
+			Format:    sticker.Format,
+			EmojiList: sticker.EmojiList,
+		},
+	})
+}
+
+// SetStickerPositionInSet moves a sticker in a set.
+func (a *SenderAdapter) SetStickerPositionInSet(ctx context.Context, sticker string, position int) error {
+	return a.client.SetStickerPositionInSet(ctx, sender.SetStickerPositionInSetRequest{
+		Sticker:  sticker,
+		Position: position,
+	})
+}
+
+// DeleteStickerFromSet deletes a sticker from a set.
+func (a *SenderAdapter) DeleteStickerFromSet(ctx context.Context, sticker string) error {
+	return a.client.DeleteStickerFromSet(ctx, sticker)
+}
+
+// SetStickerSetTitle sets the title of a sticker set.
+func (a *SenderAdapter) SetStickerSetTitle(ctx context.Context, name, title string) error {
+	return a.client.SetStickerSetTitle(ctx, name, title)
+}
+
+// DeleteStickerSet deletes a sticker set.
+func (a *SenderAdapter) DeleteStickerSet(ctx context.Context, name string) error {
+	return a.client.DeleteStickerSet(ctx, name)
+}
+
+// SetStickerEmojiList sets the emoji list for a sticker.
+func (a *SenderAdapter) SetStickerEmojiList(ctx context.Context, sticker string, emojiList []string) error {
+	return a.client.SetStickerEmojiList(ctx, sender.SetStickerEmojiListRequest{
+		Sticker:   sticker,
+		EmojiList: emojiList,
+	})
+}
+
+// ReplaceStickerInSet replaces a sticker in a set.
+func (a *SenderAdapter) ReplaceStickerInSet(ctx context.Context, userID int64, name, oldSticker string, sticker StickerInput) error {
+	return a.client.ReplaceStickerInSet(ctx, sender.ReplaceStickerInSetRequest{
+		UserID:     userID,
+		Name:       name,
+		OldSticker: oldSticker,
+		Sticker: sender.InputSticker{
+			Sticker:   mediaInputToInputFile(sticker.Sticker),
+			Format:    sticker.Format,
+			EmojiList: sticker.EmojiList,
+		},
+	})
+}
+
+// ================= Extended: Stars & Payments =================
+
+// GetMyStarBalance returns the bot's Star balance.
+func (a *SenderAdapter) GetMyStarBalance(ctx context.Context) (*tg.StarAmount, error) {
+	return a.client.GetMyStarBalance(ctx)
+}
+
+// GetStarTransactions returns the bot's Star transactions.
+func (a *SenderAdapter) GetStarTransactions(ctx context.Context, limit int) (*tg.StarTransactions, error) {
+	return a.client.GetStarTransactions(ctx, sender.GetStarTransactionsRequest{Limit: limit})
+}
+
+// SendInvoice sends an invoice.
+func (a *SenderAdapter) SendInvoice(ctx context.Context, chatID int64, title, description, payload, currency string, prices []tg.LabeledPrice) (*tg.Message, error) {
+	return a.client.SendInvoice(ctx, sender.SendInvoiceRequest{
+		ChatID:      chatID,
+		Title:       title,
+		Description: description,
+		Payload:     payload,
+		Currency:    currency,
+		Prices:      prices,
+	})
+}
+
+// ================= Extended: Gifts =================
+
+// GetAvailableGifts returns available gifts.
+func (a *SenderAdapter) GetAvailableGifts(ctx context.Context) (*tg.Gifts, error) {
+	return a.client.GetAvailableGifts(ctx)
+}
+
+// ================= Extended: Checklists =================
+
+// SendChecklist sends a checklist message.
+func (a *SenderAdapter) SendChecklist(ctx context.Context, chatID int64, title string, tasks []string) (*tg.Message, error) {
+	inputTasks := make([]tg.InputChecklistTask, len(tasks))
+	for i, t := range tasks {
+		inputTasks[i] = tg.InputChecklistTask{ID: i + 1, Text: t}
+	}
+	return a.client.SendChecklist(ctx, sender.SendChecklistRequest{
+		ChatID: chatID,
+		Checklist: tg.InputChecklist{
+			Title: title,
+			Tasks: inputTasks,
+		},
+	})
+}
+
+// EditChecklist edits a checklist message.
+func (a *SenderAdapter) EditChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error) {
+	inputTasks := make([]tg.InputChecklistTask, len(tasks))
+	for i, t := range tasks {
+		inputTasks[i] = tg.InputChecklistTask{
+			ID:   t.ID,
+			Text: t.Text,
+		}
+	}
+	return a.client.EditChecklist(ctx, sender.EditChecklistRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Checklist: tg.InputChecklist{
+			Title: title,
+			Tasks: inputTasks,
+		},
+	})
+}
+
 // SetWebhook sets a webhook URL.
 func (a *SenderAdapter) SetWebhook(ctx context.Context, webhookURL string) error {
 	return receiver.SetWebhook(ctx, a.httpClient, a.token, webhookURL, "")

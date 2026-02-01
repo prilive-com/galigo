@@ -85,6 +85,10 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
+	scenarios = append(scenarios, suites.AllStickerScenarios()...)
+	scenarios = append(scenarios, suites.AllStarsScenarios()...)
+	scenarios = append(scenarios, suites.AllGiftScenarios()...)
+	scenarios = append(scenarios, suites.AllChecklistScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 
@@ -110,7 +114,7 @@ func showCoverageStatus(logger *slog.Logger) {
 
 func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
 	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
-	rt := engine.NewRuntime(adapter, cfg.ChatID)
+	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
 	runner := engine.NewRunner(rt, engine.RunnerConfig{
 		BaseDelay:     cfg.SendInterval,
 		Jitter:        cfg.JitterInterval,
@@ -165,6 +169,24 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S18_Polls()}
 	case "forum-stickers":
 		scenarios = []engine.Scenario{suites.S19_ForumStickers()}
+	// Extended: Stickers
+	case "stickers":
+		scenarios = suites.AllStickerScenarios()
+	case "sticker-lifecycle":
+		scenarios = []engine.Scenario{suites.S20_StickerLifecycle()}
+	// Extended: Stars & Payments
+	case "stars":
+		scenarios = suites.AllStarsScenarios()
+	case "star-balance":
+		scenarios = []engine.Scenario{suites.S21_Stars()}
+	case "invoice":
+		scenarios = []engine.Scenario{suites.S22_Invoice()}
+	// Extended: Gifts
+	case "gifts":
+		scenarios = suites.AllGiftScenarios()
+	// Extended: Checklists
+	case "checklists":
+		scenarios = suites.AllChecklistScenarios()
 	// Interactive (opt-in, excluded from "all")
 	case "interactive":
 		runInteractiveSuite(cfg, senderClient, logger)
@@ -183,9 +205,13 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 		scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
+		scenarios = append(scenarios, suites.AllStickerScenarios()...)
+		scenarios = append(scenarios, suites.AllStarsScenarios()...)
+		scenarios = append(scenarios, suites.AllGiftScenarios()...)
+		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
 		os.Exit(1)
 	}
 
@@ -250,7 +276,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 	// Create runtime with callback channel
 	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
 	callbackChan := make(chan *tg.CallbackQuery, 10)
-	rt := engine.NewRuntime(adapter, cfg.ChatID)
+	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
 	rt.CallbackChan = callbackChan
 	runner := engine.NewRunner(rt, engine.RunnerConfig{
 		BaseDelay:     cfg.SendInterval,
@@ -411,7 +437,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		return
 	}
 
-	rt := engine.NewRuntime(adapter, chatID)
+	rt := engine.NewRuntime(adapter, chatID, cfg.Admins[0])
 	runner := engine.NewRunner(rt, engine.RunnerConfig{
 		BaseDelay:     cfg.SendInterval,
 		Jitter:        cfg.JitterInterval,
@@ -453,6 +479,21 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = suites.AllPhaseCScenarios()
 	case "inline-keyboard":
 		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
+	// Extended: Stickers
+	case "stickers":
+		scenarios = suites.AllStickerScenarios()
+	case "sticker-lifecycle":
+		scenarios = []engine.Scenario{suites.S20_StickerLifecycle()}
+	case "stars":
+		scenarios = suites.AllStarsScenarios()
+	case "star-balance":
+		scenarios = []engine.Scenario{suites.S21_Stars()}
+	case "invoice":
+		scenarios = []engine.Scenario{suites.S22_Invoice()}
+	case "gifts":
+		scenarios = suites.AllGiftScenarios()
+	case "checklists":
+		scenarios = suites.AllChecklistScenarios()
 	// Interactive (opt-in, requires user interaction)
 	case "interactive", "callback":
 		scenarios = suites.AllInteractiveScenarios()
@@ -493,6 +534,10 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 		scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
+		scenarios = append(scenarios, suites.AllStickerScenarios()...)
+		scenarios = append(scenarios, suites.AllStarsScenarios()...)
+		scenarios = append(scenarios, suites.AllGiftScenarios()...)
+		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
 		return
@@ -527,6 +572,10 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios := append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 	scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
 	scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
+	scenarios = append(scenarios, suites.AllStickerScenarios()...)
+	scenarios = append(scenarios, suites.AllStarsScenarios()...)
+	scenarios = append(scenarios, suites.AllGiftScenarios()...)
+	scenarios = append(scenarios, suites.AllChecklistScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 
@@ -575,6 +624,15 @@ Phase B (Media):
 Phase C (Keyboards):
   keyboards       - All keyboard tests
   inline-keyboard - Inline keyboard + edit markup
+
+Extended:
+  stickers          - Sticker set lifecycle
+  sticker-lifecycle - Full sticker CRUD (S20)
+  stars             - Star balance + transactions (S21-S22)
+  star-balance      - Star balance only (S21)
+  invoice           - Send invoice (S22)
+  gifts             - Gift catalog (S23)
+  checklists        - Checklist lifecycle (S24)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

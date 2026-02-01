@@ -184,8 +184,110 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `SendPoll` - Send native polls (regular and quiz)
 - `StopPoll` - Stop a running poll
 
+### Chat Photo
+- `SetChatPhoto` - Set chat photo (multipart upload)
+- `DeleteChatPhoto` - Delete chat photo
+
+### Chat Moderation
+- `BanChatMember` - Ban a user
+- `UnbanChatMember` - Unban a user
+- `RestrictChatMember` - Restrict user permissions
+- `PromoteChatMember` - Promote a user to admin
+- `DemoteChatMember` - Demote an admin
+- `SetChatAdministratorCustomTitle` - Set admin custom title
+- `BanChatSenderChat` - Ban a sender chat
+- `UnbanChatSenderChat` - Unban a sender chat
+- `SetChatPermissions` - Set default chat permissions
+- `LeaveChat` - Leave a chat
+
 ### Forum Topics
+- `CreateForumTopic` - Create a forum topic
+- `EditForumTopic` - Edit a forum topic
+- `CloseForumTopic` - Close a forum topic
+- `ReopenForumTopic` - Reopen a forum topic
+- `DeleteForumTopic` - Delete a forum topic
+- `UnpinAllForumTopicMessages` - Unpin all messages in a topic
+- `EditGeneralForumTopic` - Edit the general forum topic
+- `CloseGeneralForumTopic` - Close the general topic
+- `ReopenGeneralForumTopic` - Reopen the general topic
+- `HideGeneralForumTopic` - Hide the general topic
+- `UnhideGeneralForumTopic` - Unhide the general topic
+- `UnpinAllGeneralForumTopicMessages` - Unpin all messages in general topic
 - `GetForumTopicIconStickers` - Get available topic icon stickers
+
+### Stickers
+- `CreateNewStickerSet` - Create a new sticker set
+- `GetStickerSet` - Get sticker set info
+- `AddStickerToSet` - Add a sticker to a set
+- `SetStickerPositionInSet` - Reorder a sticker in a set
+- `SetStickerEmojiList` - Set sticker emoji list
+- `SetStickerSetTitle` - Set sticker set title
+- `DeleteStickerFromSet` - Remove a sticker from a set
+- `DeleteStickerSet` - Delete a sticker set
+- `UploadStickerFile` - Upload a sticker file
+- `SetStickerSetThumbnail` - Set sticker set thumbnail
+- `SetStickerKeywords` - Set sticker keywords
+- `SetStickerMaskPosition` - Set sticker mask position
+- `ReplaceStickerInSet` - Replace a sticker in a set
+- `GetCustomEmojiStickers` - Get custom emoji stickers
+- `SetCustomEmojiStickerSetThumbnail` - Set custom emoji set thumbnail
+
+### Payments & Stars
+- `SendInvoice` - Send an invoice
+- `CreateInvoiceLink` - Create an invoice link
+- `AnswerShippingQuery` - Answer a shipping query
+- `AnswerPreCheckoutQuery` - Answer a pre-checkout query
+- `RefundStarPayment` - Refund a star payment
+- `GetStarTransactions` - Get star transactions
+- `GetMyStarBalance` - Get bot's star balance
+
+### Gifts
+- `GetAvailableGifts` - Get available gifts
+- `SendGift` - Send a gift
+- `TransferGift` - Transfer a gift
+- `UpgradeGift` - Upgrade a gift
+- `ConvertGiftToStars` - Convert a gift to stars
+- `GetOwnedGifts` - Get owned gifts
+
+### Checklists
+- `SendChecklist` - Send a checklist message
+- `EditChecklist` - Edit a checklist message
+
+### Inline Queries
+- `AnswerInlineQuery` - Answer an inline query
+- `AnswerWebAppQuery` - Answer a web app query
+- `SavePreparedInlineMessage` - Save a prepared inline message
+
+### Games
+- `SendGame` - Send a game
+- `SetGameScore` - Set a game score
+- `GetGameHighScores` - Get game high scores
+
+### Business
+- `GetBusinessConnection` - Get business connection info
+- `SetBusinessAccountName` - Set business account name
+- `SetBusinessAccountBio` - Set business account bio
+- `SetBusinessAccountUsername` - Set business account username
+- `SetBusinessAccountGiftSettings` - Set gift settings
+- `SetBusinessAccountProfilePhoto` - Set business profile photo
+- `RemoveBusinessAccountProfilePhoto` - Remove business profile photo
+- `GetBusinessAccountStarBalance` - Get business star balance
+- `TransferBusinessAccountStars` - Transfer business stars
+- `PostStory` - Post a story
+- `EditStory` - Edit a story
+- `DeleteStory` - Delete a story
+
+### Chat Boosts & Subscriptions
+- `GetUserChatBoosts` - Get user's chat boosts
+- `CreateChatSubscriptionInviteLink` - Create subscription invite link
+- `EditChatSubscriptionInviteLink` - Edit subscription invite link
+
+### Verification
+- `VerifyUser` - Verify a user
+- `VerifyChat` - Verify a chat
+- `RemoveUserVerification` - Remove user verification
+- `RemoveChatVerification` - Remove chat verification
+- `SetPassportDataErrors` - Set passport data errors
 
 ### Utilities
 - `GetFile` - Get file info for download
@@ -483,8 +585,9 @@ The library includes a built-in acceptance test bot that validates all API metho
 
 ```bash
 # Quick run
-export TELEGRAM_BOT_TOKEN="your-token"
+export TESTBOT_TOKEN="your-token"
 export TESTBOT_CHAT_ID="your-chat-id"
+export TESTBOT_ADMINS="your-user-id"
 go run ./cmd/galigo-testbot --run all
 
 # Run specific suites
@@ -492,6 +595,10 @@ go run ./cmd/galigo-testbot --run core        # Core messaging (S0-S5)
 go run ./cmd/galigo-testbot --run media       # Media uploads (S6-S11)
 go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards (S10)
 go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (S15-S19)
+go run ./cmd/galigo-testbot --run stickers    # Sticker set lifecycle (S20)
+go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21-S22)
+go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
+go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
 
 # Check method coverage
 go run ./cmd/galigo-testbot --status

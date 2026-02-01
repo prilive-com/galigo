@@ -8,6 +8,7 @@ type MethodCategory string
 const (
 	CategoryMessaging MethodCategory = "messaging"
 	CategoryChatAdmin MethodCategory = "chat-admin"
+	CategoryExtended  MethodCategory = "extended"
 	CategoryLegacy    MethodCategory = "legacy"
 )
 
@@ -81,6 +82,28 @@ var AllMethods = []Method{
 	// Forum
 	{Name: "getForumTopicIconStickers", Category: CategoryChatAdmin},
 
+	// === Extended: Stickers ===
+	{Name: "createNewStickerSet", Category: CategoryExtended},
+	{Name: "getStickerSet", Category: CategoryExtended},
+	{Name: "addStickerToSet", Category: CategoryExtended},
+	{Name: "setStickerPositionInSet", Category: CategoryExtended},
+	{Name: "setStickerEmojiList", Category: CategoryExtended},
+	{Name: "setStickerSetTitle", Category: CategoryExtended},
+	{Name: "deleteStickerFromSet", Category: CategoryExtended},
+	{Name: "deleteStickerSet", Category: CategoryExtended},
+
+	// === Extended: Stars & Payments ===
+	{Name: "getMyStarBalance", Category: CategoryExtended},
+	{Name: "getStarTransactions", Category: CategoryExtended},
+	{Name: "sendInvoice", Category: CategoryExtended},
+
+	// === Extended: Gifts ===
+	{Name: "getAvailableGifts", Category: CategoryExtended},
+
+	// === Extended: Checklists ===
+	{Name: "sendChecklist", Category: CategoryExtended},
+	{Name: "editChecklist", Category: CategoryExtended},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},
@@ -116,6 +139,17 @@ func ChatAdminMethods() []Method {
 	var methods []Method
 	for _, m := range AllMethods {
 		if m.Category == CategoryChatAdmin {
+			methods = append(methods, m)
+		}
+	}
+	return methods
+}
+
+// ExtendedMethods returns only extended methods (stickers, stars, gifts, checklists).
+func ExtendedMethods() []Method {
+	var methods []Method
+	for _, m := range AllMethods {
+		if m.Category == CategoryExtended {
 			methods = append(methods, m)
 		}
 	}

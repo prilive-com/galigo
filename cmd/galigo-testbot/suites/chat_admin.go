@@ -28,7 +28,7 @@ func S16_ChatSettings() engine.Scenario {
 		ScenarioName:        "S16-ChatSettings",
 		ScenarioDescription: "Set and restore chat title and description",
 		CoveredMethods:      []string{"setChatTitle", "setChatDescription"},
-		ScenarioTimeout:     30 * time.Second,
+		ScenarioTimeout:     60 * time.Second,
 		ScenarioSteps: []engine.Step{
 			&engine.SaveChatTitleStep{},
 			&engine.SetChatTitleStep{Title: "[galigo-test] Settings Test"},

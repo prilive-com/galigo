@@ -1,0 +1,69 @@
+{
+  "run_id": "20260127-034455",
+  "start_time": "2026-01-27T03:44:55.938517663Z",
+  "end_time": "2026-01-27T03:44:59.690862319Z",
+  "duration": 3752344697,
+  "success": true,
+  "scenarios": [
+    {
+      "scenario_name": "S2-MessageLifecycle",
+      "covers": [
+        "sendMessage",
+        "editMessageText",
+        "deleteMessage"
+      ],
+      "start_time": "2026-01-27T03:44:55.938538221Z",
+      "end_time": "2026-01-27T03:44:59.690739089Z",
+      "duration": 3752201048,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "sendMessage",
+          "duration": 95360095,
+          "success": true,
+          "message_ids": [
+            9
+          ],
+          "evidence": {
+            "message_id": 9,
+            "text": "galigo-testbot: message lifecycle test"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "editMessageText",
+          "duration": 32424275,
+          "success": true,
+          "evidence": {
+            "message_id": 9,
+            "new_text": "galigo-testbot: EDITED message"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "deleteMessage",
+          "duration": 22768785,
+          "success": true,
+          "evidence": {
+            "deleted_message_id": 9
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 1,
+    "failed_scenarios": 0,
+    "total_steps": 3,
+    "passed_steps": 3,
+    "failed_steps": 0,
+    "methods_covered": [
+      "sendMessage",
+      "editMessageText",
+      "deleteMessage"
+    ],
+    "total_duration": "3.752344697s"
+  }
+}

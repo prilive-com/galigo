@@ -1,1842 +1,1631 @@
-# galigo Tier 3 Implementation Plan v2.0
+# Tier 3 Implementation Plan — Final Version 7.0
 
-## Consolidated Technical Specification
-
-**Version:** 2.0 (Enhanced)  
-**Target:** galigo v2.2.0 / v3.0.0  
-**Telegram Bot API:** 9.3 (Dec 31, 2025)  
-**Go Version:** 1.25  
-**Estimated Effort:** 8-10 weeks (16 PRs)  
-**Prerequisites:** Tier 1 + Tier 2 complete
+**Version:** 7.0 (All Reviews Incorporated — Production Ready)  
+**Date:** January 2026  
+**Status:** Ready for Implementation  
+**Based on:** Developer critique + Consultant 1 + Consultant 2 + Final developer review
 
 ---
 
 ## Executive Summary
 
-This consolidated plan combines multiple independent analyses to deliver advanced features for production bots: payments, stickers, business accounts, gifts, stories, drafts, verification, and the newest Bot API 9.x additions.
+This plan covers **~61 methods** organized into 8 implementation epics, preceded by a **blocking Types PR**. All previous review issues have been addressed, including the final 6 minor issues from the last review.
 
-### Key Improvements in v2.0
+### Final Corrections Applied (v7.0)
 
-| Area | v1.0 Plan | v2.0 Enhanced Plan |
-|------|-----------|-------------------|
-| Draft Streaming | Basic method | **SSE/chunked streaming with callbacks** |
-| Checklists | Missing | **`sendChecklist`, `editMessageChecklist`** |
-| Suggested Posts | Missing | **`approveSuggestedPost`, `declineSuggestedPost`** |
-| Verification | Missing | **4 verification methods** |
-| Business Messages | Missing | **`readBusinessMessage`, `deleteBusinessMessages`** |
-| Stars Transfer | Partial | **`transferBusinessAccountStars`** |
-| Stories | Basic | **Added `repostStory`** |
-| Gift Browsing | Combined | **Separate `getUserGifts`, `getChatGifts`, `getBusinessAccountGifts`** |
-| Safety | Basic | **Value operation safeguards, no-retry defaults** |
+| Issue | Resolution |
+|-------|------------|
+| `unmarshalTransactionPartner` swallows errors | ✅ Return `Unknown{Raw: data}` on unmarshal failure |
+| `RevenueWithdrawalState` no Unknown | ✅ Added `RevenueWithdrawalStateUnknown` + unmarshal function |
+| `*RevenueWithdrawalState` interface pointer | ✅ Fixed to `RevenueWithdrawalState` (interface already pointer) |
+| `*int` usage inconsistent | ✅ Audited: `Offset` uses plain `int` with `omitempty` (default 0) |
+| Rate limiter on time-critical ops | ✅ Skip `waitForRateLimiter` for `AnswerPreCheckoutQuery` |
+| Import path mismatch | ✅ Fixed to `github.com/prilive-com/galigo/tg` |
+| `PassportElementError` send-only | ✅ Documented: no unmarshal needed |
 
 ---
 
-## Tier 3 Complete Method List
+## Guiding Principles (Non-Negotiable)
 
-### Payments & Stars (12 methods)
-- `sendInvoice`, `createInvoiceLink`
-- `answerShippingQuery`, `answerPreCheckoutQuery`
-- `getStarTransactions`, `refundStarPayment`
-- `editUserStarSubscription`, `setUserEmojiStatus`
-- `sendPaidMedia`
-- `getBusinessAccountStarBalance`, `transferBusinessAccountStars` ✨NEW
-
-### Stickers (16 methods)
-- `sendSticker`, `getStickerSet`, `getCustomEmojiStickers`
-- `uploadStickerFile`, `createNewStickerSet`, `addStickerToSet`
-- `setStickerPositionInSet`, `deleteStickerFromSet`, `replaceStickerInSet`
-- `setStickerEmojiList`, `setStickerKeywords`, `setStickerMaskPosition`
-- `setStickerSetTitle`, `setStickerSetThumbnail`
-- `setCustomEmojiStickerSetThumbnail`, `deleteStickerSet`
-
-### Games (3 methods)
-- `sendGame`, `setGameScore`, `getGameHighScores`
-
-### Gifts (10 methods) ✨EXPANDED
-- `getAvailableGifts`, `sendGift`, `giftPremiumSubscription`
-- `getUserGifts`, `getChatGifts` ✨NEW
-- `getBusinessAccountGifts` ✨NEW
-- `saveGift`, `convertGiftToStars`, `upgradeGift`, `transferGift`
-
-### Business Account (14 methods) ✨EXPANDED
-- `getBusinessConnection`
-- `readBusinessMessage`, `deleteBusinessMessages` ✨NEW
-- `setBusinessAccountName`, `setBusinessAccountUsername`, `setBusinessAccountBio`
-- `setBusinessAccountProfilePhoto`, `removeBusinessAccountProfilePhoto`
-- `setBusinessAccountGiftSettings`
-- `getBusinessAccountStarBalance`, `transferBusinessAccountStars` ✨NEW
-- `postStory`, `repostStory` ✨NEW, `editStory`, `deleteStory`
-
-### Verification (4 methods) ✨NEW
-- `verifyUser`, `verifyChat`
-- `removeUserVerification`, `removeChatVerification`
-
-### Suggested Posts (2 methods) ✨NEW
-- `approveSuggestedPost`, `declineSuggestedPost`
-
-### Checklists (2 methods) ✨NEW
-- `sendChecklist`, `editMessageChecklist`
-
-### Draft Streaming (1 method) ✨ENHANCED
-- `sendMessageDraft` (streaming API with chunked response)
-
-### Webhooks (3 methods)
-- `setWebhook`, `deleteWebhook`, `getWebhookInfo`
-
-### Passport (1 method)
-- `setPassportDataErrors`
-
-### Chat Boosts (2 methods)
-- `getUserChatBoosts`, `getAvailableBoosts`
-
-### Web Apps (2 methods)
-- `answerWebAppQuery`, `getStory`
-
-**TOTAL: ~72 methods** (up from 61 in v1.0)
+1. **Use actual codebase patterns**: `callJSON`, `executeRequest`, `withRetry`
+2. **Typed request structs**: No `map[string]any` in exported APIs
+3. **Use existing error types**: `tg.NewValidationError(field, message)`
+4. **Use `nil` for void methods**: Not `var result bool`
+5. **No retry for value operations**: Payments, gifts, refunds use `callJSON` directly
+6. **Upload types in `sender/`**: Avoid import cycles with `tg/`
+7. **Extend existing types**: Don't duplicate (e.g., Sticker in `tg/types.go`)
+8. **`*int` for truly optional fields**: Plain `int` with `omitempty` when default 0 is meaningful
+9. **Unknown fallbacks**: All polymorphic types have `Unknown` variant
+10. **Error handling in unmarshal**: Return `Unknown{Raw: data}` on parse failure
+11. **Skip rate limiter for time-critical ops**: `AnswerPreCheckoutQuery` (10s deadline)
 
 ---
 
-## PR Dependency Graph
+## PR0: Missing Types (BLOCKING)
+
+**This PR must be merged before any epic can begin.**
+
+### File Structure
 
 ```
-Tier 2 Complete
-      │
-      ▼
-PR10 (Tier 3 Types + Safety) ◄──────────────────────────────────┐
-      │                                                          │
-      ├────────┬────────┬────────┬────────┬────────┐            │
-      ▼        ▼        ▼        ▼        ▼        ▼            │
-   PR11     PR12     PR13     PR14     PR15     PR16            │
-(Payments)(Stickers)(Games)(Gifts)  (Verify)(Business)          │
-      │        │        │        │        │        │            │
-      └────────┴────────┴────────┴────────┴────────┘            │
-                              │                                  │
-              ┌───────────────┼───────────────┐                  │
-              ▼               ▼               ▼                  │
-           PR17            PR18            PR19                  │
-        (Stories)    (Suggested Posts) (Checklists)              │
-              │               │               │                  │
-              └───────────────┴───────────────┘                  │
-                              │                                  │
-                              ▼                                  │
-                    PR20 (Draft Streaming) ◄─────────────────────┤
-                              │                                  │
-                              ▼                                  │
-                    PR21 (Webhooks)                              │
-                              │                                  │
-                              ▼                                  │
-                    PR22 (Passport + Boosts)                     │
-                              │                                  │
-                              ▼                                  │
-                    PR23 (Integration Tests)                     │
-                              │                                  │
-                              ▼                                  │
-                    PR24 (Docs + Coverage Matrix)                │
-                              │                                  │
-                              ▼                                  │
-                    PR25 (Release v2.2.0/v3.0.0)                 │
+tg/
+├── types.go          # Extend: Sticker, add ReplyParameters, LinkPreviewOptions
+├── payments.go       # NEW: LabeledPrice, StarTransaction, TransactionPartner union
+├── checklists.go     # NEW: InputChecklist, ChecklistTask
+├── inline.go         # NEW: InlineQueryResult partial union
+├── games.go          # NEW: Game, GameHighScore, CallbackGame
+├── gifts.go          # NEW: Gift, OwnedGift (full fields)
+├── business.go       # NEW: BusinessConnection, Story, OwnedGifts
+├── boosts.go         # NEW: ChatBoost, ChatBoostSource union
+├── passport.go       # NEW: PassportElementError (send-only, no unmarshal)
+├── stickers.go       # NEW: StickerSet, MaskPosition (response types only)
+
+sender/
+├── stickers_input.go # NEW: InputSticker (contains InputFile)
+├── business_input.go # NEW: InputStoryContent, InputProfilePhoto
+├── rate_limiter.go   # NEW: Optional proactive rate limiting
 ```
 
 ---
 
-## PR10: Tier 3 Types + Safety Foundations
-
-**Goal:** Define all types and safety rules for value-moving operations.  
-**Estimated Time:** 10-12 hours  
-**Breaking Changes:** None (additive)
-
-### 10.1 Critical Safety Rules
-
-**IMPORTANT:** Methods that spend Stars, send gifts, or transfer value must have special handling:
+### tg/types.go — Extensions
 
 ```go
-// ValueOperation marks methods that move monetary value
-type ValueOperation interface {
-    isValueOperation()
+// tg/types.go — ADD these types (verify InlineKeyboardMarkup, MessageEntity exist)
+
+// ReplyParameters describes reply behavior
+// Added in Bot API 7.0, extended in 9.2 for checklists
+type ReplyParameters struct {
+    MessageID                int             `json:"message_id"`
+    ChatID                   any             `json:"chat_id,omitempty"`
+    AllowSendingWithoutReply bool            `json:"allow_sending_without_reply,omitempty"`
+    Quote                    string          `json:"quote,omitempty"`
+    QuoteParseMode           string          `json:"quote_parse_mode,omitempty"`
+    QuoteEntities            []MessageEntity `json:"quote_entities,omitempty"`
+    QuotePosition            int             `json:"quote_position,omitempty"` // 0 is valid, omitempty OK
 }
 
-// DefaultRetryPolicy for value operations: NO AUTOMATIC RETRY
-// Users must explicitly opt-in with WithRetryValueOperations()
+// LinkPreviewOptions describes link preview generation options
+type LinkPreviewOptions struct {
+    IsDisabled       bool   `json:"is_disabled,omitempty"`
+    URL              string `json:"url,omitempty"`
+    PreferSmallMedia bool   `json:"prefer_small_media,omitempty"`
+    PreferLargeMedia bool   `json:"prefer_large_media,omitempty"`
+    ShowAboveText    bool   `json:"show_above_text,omitempty"`
+}
+
+// WebAppInfo describes a Web App
+type WebAppInfo struct {
+    URL string `json:"url"`
+}
+
+// LoginUrl represents a parameter of the inline keyboard button
+type LoginUrl struct {
+    URL                string `json:"url"`
+    ForwardText        string `json:"forward_text,omitempty"`
+    BotUsername        string `json:"bot_username,omitempty"`
+    RequestWriteAccess bool   `json:"request_write_access,omitempty"`
+}
+
+// SwitchInlineQueryChosenChat allows switching to inline mode in a chosen chat
+type SwitchInlineQueryChosenChat struct {
+    Query             string `json:"query,omitempty"`
+    AllowUserChats    bool   `json:"allow_user_chats,omitempty"`
+    AllowBotChats     bool   `json:"allow_bot_chats,omitempty"`
+    AllowGroupChats   bool   `json:"allow_group_chats,omitempty"`
+    AllowChannelChats bool   `json:"allow_channel_chats,omitempty"`
+}
 ```
 
-**Implementation Requirements:**
+---
 
-1. **No automatic retry** for value-moving operations by default
-2. **Explicit opt-in** required: `WithAllowRetry()` option
-3. **Structured logging redaction** - never log gift IDs + business_connection_id together
-4. **Idempotency keys** where supported by the API
+### tg/payments.go — NEW FILE (CORRECTED)
 
 ```go
-// Example: Safe value operation call
-err := client.SendGift(ctx, userID, giftID,
-    sender.WithNoRetry(), // Explicit, but this should be default
-)
+// tg/payments.go — Payment and Stars types
 
-// Example: Explicit retry opt-in (advanced users only)
-err := client.SendGift(ctx, userID, giftID,
-    sender.WithAllowRetry(3), // User explicitly accepts retry risk
-)
-```
-
-### 10.2 New Types: Drafts
-
-**File:** `tg/drafts.go` (new)
-
-```go
 package tg
 
-// MessageDraft represents a draft message being streamed
-type MessageDraft struct {
-    Text     string          `json:"text,omitempty"`
-    Entities []MessageEntity `json:"entities,omitempty"`
+import "encoding/json"
+
+// LabeledPrice represents a portion of the price
+type LabeledPrice struct {
+    Label  string `json:"label"`
+    Amount int    `json:"amount"` // Smallest currency unit (cents, etc.)
 }
 
-// DraftChunk represents a chunk in the draft streaming response
-type DraftChunk struct {
-    // Type indicates the chunk type: "text", "done", "error"
-    Type string `json:"type"`
-    
-    // Text contains the incremental text for "text" chunks
-    Text string `json:"text,omitempty"`
-    
-    // Message contains the final message for "done" chunks
-    Message *Message `json:"message,omitempty"`
-    
-    // Error contains error info for "error" chunks
-    Error string `json:"error,omitempty"`
+// ShippingOption represents one shipping option
+type ShippingOption struct {
+    ID     string         `json:"id"`
+    Title  string         `json:"title"`
+    Prices []LabeledPrice `json:"prices"`
 }
 
-// SuggestedPostParameters contains parameters for suggested posts
-type SuggestedPostParameters struct {
-    ChatID    ChatID `json:"chat_id"`
-    SendDate  *int64 `json:"send_date,omitempty"` // Unix time, max 30 days in future
-    Comment   string `json:"comment,omitempty"`
+// ShippingAddress represents a shipping address
+type ShippingAddress struct {
+    CountryCode string `json:"country_code"`
+    State       string `json:"state"`
+    City        string `json:"city"`
+    StreetLine1 string `json:"street_line1"`
+    StreetLine2 string `json:"street_line2"`
+    PostCode    string `json:"post_code"`
+}
+
+// OrderInfo represents information about an order
+type OrderInfo struct {
+    Name            string           `json:"name,omitempty"`
+    PhoneNumber     string           `json:"phone_number,omitempty"`
+    Email           string           `json:"email,omitempty"`
+    ShippingAddress *ShippingAddress `json:"shipping_address,omitempty"`
+}
+
+// SuccessfulPayment contains information about a successful payment
+type SuccessfulPayment struct {
+    Currency                   string     `json:"currency"`
+    TotalAmount                int        `json:"total_amount"`
+    InvoicePayload             string     `json:"invoice_payload"`
+    ShippingOptionID           string     `json:"shipping_option_id,omitempty"`
+    OrderInfo                  *OrderInfo `json:"order_info,omitempty"`
+    TelegramPaymentChargeID    string     `json:"telegram_payment_charge_id"`
+    ProviderPaymentChargeID    string     `json:"provider_payment_charge_id"`
+    SubscriptionExpirationDate int64      `json:"subscription_expiration_date,omitempty"`
+    IsRecurring                bool       `json:"is_recurring,omitempty"`
+    IsFirstRecurring           bool       `json:"is_first_recurring,omitempty"`
+}
+
+// StarAmount represents an amount of Telegram Stars
+type StarAmount struct {
+    Amount         int `json:"amount"`
+    NanostarAmount int `json:"nanostar_amount,omitempty"`
+}
+
+// StarTransactions contains a list of Star transactions
+type StarTransactions struct {
+    Transactions []StarTransaction `json:"transactions"`
+}
+
+// StarTransaction describes a Telegram Star transaction
+type StarTransaction struct {
+    ID             string             `json:"id"`
+    Amount         int                `json:"amount"`
+    NanostarAmount int                `json:"nanostar_amount,omitempty"`
+    Date           int64              `json:"date"`
+    Source         TransactionPartner `json:"source,omitempty"`
+    Receiver       TransactionPartner `json:"receiver,omitempty"`
+}
+
+// Custom UnmarshalJSON for StarTransaction to handle polymorphic Source/Receiver
+func (s *StarTransaction) UnmarshalJSON(data []byte) error {
+    type Alias StarTransaction
+    aux := &struct {
+        Source   json.RawMessage `json:"source,omitempty"`
+        Receiver json.RawMessage `json:"receiver,omitempty"`
+        *Alias
+    }{Alias: (*Alias)(s)}
+
+    if err := json.Unmarshal(data, aux); err != nil {
+        return err
+    }
+
+    if len(aux.Source) > 0 && string(aux.Source) != "null" {
+        s.Source = unmarshalTransactionPartner(aux.Source)
+    }
+    if len(aux.Receiver) > 0 && string(aux.Receiver) != "null" {
+        s.Receiver = unmarshalTransactionPartner(aux.Receiver)
+    }
+    return nil
+}
+
+// --- TransactionPartner Union ---
+
+// TransactionPartner describes the source or receiver of a Star transaction
+type TransactionPartner interface {
+    transactionPartnerTag()
+}
+
+// TransactionPartnerUser represents a transaction with a user
+type TransactionPartnerUser struct {
+    Type               string `json:"type"` // Always "user"
+    User               User   `json:"user"`
+    InvoicePayload     string `json:"invoice_payload,omitempty"`
+    PaidMediaPayload   string `json:"paid_media_payload,omitempty"`
+    SubscriptionPeriod int    `json:"subscription_period,omitempty"`
+    Gift               *Gift  `json:"gift,omitempty"`
+}
+
+func (TransactionPartnerUser) transactionPartnerTag() {}
+
+// TransactionPartnerFragment represents a withdrawal to Fragment
+type TransactionPartnerFragment struct {
+    Type            string                 `json:"type"` // Always "fragment"
+    WithdrawalState RevenueWithdrawalState `json:"withdrawal_state,omitempty"` // Interface, not *interface
+}
+
+func (TransactionPartnerFragment) transactionPartnerTag() {}
+
+// TransactionPartnerTelegramAds represents a transfer to Telegram Ads
+type TransactionPartnerTelegramAds struct {
+    Type string `json:"type"` // Always "telegram_ads"
+}
+
+func (TransactionPartnerTelegramAds) transactionPartnerTag() {}
+
+// TransactionPartnerTelegramApi represents payment from Telegram API usage
+type TransactionPartnerTelegramApi struct {
+    Type         string `json:"type"` // Always "telegram_api"
+    RequestCount int    `json:"request_count"`
+}
+
+func (TransactionPartnerTelegramApi) transactionPartnerTag() {}
+
+// TransactionPartnerOther represents an unknown transaction partner type
+type TransactionPartnerOther struct {
+    Type string `json:"type"` // Always "other"
+}
+
+func (TransactionPartnerOther) transactionPartnerTag() {}
+
+// TransactionPartnerUnknown is a fallback for future/unknown partner types
+// Keeps the library forward-compatible when Telegram adds new types
+type TransactionPartnerUnknown struct {
+    Type string          `json:"type"`
+    Raw  json.RawMessage `json:"-"` // Preserved for debugging
+}
+
+func (TransactionPartnerUnknown) transactionPartnerTag() {}
+
+// unmarshalTransactionPartner decodes a TransactionPartner from JSON.
+// Returns TransactionPartnerUnknown on any error (including malformed known types).
+func unmarshalTransactionPartner(data json.RawMessage) TransactionPartner {
+    var probe struct {
+        Type string `json:"type"`
+    }
+    if err := json.Unmarshal(data, &probe); err != nil {
+        return TransactionPartnerUnknown{Raw: data}
+    }
+
+    switch probe.Type {
+    case "user":
+        var p TransactionPartnerUser
+        if err := json.Unmarshal(data, &p); err != nil {
+            // Malformed "user" — return Unknown with raw data for debugging
+            return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+        }
+        return p
+    case "fragment":
+        var p TransactionPartnerFragment
+        if err := json.Unmarshal(data, &p); err != nil {
+            return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+        }
+        return p
+    case "telegram_ads":
+        var p TransactionPartnerTelegramAds
+        if err := json.Unmarshal(data, &p); err != nil {
+            return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+        }
+        return p
+    case "telegram_api":
+        var p TransactionPartnerTelegramApi
+        if err := json.Unmarshal(data, &p); err != nil {
+            return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+        }
+        return p
+    case "other":
+        var p TransactionPartnerOther
+        if err := json.Unmarshal(data, &p); err != nil {
+            return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+        }
+        return p
+    default:
+        return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
+    }
+}
+
+// --- RevenueWithdrawalState Union (CORRECTED: includes Unknown) ---
+
+// RevenueWithdrawalState describes the state of a revenue withdrawal
+type RevenueWithdrawalState interface {
+    revenueWithdrawalStateTag()
+}
+
+type RevenueWithdrawalStatePending struct {
+    Type string `json:"type"` // Always "pending"
+}
+
+func (RevenueWithdrawalStatePending) revenueWithdrawalStateTag() {}
+
+type RevenueWithdrawalStateSucceeded struct {
+    Type string `json:"type"` // Always "succeeded"
+    Date int64  `json:"date"`
+    URL  string `json:"url"`
+}
+
+func (RevenueWithdrawalStateSucceeded) revenueWithdrawalStateTag() {}
+
+type RevenueWithdrawalStateFailed struct {
+    Type string `json:"type"` // Always "failed"
+}
+
+func (RevenueWithdrawalStateFailed) revenueWithdrawalStateTag() {}
+
+// RevenueWithdrawalStateUnknown is a fallback for future withdrawal states
+type RevenueWithdrawalStateUnknown struct {
+    Type string          `json:"type"`
+    Raw  json.RawMessage `json:"-"`
+}
+
+func (RevenueWithdrawalStateUnknown) revenueWithdrawalStateTag() {}
+
+// unmarshalRevenueWithdrawalState decodes a RevenueWithdrawalState from JSON.
+// Returns RevenueWithdrawalStateUnknown on any error.
+func unmarshalRevenueWithdrawalState(data json.RawMessage) RevenueWithdrawalState {
+    var probe struct {
+        Type string `json:"type"`
+    }
+    if err := json.Unmarshal(data, &probe); err != nil {
+        return RevenueWithdrawalStateUnknown{Raw: data}
+    }
+
+    switch probe.Type {
+    case "pending":
+        var s RevenueWithdrawalStatePending
+        if err := json.Unmarshal(data, &s); err != nil {
+            return RevenueWithdrawalStateUnknown{Type: probe.Type, Raw: data}
+        }
+        return s
+    case "succeeded":
+        var s RevenueWithdrawalStateSucceeded
+        if err := json.Unmarshal(data, &s); err != nil {
+            return RevenueWithdrawalStateUnknown{Type: probe.Type, Raw: data}
+        }
+        return s
+    case "failed":
+        var s RevenueWithdrawalStateFailed
+        if err := json.Unmarshal(data, &s); err != nil {
+            return RevenueWithdrawalStateUnknown{Type: probe.Type, Raw: data}
+        }
+        return s
+    default:
+        return RevenueWithdrawalStateUnknown{Type: probe.Type, Raw: data}
+    }
+}
+
+// Custom UnmarshalJSON for TransactionPartnerFragment to handle nested polymorphic type
+func (p *TransactionPartnerFragment) UnmarshalJSON(data []byte) error {
+    type Alias TransactionPartnerFragment
+    aux := &struct {
+        WithdrawalState json.RawMessage `json:"withdrawal_state,omitempty"`
+        *Alias
+    }{Alias: (*Alias)(p)}
+
+    if err := json.Unmarshal(data, aux); err != nil {
+        return err
+    }
+
+    if len(aux.WithdrawalState) > 0 && string(aux.WithdrawalState) != "null" {
+        p.WithdrawalState = unmarshalRevenueWithdrawalState(aux.WithdrawalState)
+    }
+    return nil
 }
 ```
 
-### 10.3 New Types: Checklists
+---
 
-**File:** `tg/checklists.go` (new)
+### tg/checklists.go — NEW FILE
 
 ```go
+// tg/checklists.go — Checklist types (Bot API 9.1)
+
 package tg
 
 // InputChecklist represents a checklist to be sent
+// No InputFile, so this can live in tg/
 type InputChecklist struct {
-    Title string               `json:"title"`           // 1-256 chars
-    Items []InputChecklistItem `json:"items"`           // 1-100 items
+    Title                    string               `json:"title"`
+    ParseMode                string               `json:"parse_mode,omitempty"`
+    TitleEntities            []MessageEntity      `json:"title_entities,omitempty"`
+    Tasks                    []InputChecklistTask `json:"tasks"`
+    OthersCanAddTasks        bool                 `json:"others_can_add_tasks,omitempty"`
+    OthersCanMarkTasksAsDone bool                 `json:"others_can_mark_tasks_as_done,omitempty"`
 }
 
-// InputChecklistItem represents an item in a checklist
-type InputChecklistItem struct {
-    Text      string          `json:"text"`             // 1-1024 chars
-    Completed bool            `json:"completed,omitempty"`
-    Collapsed bool            `json:"collapsed,omitempty"`
-    Items     []InputChecklistItem `json:"items,omitempty"` // Nested items
+// InputChecklistTask represents a task in a checklist to be sent
+type InputChecklistTask struct {
+    ID           int             `json:"id"`
+    Text         string          `json:"text"`
+    ParseMode    string          `json:"parse_mode,omitempty"`
+    TextEntities []MessageEntity `json:"text_entities,omitempty"`
 }
 
 // Checklist represents a checklist in a message
 type Checklist struct {
-    Title string          `json:"title"`
-    Items []ChecklistItem `json:"items"`
+    Title                    string          `json:"title"`
+    TitleEntities            []MessageEntity `json:"title_entities,omitempty"`
+    Tasks                    []ChecklistTask `json:"tasks"`
+    OthersCanAddTasks        bool            `json:"others_can_add_tasks"`
+    OthersCanMarkTasksAsDone bool            `json:"others_can_mark_tasks_as_done"`
 }
 
-// ChecklistItem represents an item in a received checklist
-type ChecklistItem struct {
-    ID        string          `json:"id"`
-    Text      string          `json:"text"`
-    Completed bool            `json:"completed"`
-    Collapsed bool            `json:"collapsed,omitempty"`
-    Items     []ChecklistItem `json:"items,omitempty"`
+// ChecklistTask represents a task in a received checklist
+type ChecklistTask struct {
+    ID            int             `json:"id"`
+    Text          string          `json:"text"`
+    TextEntities  []MessageEntity `json:"text_entities,omitempty"`
+    IsDone        bool            `json:"is_done"`
+    CompletedByID int64           `json:"completed_by_id,omitempty"`
 }
 ```
 
-### 10.4 New Types: Verification
+---
 
-**File:** `tg/verification.go` (new)
+### tg/inline.go — NEW FILE
 
 ```go
+// tg/inline.go — Inline query types
+
 package tg
 
-// VerificationStatus represents a user/chat verification status
-type VerificationStatus struct {
-    IsVerified        bool   `json:"is_verified"`
-    CustomDescription string `json:"custom_description,omitempty"` // 0-70 chars
+import "encoding/json"
+
+// --- InlineQueryResult Union (Partial Implementation) ---
+//
+// Telegram has 20+ InlineQueryResult types. We implement commonly-used ones
+// and provide InlineQueryResultUnknown as a forward-compatible fallback.
+// Add more concrete types as needed.
+
+// InlineQueryResult represents one result of an inline query
+type InlineQueryResult interface {
+    inlineQueryResultTag()
+    // GetType returns the result type for serialization
+    GetType() string
+}
+
+// InlineQueryResultArticle represents a link to an article or web page
+type InlineQueryResultArticle struct {
+    Type                string                `json:"type"` // Always "article"
+    ID                  string                `json:"id"`
+    Title               string                `json:"title"`
+    InputMessageContent InputMessageContent   `json:"input_message_content"`
+    ReplyMarkup         *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+    URL                 string                `json:"url,omitempty"`
+    HideURL             bool                  `json:"hide_url,omitempty"`
+    Description         string                `json:"description,omitempty"`
+    ThumbnailURL        string                `json:"thumbnail_url,omitempty"`
+    ThumbnailWidth      int                   `json:"thumbnail_width,omitempty"`
+    ThumbnailHeight     int                   `json:"thumbnail_height,omitempty"`
+}
+
+func (InlineQueryResultArticle) inlineQueryResultTag() {}
+func (r InlineQueryResultArticle) GetType() string     { return "article" }
+
+// InlineQueryResultPhoto represents a link to a photo
+type InlineQueryResultPhoto struct {
+    Type                  string                `json:"type"` // Always "photo"
+    ID                    string                `json:"id"`
+    PhotoURL              string                `json:"photo_url"`
+    ThumbnailURL          string                `json:"thumbnail_url"`
+    PhotoWidth            int                   `json:"photo_width,omitempty"`
+    PhotoHeight           int                   `json:"photo_height,omitempty"`
+    Title                 string                `json:"title,omitempty"`
+    Description           string                `json:"description,omitempty"`
+    Caption               string                `json:"caption,omitempty"`
+    ParseMode             string                `json:"parse_mode,omitempty"`
+    CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`
+    ShowCaptionAboveMedia bool                  `json:"show_caption_above_media,omitempty"`
+    ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+    InputMessageContent   InputMessageContent   `json:"input_message_content,omitempty"`
+}
+
+func (InlineQueryResultPhoto) inlineQueryResultTag() {}
+func (r InlineQueryResultPhoto) GetType() string     { return "photo" }
+
+// InlineQueryResultDocument represents a link to a file
+type InlineQueryResultDocument struct {
+    Type                string                `json:"type"` // Always "document"
+    ID                  string                `json:"id"`
+    Title               string                `json:"title"`
+    DocumentURL         string                `json:"document_url"`
+    MimeType            string                `json:"mime_type"`
+    Caption             string                `json:"caption,omitempty"`
+    ParseMode           string                `json:"parse_mode,omitempty"`
+    CaptionEntities     []MessageEntity       `json:"caption_entities,omitempty"`
+    Description         string                `json:"description,omitempty"`
+    ReplyMarkup         *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+    InputMessageContent InputMessageContent   `json:"input_message_content,omitempty"`
+    ThumbnailURL        string                `json:"thumbnail_url,omitempty"`
+    ThumbnailWidth      int                   `json:"thumbnail_width,omitempty"`
+    ThumbnailHeight     int                   `json:"thumbnail_height,omitempty"`
+}
+
+func (InlineQueryResultDocument) inlineQueryResultTag() {}
+func (r InlineQueryResultDocument) GetType() string     { return "document" }
+
+// InlineQueryResultUnknown is a fallback for unknown/future result types
+// Keeps the library forward-compatible
+type InlineQueryResultUnknown struct {
+    Type string          `json:"type"`
+    Raw  json.RawMessage `json:"-"`
+}
+
+func (InlineQueryResultUnknown) inlineQueryResultTag() {}
+func (r InlineQueryResultUnknown) GetType() string     { return r.Type }
+
+// --- InputMessageContent ---
+
+// InputMessageContent represents the content of a message to be sent
+type InputMessageContent interface {
+    inputMessageContentTag()
+}
+
+// InputTextMessageContent represents text content
+type InputTextMessageContent struct {
+    MessageText        string              `json:"message_text"`
+    ParseMode          string              `json:"parse_mode,omitempty"`
+    Entities           []MessageEntity     `json:"entities,omitempty"`
+    LinkPreviewOptions *LinkPreviewOptions `json:"link_preview_options,omitempty"`
+}
+
+func (InputTextMessageContent) inputMessageContentTag() {}
+
+// InputLocationMessageContent represents location content
+type InputLocationMessageContent struct {
+    Latitude             float64 `json:"latitude"`
+    Longitude            float64 `json:"longitude"`
+    HorizontalAccuracy   float64 `json:"horizontal_accuracy,omitempty"`
+    LivePeriod           int     `json:"live_period,omitempty"`
+    Heading              int     `json:"heading,omitempty"`
+    ProximityAlertRadius int     `json:"proximity_alert_radius,omitempty"`
+}
+
+func (InputLocationMessageContent) inputMessageContentTag() {}
+
+// InputVenueMessageContent represents venue content
+type InputVenueMessageContent struct {
+    Latitude        float64 `json:"latitude"`
+    Longitude       float64 `json:"longitude"`
+    Title           string  `json:"title"`
+    Address         string  `json:"address"`
+    FoursquareID    string  `json:"foursquare_id,omitempty"`
+    FoursquareType  string  `json:"foursquare_type,omitempty"`
+    GooglePlaceID   string  `json:"google_place_id,omitempty"`
+    GooglePlaceType string  `json:"google_place_type,omitempty"`
+}
+
+func (InputVenueMessageContent) inputMessageContentTag() {}
+
+// InputContactMessageContent represents contact content
+type InputContactMessageContent struct {
+    PhoneNumber string `json:"phone_number"`
+    FirstName   string `json:"first_name"`
+    LastName    string `json:"last_name,omitempty"`
+    VCard       string `json:"vcard,omitempty"`
+}
+
+func (InputContactMessageContent) inputMessageContentTag() {}
+
+// InputInvoiceMessageContent represents invoice content
+type InputInvoiceMessageContent struct {
+    Title                     string         `json:"title"`
+    Description               string         `json:"description"`
+    Payload                   string         `json:"payload"`
+    ProviderToken             string         `json:"provider_token,omitempty"`
+    Currency                  string         `json:"currency"`
+    Prices                    []LabeledPrice `json:"prices"`
+    MaxTipAmount              int            `json:"max_tip_amount,omitempty"`
+    SuggestedTipAmounts       []int          `json:"suggested_tip_amounts,omitempty"`
+    ProviderData              string         `json:"provider_data,omitempty"`
+    PhotoURL                  string         `json:"photo_url,omitempty"`
+    PhotoSize                 int            `json:"photo_size,omitempty"`
+    PhotoWidth                int            `json:"photo_width,omitempty"`
+    PhotoHeight               int            `json:"photo_height,omitempty"`
+    NeedName                  bool           `json:"need_name,omitempty"`
+    NeedPhoneNumber           bool           `json:"need_phone_number,omitempty"`
+    NeedEmail                 bool           `json:"need_email,omitempty"`
+    NeedShippingAddress       bool           `json:"need_shipping_address,omitempty"`
+    SendPhoneNumberToProvider bool           `json:"send_phone_number_to_provider,omitempty"`
+    SendEmailToProvider       bool           `json:"send_email_to_provider,omitempty"`
+    IsFlexible                bool           `json:"is_flexible,omitempty"`
+}
+
+func (InputInvoiceMessageContent) inputMessageContentTag() {}
+
+// --- Other Inline Types ---
+
+// InlineQueryResultsButton represents a button above inline query results
+type InlineQueryResultsButton struct {
+    Text           string      `json:"text"`
+    WebApp         *WebAppInfo `json:"web_app,omitempty"`
+    StartParameter string      `json:"start_parameter,omitempty"`
+}
+
+// SentWebAppMessage describes an inline message sent by a Web App
+type SentWebAppMessage struct {
+    InlineMessageID string `json:"inline_message_id,omitempty"`
+}
+
+// InlineQuery represents an incoming inline query
+type InlineQuery struct {
+    ID       string    `json:"id"`
+    From     User      `json:"from"`
+    Query    string    `json:"query"`
+    Offset   string    `json:"offset"`
+    ChatType string    `json:"chat_type,omitempty"`
+    Location *Location `json:"location,omitempty"`
+}
+
+// Location represents a point on the map
+type Location struct {
+    Latitude             float64 `json:"latitude"`
+    Longitude            float64 `json:"longitude"`
+    HorizontalAccuracy   float64 `json:"horizontal_accuracy,omitempty"`
+    LivePeriod           int     `json:"live_period,omitempty"`
+    Heading              int     `json:"heading,omitempty"`
+    ProximityAlertRadius int     `json:"proximity_alert_radius,omitempty"`
 }
 ```
 
-### 10.5 Extended Gift Types
+---
 
-**File:** `tg/gifts.go` (update)
+### tg/games.go — NEW FILE
 
 ```go
-// OwnedGifts represents a paginated list of owned gifts
+// tg/games.go — Game types
+
+package tg
+
+// Game represents a game
+type Game struct {
+    Title        string          `json:"title"`
+    Description  string          `json:"description"`
+    Photo        []PhotoSize     `json:"photo"`
+    Text         string          `json:"text,omitempty"`
+    TextEntities []MessageEntity `json:"text_entities,omitempty"`
+    Animation    *Animation      `json:"animation,omitempty"`
+}
+
+// GameHighScore represents one row of the high scores table
+type GameHighScore struct {
+    Position int  `json:"position"`
+    User     User `json:"user"`
+    Score    int  `json:"score"`
+}
+
+// CallbackGame is a placeholder for the "callback_game" button
+// When pressed, Telegram opens the game
+type CallbackGame struct{}
+```
+
+---
+
+### tg/gifts.go — NEW FILE
+
+```go
+// tg/gifts.go — Gift types (Bot API 8.0+)
+
+package tg
+
+// Gifts represents a list of available gifts
+type Gifts struct {
+    Gifts []Gift `json:"gifts"`
+}
+
+// Gift represents a gift that can be sent
+type Gift struct {
+    ID               string  `json:"id"`
+    Sticker          Sticker `json:"sticker"`
+    StarCount        int     `json:"star_count"`
+    UpgradeStarCount int     `json:"upgrade_star_count,omitempty"`
+    TotalCount       int     `json:"total_count,omitempty"`
+    RemainingCount   int     `json:"remaining_count,omitempty"`
+}
+
+// OwnedGifts represents a list of gifts owned by a user
 type OwnedGifts struct {
-    TotalCount int        `json:"total_count"`
+    TotalCount int         `json:"total_count"`
     Gifts      []OwnedGift `json:"gifts"`
-    NextOffset string     `json:"next_offset,omitempty"`
+    NextOffset string      `json:"next_offset,omitempty"`
 }
 
-// GiftFilter contains filter parameters for gift queries
-type GiftFilter struct {
-    ExcludeUnsaved   bool `json:"exclude_unsaved,omitempty"`
-    ExcludeSaved     bool `json:"exclude_saved,omitempty"`
-    ExcludeUnlimited bool `json:"exclude_unlimited,omitempty"`
-    ExcludeLimited   bool `json:"exclude_limited,omitempty"`
-    ExcludeUnique    bool `json:"exclude_unique,omitempty"`
-    SortByPrice      bool `json:"sort_by_price,omitempty"`
+// OwnedGift represents a gift owned by a user (FULL FIELDS)
+type OwnedGift struct {
+    // Common fields
+    Type        string `json:"type"` // "regular" or "unique"
+    Gift        *Gift  `json:"gift,omitempty"`
+    OwnedGiftID string `json:"owned_gift_id,omitempty"`
+
+    // Sender info
+    SenderUser *User `json:"sender_user,omitempty"`
+    SendDate   int64 `json:"send_date"`
+
+    // Message
+    Text         string          `json:"text,omitempty"`
+    TextEntities []MessageEntity `json:"text_entities,omitempty"`
+
+    // State flags
+    IsSaved       bool `json:"is_saved,omitempty"`
+    CanBeUpgraded bool `json:"can_be_upgraded,omitempty"`
+    WasRefunded   bool `json:"was_refunded,omitempty"`
+
+    // Star values
+    ConvertStarCount        int `json:"convert_star_count,omitempty"`
+    PrepaidUpgradeStarCount int `json:"prepaid_upgrade_star_count,omitempty"`
+
+    // For unique gifts
+    TransferStarCount int `json:"transfer_star_count,omitempty"`
 }
 
-// AcceptedGiftTypes describes which gift types a business accepts
+// AcceptedGiftTypes describes which gift types are accepted
 type AcceptedGiftTypes struct {
-    UnlimitedGifts bool `json:"unlimited_gifts"`
-    LimitedGifts   bool `json:"limited_gifts"`
-    UniqueGifts    bool `json:"unique_gifts"`
-    PremiumGifts   bool `json:"premium_gifts"`
+    UnlimitedGifts      bool `json:"unlimited_gifts,omitempty"`
+    LimitedGifts        bool `json:"limited_gifts,omitempty"`
+    UniqueGifts         bool `json:"unique_gifts,omitempty"`
+    PremiumSubscription bool `json:"premium_subscription,omitempty"`
 }
 ```
 
-### 10.6 Extended Story Types
+---
 
-**File:** `tg/stories.go` (update)
+### tg/business.go — NEW FILE
 
 ```go
-// InputStoryContentPhoto represents a photo story
-type InputStoryContentPhoto struct {
-    Type  string    `json:"type"` // "photo"
-    Photo InputFile `json:"photo"`
+// tg/business.go — Business account types
+
+package tg
+
+// BusinessConnection represents a connection with a business account
+type BusinessConnection struct {
+    ID         string            `json:"id"`
+    User       User              `json:"user"`
+    UserChatID int64             `json:"user_chat_id"`
+    Date       int64             `json:"date"`
+    Rights     BusinessBotRights `json:"rights"`
+    IsEnabled  bool              `json:"is_enabled"`
 }
 
-func (InputStoryContentPhoto) inputStoryContent() {}
-
-// InputStoryContentVideo represents a video story
-type InputStoryContentVideo struct {
-    Type                string    `json:"type"` // "video"
-    Video               InputFile `json:"video"`
-    Duration            *float64  `json:"duration,omitempty"`
-    CoverFrameTimestamp *float64  `json:"cover_frame_timestamp,omitempty"`
-    IsAnimation         *bool     `json:"is_animation,omitempty"`
+// BusinessBotRights describes the rights of a bot in a business account
+type BusinessBotRights struct {
+    CanReply                   bool `json:"can_reply"`
+    CanReadMessages            bool `json:"can_read_messages"`
+    CanDeleteAllMessages       bool `json:"can_delete_all_messages"`
+    CanEditName                bool `json:"can_edit_name"`
+    CanEditBio                 bool `json:"can_edit_bio"`
+    CanEditProfilePhoto        bool `json:"can_edit_profile_photo"`
+    CanEditUsername            bool `json:"can_edit_username"`
+    CanChangeGiftSettings      bool `json:"can_change_gift_settings"`
+    CanViewGiftsAndStars       bool `json:"can_view_gifts_and_stars"`
+    CanConvertGiftsToStars     bool `json:"can_convert_gifts_to_stars"`
+    CanTransferAndUpgradeGifts bool `json:"can_transfer_and_upgrade_gifts"`
+    CanTransferStars           bool `json:"can_transfer_stars"`
+    CanManageStories           bool `json:"can_manage_stories"`
 }
 
-func (InputStoryContentVideo) inputStoryContent() {}
+// Story represents a story posted to a chat
+type Story struct {
+    ID         int         `json:"id"`
+    Chat       Chat        `json:"chat"`
+    Date       int64       `json:"date"`
+    ExpireDate int64       `json:"expire_date"`
+    Areas      []StoryArea `json:"areas,omitempty"`
+}
 
-// StoryActivePeriods - allowed values for story active_period
-const (
-    StoryPeriod6Hours  = 21600  // 6 hours
-    StoryPeriod12Hours = 43200  // 12 hours
-    StoryPeriod24Hours = 86400  // 24 hours
-    StoryPeriod48Hours = 172800 // 48 hours
-)
+// StoryArea represents a clickable area on a story
+type StoryArea struct {
+    Position StoryAreaPosition `json:"position"`
+    // Type is polymorphic - simplified here
+}
 
-// ValidStoryPeriods returns all valid story active periods
-func ValidStoryPeriods() []int {
-    return []int{StoryPeriod6Hours, StoryPeriod12Hours, StoryPeriod24Hours, StoryPeriod48Hours}
+// StoryAreaPosition describes the position of a story area
+type StoryAreaPosition struct {
+    XPercentage      float64 `json:"x_percentage"`
+    YPercentage      float64 `json:"y_percentage"`
+    WidthPercentage  float64 `json:"width_percentage"`
+    HeightPercentage float64 `json:"height_percentage"`
+    RotationAngle    float64 `json:"rotation_angle"`
 }
 ```
 
-### 10.7 Star Amount Type
+---
+
+### tg/boosts.go — NEW FILE
 
 ```go
-// StarAmount represents a Telegram Stars amount
-type StarAmount struct {
-    Amount         int  `json:"amount"`
-    NanostarAmount *int `json:"nanostar_amount,omitempty"` // Bot API 8.2
+// tg/boosts.go — Chat boost types
+
+package tg
+
+import "encoding/json"
+
+// UserChatBoosts represents a list of boosts added to a chat by a user
+type UserChatBoosts struct {
+    Boosts []ChatBoost `json:"boosts"`
 }
 
-// TotalNanostars returns the total amount in nanostars
-func (s StarAmount) TotalNanostars() int64 {
-    total := int64(s.Amount) * 1_000_000_000
-    if s.NanostarAmount != nil {
-        total += int64(*s.NanostarAmount)
-    }
-    return total
-}
-```
-
-### Definition of Done (PR10)
-
-- [ ] All Tier 3 types defined
-- [ ] Safety rules documented and implemented
-- [ ] No automatic retry for value operations
-- [ ] Idempotency strategy documented
-- [ ] JSON round-trip tests for new types
-- [ ] No `map[string]any` in exported signatures
-- [ ] int64 for all IDs that can exceed 32-bit
-
----
-
-## PR11: Payments & Telegram Stars
-
-**Goal:** Full payment processing with enhanced Star operations.  
-**Estimated Time:** 6-8 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Value Op? | Description |
-|--------|-----------|-------------|
-| `sendInvoice` | Yes | Send an invoice |
-| `createInvoiceLink` | No | Create invoice link |
-| `answerShippingQuery` | No | Answer shipping query |
-| `answerPreCheckoutQuery` | Yes | Answer pre-checkout (commits payment) |
-| `getStarTransactions` | No | Get transaction history |
-| `refundStarPayment` | Yes | Refund a payment |
-| `editUserStarSubscription` | Yes | Cancel/re-enable subscription |
-| `setUserEmojiStatus` | No | Set user emoji status |
-| `sendPaidMedia` | Yes | Send paid media |
-
-### Implementation with Safety
-
-```go
-// RefundStarPayment refunds a successful payment in Telegram Stars.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) RefundStarPayment(ctx context.Context, userID int64, telegramPaymentChargeID string, opts ...ValueOption) error {
-    if userID == 0 {
-        return tg.NewValidationError("user_id", "is required")
-    }
-    if telegramPaymentChargeID == "" {
-        return tg.NewValidationError("telegram_payment_charge_id", "is required")
-    }
-    
-    params := map[string]any{
-        "user_id":                    userID,
-        "telegram_payment_charge_id": telegramPaymentChargeID,
-    }
-    
-    // Use no-retry executor for value operations
-    return c.executor.CallNoRetry(ctx, "refundStarPayment", params, nil, opts...)
+// ChatBoost represents a boost added to a chat
+type ChatBoost struct {
+    BoostID        string          `json:"boost_id"`
+    AddDate        int64           `json:"add_date"`
+    ExpirationDate int64           `json:"expiration_date"`
+    Source         ChatBoostSource `json:"source"`
 }
 
-// ValueOption configures value operation behavior
-type ValueOption func(*valueConfig)
+// Custom UnmarshalJSON for ChatBoost
+func (b *ChatBoost) UnmarshalJSON(data []byte) error {
+    type Alias ChatBoost
+    aux := &struct {
+        Source json.RawMessage `json:"source"`
+        *Alias
+    }{Alias: (*Alias)(b)}
 
-type valueConfig struct {
-    allowRetry bool
-    maxRetries int
-}
-
-// WithAllowRetry explicitly opts into retry for value operations
-// USE WITH CAUTION: May cause double-spends on network issues
-func WithAllowRetry(maxRetries int) ValueOption {
-    return func(c *valueConfig) {
-        c.allowRetry = true
-        c.maxRetries = maxRetries
-    }
-}
-```
-
-### Definition of Done (PR11)
-
-- [ ] All 9 payment methods
-- [ ] Value operation safety for refunds
-- [ ] Subscription support (Bot API 7.9)
-- [ ] Stars currency handling
-- [ ] Tests without actual payments
-
----
-
-## PR12: Stickers
-
-**Goal:** Full sticker and sticker set management.  
-**Estimated Time:** 6-8 hours  
-**Breaking Changes:** None (additive)
-
-(Same as v1.0 - 16 methods, no changes needed)
-
----
-
-## PR13: Games
-
-**Goal:** Game sending and score management.  
-**Estimated Time:** 3-4 hours  
-**Breaking Changes:** None (additive)
-
-(Same as v1.0 - 3 methods)
-
----
-
-## PR14: Gifts (Expanded)
-
-**Goal:** Complete gift catalog, sending, and browsing.  
-**Estimated Time:** 6-8 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Value Op? | Description |
-|--------|-----------|-------------|
-| `getAvailableGifts` | No | Get gift catalog |
-| `sendGift` | Yes | Send a gift |
-| `giftPremiumSubscription` | Yes | Gift premium subscription |
-| `getUserGifts` | No | Get user's owned gifts ✨NEW |
-| `getChatGifts` | No | Get chat's owned gifts ✨NEW |
-| `getBusinessAccountGifts` | No | Get business account gifts ✨NEW |
-| `saveGift` | No | Save/unsave gift |
-| `convertGiftToStars` | Yes | Convert gift to Stars |
-| `upgradeGift` | Yes | Upgrade gift |
-| `transferGift` | Yes | Transfer unique gift |
-
-### Implementation
-
-**File:** `sender/methods_gifts.go` (new)
-
-```go
-package sender
-
-import (
-    "context"
-    
-    "github.com/example/galigo/tg"
-)
-
-// GetAvailableGifts returns the list of gifts that can be sent.
-func (c *Client) GetAvailableGifts(ctx context.Context) (*tg.Gifts, error) {
-    var gifts tg.Gifts
-    if err := c.executor.Call(ctx, "getAvailableGifts", nil, &gifts); err != nil {
-        return nil, err
-    }
-    return &gifts, nil
-}
-
-// SendGiftRequest contains parameters for sendGift
-type SendGiftRequest struct {
-    // Exactly one of UserID or ChatID must be set
-    UserID        *int64          `json:"user_id,omitempty"`
-    ChatID        *tg.ChatID      `json:"chat_id,omitempty"`
-    GiftID        string          `json:"gift_id"`
-    PayForUpgrade *bool           `json:"pay_for_upgrade,omitempty"`
-    Text          string          `json:"text,omitempty"` // 0-255 chars
-    TextParseMode tg.ParseMode    `json:"text_parse_mode,omitempty"`
-    TextEntities  []tg.MessageEntity `json:"text_entities,omitempty"`
-}
-
-// Validate checks request validity
-func (r SendGiftRequest) Validate() error {
-    // Mutual exclusivity check
-    hasUser := r.UserID != nil && *r.UserID != 0
-    hasChat := r.ChatID != nil && !r.ChatID.IsZero()
-    
-    if !hasUser && !hasChat {
-        return tg.NewValidationError("user_id/chat_id", "exactly one is required")
-    }
-    if hasUser && hasChat {
-        return tg.NewValidationError("user_id/chat_id", "mutually exclusive, provide only one")
-    }
-    if r.GiftID == "" {
-        return tg.NewValidationError("gift_id", "is required")
-    }
-    if len(r.Text) > 255 {
-        return tg.NewValidationError("text", "must be at most 255 characters")
-    }
-    return nil
-}
-
-// SendGift sends a gift to a user or chat.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) SendGift(ctx context.Context, req SendGiftRequest, opts ...ValueOption) error {
-    if err := req.Validate(); err != nil {
+    if err := json.Unmarshal(data, aux); err != nil {
         return err
     }
-    
-    return c.executor.CallNoRetry(ctx, "sendGift", req, nil, opts...)
-}
 
-// GiftPremiumSubscription gifts a Telegram Premium subscription.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) GiftPremiumSubscription(ctx context.Context, userID int64, monthCount, starCount int, opts ...GiftOption) error {
-    if userID == 0 {
-        return tg.NewValidationError("user_id", "is required")
-    }
-    
-    // Validate allowed month/star combinations
-    if !isValidPremiumGiftCombo(monthCount, starCount) {
-        return tg.NewValidationError("month_count/star_count", "invalid combination")
-    }
-    
-    req := struct {
-        UserID     int64  `json:"user_id"`
-        MonthCount int    `json:"month_count"`
-        StarCount  int    `json:"star_count"`
-        Text       string `json:"text,omitempty"`
-        TextParseMode tg.ParseMode `json:"text_parse_mode,omitempty"`
-        TextEntities []tg.MessageEntity `json:"text_entities,omitempty"`
-    }{
-        UserID:     userID,
-        MonthCount: monthCount,
-        StarCount:  starCount,
-    }
-    
-    for _, opt := range opts {
-        opt(&req)
-    }
-    
-    return c.executor.CallNoRetry(ctx, "giftPremiumSubscription", req, nil)
-}
-
-// isValidPremiumGiftCombo validates month/star combinations
-func isValidPremiumGiftCombo(months, stars int) bool {
-    // Known valid combinations as of Bot API 9.3
-    validCombos := map[int][]int{
-        1:  {500},
-        3:  {1000},
-        6:  {1500},
-        12: {2500},
-    }
-    
-    allowed, ok := validCombos[months]
-    if !ok {
-        return false
-    }
-    for _, s := range allowed {
-        if stars == s {
-            return true
-        }
-    }
-    return false
-}
-
-// GetUserGiftsRequest contains parameters for getUserGifts
-type GetUserGiftsRequest struct {
-    UserID int64         `json:"user_id"`
-    Filter *tg.GiftFilter `json:"filter,omitempty"`
-    Offset string        `json:"offset,omitempty"`
-    Limit  int           `json:"limit,omitempty"` // 1-100, default 100
-}
-
-// GetUserGifts returns gifts owned by a user.
-func (c *Client) GetUserGifts(ctx context.Context, req GetUserGiftsRequest) (*tg.OwnedGifts, error) {
-    if req.UserID == 0 {
-        return nil, tg.NewValidationError("user_id", "is required")
-    }
-    if req.Limit < 0 || req.Limit > 100 {
-        return nil, tg.NewValidationError("limit", "must be 1-100")
-    }
-    
-    var gifts tg.OwnedGifts
-    if err := c.executor.Call(ctx, "getUserGifts", req, &gifts); err != nil {
-        return nil, err
-    }
-    return &gifts, nil
-}
-
-// GetChatGiftsRequest contains parameters for getChatGifts
-type GetChatGiftsRequest struct {
-    ChatID tg.ChatID     `json:"chat_id"`
-    Filter *tg.GiftFilter `json:"filter,omitempty"`
-    Offset string        `json:"offset,omitempty"`
-    Limit  int           `json:"limit,omitempty"`
-}
-
-// GetChatGifts returns gifts owned by a chat.
-func (c *Client) GetChatGifts(ctx context.Context, req GetChatGiftsRequest) (*tg.OwnedGifts, error) {
-    if req.ChatID.IsZero() {
-        return nil, tg.NewValidationError("chat_id", "is required")
-    }
-    
-    var gifts tg.OwnedGifts
-    if err := c.executor.Call(ctx, "getChatGifts", req, &gifts); err != nil {
-        return nil, err
-    }
-    return &gifts, nil
-}
-
-// ConvertGiftToStars converts a gift to Telegram Stars.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) ConvertGiftToStars(ctx context.Context, businessConnectionID, ownedGiftID string, opts ...ValueOption) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if ownedGiftID == "" {
-        return tg.NewValidationError("owned_gift_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "owned_gift_id":          ownedGiftID,
-    }
-    
-    return c.executor.CallNoRetry(ctx, "convertGiftToStars", params, nil, opts...)
-}
-
-// UpgradeGift upgrades a gift to a unique one.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) UpgradeGift(ctx context.Context, businessConnectionID, ownedGiftID string, keepOriginalDetails *bool, starCount *int, opts ...ValueOption) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if ownedGiftID == "" {
-        return tg.NewValidationError("owned_gift_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "owned_gift_id":          ownedGiftID,
-    }
-    if keepOriginalDetails != nil {
-        params["keep_original_details"] = *keepOriginalDetails
-    }
-    if starCount != nil {
-        params["star_count"] = *starCount
-    }
-    
-    return c.executor.CallNoRetry(ctx, "upgradeGift", params, nil, opts...)
-}
-
-// TransferGift transfers a unique gift to another user.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) TransferGift(ctx context.Context, businessConnectionID, ownedGiftID string, newOwnerChatID tg.ChatID, starCount *int, opts ...ValueOption) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if ownedGiftID == "" {
-        return tg.NewValidationError("owned_gift_id", "is required")
-    }
-    if newOwnerChatID.IsZero() {
-        return tg.NewValidationError("new_owner_chat_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "owned_gift_id":          ownedGiftID,
-        "new_owner_chat_id":      newOwnerChatID,
-    }
-    if starCount != nil {
-        params["star_count"] = *starCount
-    }
-    
-    return c.executor.CallNoRetry(ctx, "transferGift", params, nil, opts...)
-}
-```
-
-### Definition of Done (PR14)
-
-- [ ] All 10 gift methods
-- [ ] `sendGift` mutual exclusivity validation
-- [ ] `giftPremiumSubscription` combo validation
-- [ ] Gift browsing with filters and pagination
-- [ ] Value operation safety for spending methods
-- [ ] Tests for validation logic
-
----
-
-## PR15: Verification APIs ✨NEW
-
-**Goal:** User and chat verification management.  
-**Estimated Time:** 2-3 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `verifyUser` | Verify a user |
-| `verifyChat` | Verify a chat |
-| `removeUserVerification` | Remove user verification |
-| `removeChatVerification` | Remove chat verification |
-
-### Implementation
-
-**File:** `sender/methods_verification.go` (new)
-
-```go
-package sender
-
-import (
-    "context"
-    
-    "github.com/example/galigo/tg"
-)
-
-// VerifyUser verifies a user on behalf of the organization.
-// Requires appropriate bot permissions.
-func (c *Client) VerifyUser(ctx context.Context, userID int64, customDescription string) error {
-    if userID == 0 {
-        return tg.NewValidationError("user_id", "is required")
-    }
-    if len(customDescription) > 70 {
-        return tg.NewValidationError("custom_description", "must be at most 70 characters")
-    }
-    
-    params := map[string]any{"user_id": userID}
-    if customDescription != "" {
-        params["custom_description"] = customDescription
-    }
-    
-    return c.executor.Call(ctx, "verifyUser", params, nil)
-}
-
-// VerifyChat verifies a chat on behalf of the organization.
-// Requires appropriate bot permissions.
-func (c *Client) VerifyChat(ctx context.Context, chatID tg.ChatID, customDescription string) error {
-    if chatID.IsZero() {
-        return tg.NewValidationError("chat_id", "is required")
-    }
-    if len(customDescription) > 70 {
-        return tg.NewValidationError("custom_description", "must be at most 70 characters")
-    }
-    
-    params := map[string]any{"chat_id": chatID}
-    if customDescription != "" {
-        params["custom_description"] = customDescription
-    }
-    
-    return c.executor.Call(ctx, "verifyChat", params, nil)
-}
-
-// RemoveUserVerification removes verification from a user.
-func (c *Client) RemoveUserVerification(ctx context.Context, userID int64) error {
-    if userID == 0 {
-        return tg.NewValidationError("user_id", "is required")
-    }
-    
-    params := map[string]any{"user_id": userID}
-    return c.executor.Call(ctx, "removeUserVerification", params, nil)
-}
-
-// RemoveChatVerification removes verification from a chat.
-func (c *Client) RemoveChatVerification(ctx context.Context, chatID tg.ChatID) error {
-    if chatID.IsZero() {
-        return tg.NewValidationError("chat_id", "is required")
-    }
-    
-    params := map[string]any{"chat_id": chatID}
-    return c.executor.Call(ctx, "removeChatVerification", params, nil)
-}
-```
-
-### Definition of Done (PR15)
-
-- [ ] All 4 verification methods
-- [ ] Custom description length validation (0-70 chars)
-- [ ] Documentation about required permissions
-- [ ] Tests
-
----
-
-## PR16: Business Account (Expanded)
-
-**Goal:** Complete business account management.  
-**Estimated Time:** 8-10 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Value Op? | Description |
-|--------|-----------|-------------|
-| `getBusinessConnection` | No | Get connection info |
-| `readBusinessMessage` | No | Mark message as read ✨NEW |
-| `deleteBusinessMessages` | No | Delete messages ✨NEW |
-| `setBusinessAccountName` | No | Set name |
-| `setBusinessAccountUsername` | No | Set username |
-| `setBusinessAccountBio` | No | Set bio |
-| `setBusinessAccountProfilePhoto` | No | Set photo |
-| `removeBusinessAccountProfilePhoto` | No | Remove photo |
-| `setBusinessAccountGiftSettings` | No | Set gift settings |
-| `getBusinessAccountStarBalance` | No | Get Stars balance |
-| `transferBusinessAccountStars` | Yes | Transfer Stars ✨NEW |
-| `getBusinessAccountGifts` | No | Get gifts ✨NEW |
-
-### Implementation
-
-**File:** `sender/methods_business.go` (new)
-
-```go
-package sender
-
-import (
-    "context"
-    
-    "github.com/example/galigo/tg"
-)
-
-// GetBusinessConnection returns information about a business connection.
-func (c *Client) GetBusinessConnection(ctx context.Context, businessConnectionID string) (*tg.BusinessConnection, error) {
-    if businessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    params := map[string]any{"business_connection_id": businessConnectionID}
-    
-    var conn tg.BusinessConnection
-    if err := c.executor.Call(ctx, "getBusinessConnection", params, &conn); err != nil {
-        return nil, err
-    }
-    return &conn, nil
-}
-
-// ReadBusinessMessage marks a message as read in a business chat.
-// Note: chat_id must have been active in last 24 hours (server enforced).
-func (c *Client) ReadBusinessMessage(ctx context.Context, businessConnectionID string, chatID tg.ChatID, messageID int) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if chatID.IsZero() {
-        return tg.NewValidationError("chat_id", "is required")
-    }
-    if messageID == 0 {
-        return tg.NewValidationError("message_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "chat_id":                chatID,
-        "message_id":             messageID,
-    }
-    
-    return c.executor.Call(ctx, "readBusinessMessage", params, nil)
-}
-
-// DeleteBusinessMessages deletes messages in a business chat.
-// message_ids must contain 1-100 message IDs.
-func (c *Client) DeleteBusinessMessages(ctx context.Context, businessConnectionID string, messageIDs []int) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if len(messageIDs) < 1 || len(messageIDs) > 100 {
-        return tg.NewValidationError("message_ids", "must have 1-100 message IDs")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "message_ids":            messageIDs,
-    }
-    
-    return c.executor.Call(ctx, "deleteBusinessMessages", params, nil)
-}
-
-// SetBusinessAccountName sets the name of a business account.
-// first_name: 1-64 chars, last_name: 0-64 chars
-func (c *Client) SetBusinessAccountName(ctx context.Context, businessConnectionID, firstName, lastName string) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if firstName == "" || len(firstName) > 64 {
-        return tg.NewValidationError("first_name", "must be 1-64 characters")
-    }
-    if len(lastName) > 64 {
-        return tg.NewValidationError("last_name", "must be at most 64 characters")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "first_name":             firstName,
-    }
-    if lastName != "" {
-        params["last_name"] = lastName
-    }
-    
-    return c.executor.Call(ctx, "setBusinessAccountName", params, nil)
-}
-
-// SetBusinessAccountUsername sets the username of a business account.
-// username: 0-32 chars (empty to remove)
-func (c *Client) SetBusinessAccountUsername(ctx context.Context, businessConnectionID, username string) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if len(username) > 32 {
-        return tg.NewValidationError("username", "must be at most 32 characters")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-    }
-    if username != "" {
-        params["username"] = username
-    }
-    
-    return c.executor.Call(ctx, "setBusinessAccountUsername", params, nil)
-}
-
-// SetBusinessAccountBio sets the bio of a business account.
-// bio: 0-140 chars (empty to remove)
-func (c *Client) SetBusinessAccountBio(ctx context.Context, businessConnectionID, bio string) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if len(bio) > 140 {
-        return tg.NewValidationError("bio", "must be at most 140 characters")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-    }
-    if bio != "" {
-        params["bio"] = bio
-    }
-    
-    return c.executor.Call(ctx, "setBusinessAccountBio", params, nil)
-}
-
-// SetBusinessAccountProfilePhoto sets the profile photo.
-func (c *Client) SetBusinessAccountProfilePhoto(ctx context.Context, businessConnectionID string, photo tg.InputFile, isPublic *bool) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-    }
-    if isPublic != nil {
-        params["is_public"] = *isPublic
-    }
-    
-    if photo.IsUpload() {
-        files := []FilePart{{
-            FieldName: "photo",
-            FileName:  photo.GetUpload().Name,
-            Reader:    photo.GetUpload().Reader,
-        }}
-        return c.executor.CallMultipart(ctx, "setBusinessAccountProfilePhoto", params, files, nil)
-    }
-    
-    params["photo"] = photo.GetValue()
-    return c.executor.Call(ctx, "setBusinessAccountProfilePhoto", params, nil)
-}
-
-// RemoveBusinessAccountProfilePhoto removes the profile photo.
-func (c *Client) RemoveBusinessAccountProfilePhoto(ctx context.Context, businessConnectionID string, isPublic *bool) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-    }
-    if isPublic != nil {
-        params["is_public"] = *isPublic
-    }
-    
-    return c.executor.Call(ctx, "removeBusinessAccountProfilePhoto", params, nil)
-}
-
-// SetBusinessAccountGiftSettings sets gift settings.
-func (c *Client) SetBusinessAccountGiftSettings(ctx context.Context, businessConnectionID string, showGiftButton bool, acceptedGiftTypes *tg.AcceptedGiftTypes) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "show_gift_button":       showGiftButton,
-    }
-    if acceptedGiftTypes != nil {
-        params["accepted_gift_types"] = acceptedGiftTypes
-    }
-    
-    return c.executor.Call(ctx, "setBusinessAccountGiftSettings", params, nil)
-}
-
-// GetBusinessAccountStarBalance returns the Stars balance.
-func (c *Client) GetBusinessAccountStarBalance(ctx context.Context, businessConnectionID string) (*tg.StarAmount, error) {
-    if businessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-    }
-    
-    var balance tg.StarAmount
-    if err := c.executor.Call(ctx, "getBusinessAccountStarBalance", params, &balance); err != nil {
-        return nil, err
-    }
-    return &balance, nil
-}
-
-// TransferBusinessAccountStars transfers Stars from business account to bot.
-// WARNING: This is a value operation. No automatic retry.
-func (c *Client) TransferBusinessAccountStars(ctx context.Context, businessConnectionID string, starCount int, opts ...ValueOption) error {
-    if businessConnectionID == "" {
-        return tg.NewValidationError("business_connection_id", "is required")
-    }
-    if starCount < 1 || starCount > 10000 {
-        return tg.NewValidationError("star_count", "must be 1-10000")
-    }
-    
-    params := map[string]any{
-        "business_connection_id": businessConnectionID,
-        "star_count":             starCount,
-    }
-    
-    return c.executor.CallNoRetry(ctx, "transferBusinessAccountStars", params, nil, opts...)
-}
-
-// GetBusinessAccountGiftsRequest contains parameters for getBusinessAccountGifts
-type GetBusinessAccountGiftsRequest struct {
-    BusinessConnectionID string        `json:"business_connection_id"`
-    Filter               *tg.GiftFilter `json:"filter,omitempty"`
-    Offset               string        `json:"offset,omitempty"`
-    Limit                int           `json:"limit,omitempty"`
-}
-
-// GetBusinessAccountGifts returns gifts owned by a business account.
-func (c *Client) GetBusinessAccountGifts(ctx context.Context, req GetBusinessAccountGiftsRequest) (*tg.OwnedGifts, error) {
-    if req.BusinessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    
-    var gifts tg.OwnedGifts
-    if err := c.executor.Call(ctx, "getBusinessAccountGifts", req, &gifts); err != nil {
-        return nil, err
-    }
-    return &gifts, nil
-}
-```
-
-### Definition of Done (PR16)
-
-- [ ] All 12 business methods
-- [ ] `readBusinessMessage` implemented
-- [ ] `deleteBusinessMessages` with 1-100 validation
-- [ ] Profile field length validation
-- [ ] `transferBusinessAccountStars` with value safety
-- [ ] Integration test example documented
-
----
-
-## PR17: Stories (Expanded)
-
-**Goal:** Story posting and management.  
-**Estimated Time:** 4-5 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `postStory` | Post a new story |
-| `repostStory` | Repost existing story ✨NEW |
-| `editStory` | Edit a story |
-| `deleteStory` | Delete a story |
-| `getStory` | Get a story |
-
-### Implementation
-
-```go
-// PostStoryRequest contains parameters for postStory
-type PostStoryRequest struct {
-    BusinessConnectionID string               `json:"business_connection_id"`
-    Content              tg.InputStoryContent `json:"content"`
-    ActivePeriod         int                  `json:"active_period"` // Must be valid period
-    Caption              string               `json:"caption,omitempty"`
-    ParseMode            tg.ParseMode         `json:"parse_mode,omitempty"`
-    CaptionEntities      []tg.MessageEntity   `json:"caption_entities,omitempty"`
-    Areas                []tg.StoryArea       `json:"areas,omitempty"`
-    PostToChatPage       *bool                `json:"post_to_chat_page,omitempty"`
-    ProtectContent       *bool                `json:"protect_content,omitempty"`
-}
-
-// PostStory posts a story on behalf of a business account.
-func (c *Client) PostStory(ctx context.Context, req PostStoryRequest) (*tg.Story, error) {
-    if req.BusinessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    if req.Content == nil {
-        return nil, tg.NewValidationError("content", "is required")
-    }
-    if !isValidStoryPeriod(req.ActivePeriod) {
-        return nil, tg.NewValidationError("active_period", "must be one of: 21600, 43200, 86400, 172800")
-    }
-    
-    var story tg.Story
-    if err := c.executeStoryRequest(ctx, "postStory", req, &story); err != nil {
-        return nil, err
-    }
-    return &story, nil
-}
-
-func isValidStoryPeriod(period int) bool {
-    for _, p := range tg.ValidStoryPeriods() {
-        if period == p {
-            return true
-        }
-    }
-    return false
-}
-
-// RepostStoryRequest contains parameters for repostStory
-type RepostStoryRequest struct {
-    BusinessConnectionID string             `json:"business_connection_id"`
-    FromChatID           tg.ChatID          `json:"from_chat_id"`
-    FromStoryID          int                `json:"from_story_id"`
-    ActivePeriod         int                `json:"active_period"`
-    Caption              string             `json:"caption,omitempty"`
-    ParseMode            tg.ParseMode       `json:"parse_mode,omitempty"`
-    CaptionEntities      []tg.MessageEntity `json:"caption_entities,omitempty"`
-    Areas                []tg.StoryArea     `json:"areas,omitempty"`
-    PostToChatPage       *bool              `json:"post_to_chat_page,omitempty"`
-    ProtectContent       *bool              `json:"protect_content,omitempty"`
-}
-
-// RepostStory reposts an existing story.
-// Note: Requires specific business rights (server enforced).
-func (c *Client) RepostStory(ctx context.Context, req RepostStoryRequest) (*tg.Story, error) {
-    if req.BusinessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    if req.FromChatID.IsZero() {
-        return nil, tg.NewValidationError("from_chat_id", "is required")
-    }
-    if req.FromStoryID == 0 {
-        return nil, tg.NewValidationError("from_story_id", "is required")
-    }
-    if !isValidStoryPeriod(req.ActivePeriod) {
-        return nil, tg.NewValidationError("active_period", "must be one of: 21600, 43200, 86400, 172800")
-    }
-    
-    var story tg.Story
-    if err := c.executor.Call(ctx, "repostStory", req, &story); err != nil {
-        return nil, err
-    }
-    return &story, nil
-}
-
-// EditStory, DeleteStory, GetStory... (same as v1.0)
-```
-
-### Definition of Done (PR17)
-
-- [ ] All 5 story methods
-- [ ] `repostStory` implemented
-- [ ] `active_period` validation
-- [ ] Media upload for story content
-- [ ] Story areas support
-- [ ] Tests
-
----
-
-## PR18: Suggested Posts ✨NEW
-
-**Goal:** Channel suggested post moderation.  
-**Estimated Time:** 3-4 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `approveSuggestedPost` | Approve and schedule post |
-| `declineSuggestedPost` | Decline a suggested post |
-
-### Implementation
-
-**File:** `sender/methods_suggested_posts.go` (new)
-
-```go
-package sender
-
-import (
-    "context"
-    "time"
-    
-    "github.com/example/galigo/tg"
-)
-
-// ApproveSuggestedPost approves a suggested post and schedules it.
-// send_date must not be more than 30 days in the future.
-func (c *Client) ApproveSuggestedPost(ctx context.Context, chatID tg.ChatID, messageID int, sendDate *time.Time) error {
-    if chatID.IsZero() {
-        return tg.NewValidationError("chat_id", "is required")
-    }
-    if messageID == 0 {
-        return tg.NewValidationError("message_id", "is required")
-    }
-    
-    params := map[string]any{
-        "chat_id":    chatID,
-        "message_id": messageID,
-    }
-    
-    if sendDate != nil {
-        // Validate: not more than 30 days in future
-        maxDate := time.Now().AddDate(0, 0, 30)
-        if sendDate.After(maxDate) {
-            return tg.NewValidationError("send_date", "must not be more than 30 days in the future")
-        }
-        params["send_date"] = sendDate.Unix()
-    }
-    
-    return c.executor.Call(ctx, "approveSuggestedPost", params, nil)
-}
-
-// DeclineSuggestedPost declines a suggested post.
-func (c *Client) DeclineSuggestedPost(ctx context.Context, chatID tg.ChatID, messageID int, comment string) error {
-    if chatID.IsZero() {
-        return tg.NewValidationError("chat_id", "is required")
-    }
-    if messageID == 0 {
-        return tg.NewValidationError("message_id", "is required")
-    }
-    
-    params := map[string]any{
-        "chat_id":    chatID,
-        "message_id": messageID,
-    }
-    if comment != "" {
-        params["comment"] = comment
-    }
-    
-    return c.executor.Call(ctx, "declineSuggestedPost", params, nil)
-}
-```
-
-### Definition of Done (PR18)
-
-- [ ] `approveSuggestedPost` with 30-day validation
-- [ ] `declineSuggestedPost` with optional comment
-- [ ] Documentation about admin requirements
-- [ ] Tests
-
----
-
-## PR19: Checklists ✨NEW
-
-**Goal:** Checklist messages for business accounts.  
-**Estimated Time:** 4-5 hours  
-**Breaking Changes:** None (additive)
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `sendChecklist` | Send a checklist message |
-| `editMessageChecklist` | Edit a checklist message |
-
-### Implementation
-
-**File:** `sender/methods_checklists.go` (new)
-
-```go
-package sender
-
-import (
-    "context"
-    
-    "github.com/example/galigo/tg"
-)
-
-// SendChecklistRequest contains parameters for sendChecklist
-type SendChecklistRequest struct {
-    BusinessConnectionID string              `json:"business_connection_id"`
-    ChatID               tg.ChatID           `json:"chat_id"`
-    Checklist            tg.InputChecklist   `json:"checklist"`
-    MessageThreadID      *int                `json:"message_thread_id,omitempty"`
-    DisableNotification  *bool               `json:"disable_notification,omitempty"`
-    ProtectContent       *bool               `json:"protect_content,omitempty"`
-    MessageEffectID      string              `json:"message_effect_id,omitempty"`
-    ReplyParameters      *tg.ReplyParameters `json:"reply_parameters,omitempty"`
-    ReplyMarkup          any                 `json:"reply_markup,omitempty"`
-}
-
-// SendChecklist sends a checklist message.
-func (c *Client) SendChecklist(ctx context.Context, req SendChecklistRequest) (*tg.Message, error) {
-    if req.BusinessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
-    }
-    if req.ChatID.IsZero() {
-        return nil, tg.NewValidationError("chat_id", "is required")
-    }
-    
-    // Validate checklist
-    if err := validateChecklist(req.Checklist); err != nil {
-        return nil, err
-    }
-    
-    var msg tg.Message
-    if err := c.executor.Call(ctx, "sendChecklist", req, &msg); err != nil {
-        return nil, err
-    }
-    return &msg, nil
-}
-
-func validateChecklist(cl tg.InputChecklist) error {
-    if cl.Title == "" || len(cl.Title) > 256 {
-        return tg.NewValidationError("checklist.title", "must be 1-256 characters")
-    }
-    if len(cl.Items) < 1 || len(cl.Items) > 100 {
-        return tg.NewValidationError("checklist.items", "must have 1-100 items")
-    }
-    
-    for i, item := range cl.Items {
-        if item.Text == "" || len(item.Text) > 1024 {
-            return tg.NewValidationError("checklist.items", "item %d text must be 1-1024 characters", i)
-        }
-        // Recursively validate nested items
-        for j, nested := range item.Items {
-            if nested.Text == "" || len(nested.Text) > 1024 {
-                return tg.NewValidationError("checklist.items", "item %d.%d text must be 1-1024 characters", i, j)
-            }
-        }
-    }
-    
+    b.Source = unmarshalChatBoostSource(aux.Source)
     return nil
 }
 
-// EditMessageChecklistRequest contains parameters for editMessageChecklist
-type EditMessageChecklistRequest struct {
-    BusinessConnectionID string            `json:"business_connection_id"`
-    ChatID               tg.ChatID         `json:"chat_id"`
-    MessageID            int               `json:"message_id"`
-    Checklist            tg.InputChecklist `json:"checklist"`
-    ReplyMarkup          any               `json:"reply_markup,omitempty"`
+// --- ChatBoostSource Union ---
+
+// ChatBoostSource describes the source of a chat boost
+type ChatBoostSource interface {
+    chatBoostSourceTag()
+    GetSource() string
 }
 
-// EditMessageChecklist edits a checklist message.
-func (c *Client) EditMessageChecklist(ctx context.Context, req EditMessageChecklistRequest) (*tg.Message, error) {
-    if req.BusinessConnectionID == "" {
-        return nil, tg.NewValidationError("business_connection_id", "is required")
+// ChatBoostSourcePremium represents a boost from a Premium subscriber
+type ChatBoostSourcePremium struct {
+    Source string `json:"source"` // Always "premium"
+    User   User   `json:"user"`
+}
+
+func (ChatBoostSourcePremium) chatBoostSourceTag() {}
+func (s ChatBoostSourcePremium) GetSource() string { return "premium" }
+
+// ChatBoostSourceGiftCode represents a boost from a gift code
+type ChatBoostSourceGiftCode struct {
+    Source string `json:"source"` // Always "gift_code"
+    User   User   `json:"user"`
+}
+
+func (ChatBoostSourceGiftCode) chatBoostSourceTag() {}
+func (s ChatBoostSourceGiftCode) GetSource() string { return "gift_code" }
+
+// ChatBoostSourceGiveaway represents a boost from a giveaway
+type ChatBoostSourceGiveaway struct {
+    Source            string `json:"source"` // Always "giveaway"
+    GiveawayMessageID int    `json:"giveaway_message_id"`
+    User              *User  `json:"user,omitempty"`
+    PrizeStarCount    int    `json:"prize_star_count,omitempty"`
+    IsUnclaimed       bool   `json:"is_unclaimed,omitempty"`
+}
+
+func (ChatBoostSourceGiveaway) chatBoostSourceTag() {}
+func (s ChatBoostSourceGiveaway) GetSource() string { return "giveaway" }
+
+// ChatBoostSourceUnknown is a fallback for future boost source types
+type ChatBoostSourceUnknown struct {
+    Source string          `json:"source"`
+    Raw    json.RawMessage `json:"-"`
+}
+
+func (ChatBoostSourceUnknown) chatBoostSourceTag() {}
+func (s ChatBoostSourceUnknown) GetSource() string { return s.Source }
+
+// unmarshalChatBoostSource decodes a ChatBoostSource from JSON.
+// Returns ChatBoostSourceUnknown on any error.
+func unmarshalChatBoostSource(data json.RawMessage) ChatBoostSource {
+    var probe struct {
+        Source string `json:"source"`
     }
-    if req.ChatID.IsZero() {
-        return nil, tg.NewValidationError("chat_id", "is required")
+    if err := json.Unmarshal(data, &probe); err != nil {
+        return ChatBoostSourceUnknown{Raw: data}
     }
-    if req.MessageID == 0 {
-        return nil, tg.NewValidationError("message_id", "is required")
+
+    switch probe.Source {
+    case "premium":
+        var s ChatBoostSourcePremium
+        if err := json.Unmarshal(data, &s); err != nil {
+            return ChatBoostSourceUnknown{Source: probe.Source, Raw: data}
+        }
+        return s
+    case "gift_code":
+        var s ChatBoostSourceGiftCode
+        if err := json.Unmarshal(data, &s); err != nil {
+            return ChatBoostSourceUnknown{Source: probe.Source, Raw: data}
+        }
+        return s
+    case "giveaway":
+        var s ChatBoostSourceGiveaway
+        if err := json.Unmarshal(data, &s); err != nil {
+            return ChatBoostSourceUnknown{Source: probe.Source, Raw: data}
+        }
+        return s
+    default:
+        return ChatBoostSourceUnknown{Source: probe.Source, Raw: data}
     }
-    
-    if err := validateChecklist(req.Checklist); err != nil {
-        return nil, err
-    }
-    
-    var msg tg.Message
-    if err := c.executor.Call(ctx, "editMessageChecklist", req, &msg); err != nil {
-        return nil, err
-    }
-    return &msg, nil
 }
 ```
-
-### Definition of Done (PR19)
-
-- [ ] `sendChecklist` with validation
-- [ ] `editMessageChecklist`
-- [ ] Nested item support
-- [ ] Tests
 
 ---
 
-## PR20: Draft Streaming (sendMessageDraft) ✨CRITICAL
-
-**Goal:** Streaming draft message API for AI-powered bots.  
-**Estimated Time:** 8-10 hours  
-**Breaking Changes:** None (additive)  
-**Complexity:** HIGH - requires streaming response handling
-
-### The Challenge
-
-`sendMessageDraft` is **not** a simple request/response API. It returns a **streaming response** (SSE/chunked) with partial text chunks as the draft is being generated. This is the "hardest" Tier 3 piece.
-
-### API Design
+### tg/passport.go — NEW FILE
 
 ```go
-// High-level API with callback
-func (c *Client) SendMessageDraft(
-    ctx context.Context,
-    req SendMessageDraftRequest,
-    onChunk func(tg.DraftChunk) error,
-) (*tg.Message, error)
+// tg/passport.go — Telegram Passport types
+//
+// NOTE: PassportElementError types are SEND-ONLY (sent to Telegram, not received).
+// No unmarshal function is needed. The interface + tag pattern is used only for
+// type-safe slice typing: []PassportElementError
 
-// Low-level API for advanced users
-func (c *Client) SendMessageDraftStream(
-    ctx context.Context,
-    req SendMessageDraftRequest,
-) (io.ReadCloser, error)
+package tg
+
+// --- PassportElementError Union (SEND-ONLY) ---
+
+// PassportElementError describes an error in Telegram Passport data
+// This is a SEND-ONLY type — no UnmarshalJSON needed
+type PassportElementError interface {
+    passportElementErrorTag()
+    GetSource() string
+}
+
+// PassportElementErrorDataField represents an error in a data field
+type PassportElementErrorDataField struct {
+    Source    string `json:"source"` // Always "data"
+    Type      string `json:"type"`
+    FieldName string `json:"field_name"`
+    DataHash  string `json:"data_hash"`
+    Message   string `json:"message"`
+}
+
+func (PassportElementErrorDataField) passportElementErrorTag() {}
+func (e PassportElementErrorDataField) GetSource() string      { return "data" }
+
+// PassportElementErrorFrontSide represents an error with the front side
+type PassportElementErrorFrontSide struct {
+    Source   string `json:"source"` // Always "front_side"
+    Type     string `json:"type"`
+    FileHash string `json:"file_hash"`
+    Message  string `json:"message"`
+}
+
+func (PassportElementErrorFrontSide) passportElementErrorTag() {}
+func (e PassportElementErrorFrontSide) GetSource() string      { return "front_side" }
+
+// PassportElementErrorReverseSide represents an error with the reverse side
+type PassportElementErrorReverseSide struct {
+    Source   string `json:"source"` // Always "reverse_side"
+    Type     string `json:"type"`
+    FileHash string `json:"file_hash"`
+    Message  string `json:"message"`
+}
+
+func (PassportElementErrorReverseSide) passportElementErrorTag() {}
+func (e PassportElementErrorReverseSide) GetSource() string      { return "reverse_side" }
+
+// PassportElementErrorSelfie represents an error with the selfie
+type PassportElementErrorSelfie struct {
+    Source   string `json:"source"` // Always "selfie"
+    Type     string `json:"type"`
+    FileHash string `json:"file_hash"`
+    Message  string `json:"message"`
+}
+
+func (PassportElementErrorSelfie) passportElementErrorTag() {}
+func (e PassportElementErrorSelfie) GetSource() string      { return "selfie" }
+
+// PassportElementErrorFile represents an error with a document scan
+type PassportElementErrorFile struct {
+    Source   string `json:"source"` // Always "file"
+    Type     string `json:"type"`
+    FileHash string `json:"file_hash"`
+    Message  string `json:"message"`
+}
+
+func (PassportElementErrorFile) passportElementErrorTag() {}
+func (e PassportElementErrorFile) GetSource() string      { return "file" }
+
+// PassportElementErrorFiles represents an error with multiple document scans
+type PassportElementErrorFiles struct {
+    Source     string   `json:"source"` // Always "files"
+    Type       string   `json:"type"`
+    FileHashes []string `json:"file_hashes"`
+    Message    string   `json:"message"`
+}
+
+func (PassportElementErrorFiles) passportElementErrorTag() {}
+func (e PassportElementErrorFiles) GetSource() string      { return "files" }
+
+// PassportElementErrorTranslationFile represents an error with one translation
+type PassportElementErrorTranslationFile struct {
+    Source   string `json:"source"` // Always "translation_file"
+    Type     string `json:"type"`
+    FileHash string `json:"file_hash"`
+    Message  string `json:"message"`
+}
+
+func (PassportElementErrorTranslationFile) passportElementErrorTag() {}
+func (e PassportElementErrorTranslationFile) GetSource() string      { return "translation_file" }
+
+// PassportElementErrorTranslationFiles represents an error with translations
+type PassportElementErrorTranslationFiles struct {
+    Source     string   `json:"source"` // Always "translation_files"
+    Type       string   `json:"type"`
+    FileHashes []string `json:"file_hashes"`
+    Message    string   `json:"message"`
+}
+
+func (PassportElementErrorTranslationFiles) passportElementErrorTag() {}
+func (e PassportElementErrorTranslationFiles) GetSource() string      { return "translation_files" }
+
+// PassportElementErrorUnspecified represents an unspecified error
+type PassportElementErrorUnspecified struct {
+    Source      string `json:"source"` // Always "unspecified"
+    Type        string `json:"type"`
+    ElementHash string `json:"element_hash"`
+    Message     string `json:"message"`
+}
+
+func (PassportElementErrorUnspecified) passportElementErrorTag() {}
+func (e PassportElementErrorUnspecified) GetSource() string      { return "unspecified" }
 ```
 
-### Implementation
+---
 
-**File:** `sender/methods_draft.go` (new)
+### tg/stickers.go — NEW FILE (Response Types Only)
 
 ```go
+// tg/stickers.go — Sticker response types
+// NOTE: InputSticker lives in sender/ due to InputFile dependency
+
+package tg
+
+// StickerSet represents a sticker set
+type StickerSet struct {
+    Name        string     `json:"name"`
+    Title       string     `json:"title"`
+    StickerType string     `json:"sticker_type"` // "regular", "mask", "custom_emoji"
+    Stickers    []Sticker  `json:"stickers"`
+    Thumbnail   *PhotoSize `json:"thumbnail,omitempty"`
+}
+
+// MaskPosition describes the position for mask stickers
+type MaskPosition struct {
+    Point  string  `json:"point"` // "forehead", "eyes", "mouth", "chin"
+    XShift float64 `json:"x_shift"`
+    YShift float64 `json:"y_shift"`
+    Scale  float64 `json:"scale"`
+}
+
+// NOTE: Sticker type should be extended in tg/types.go (existing)
+// Add these fields if missing:
+//   Type             string        // "regular", "mask", "custom_emoji"
+//   IsAnimated       bool
+//   IsVideo          bool
+//   MaskPosition     *MaskPosition
+//   CustomEmojiID    string
+//   NeedsRepainting  bool
+```
+
+---
+
+### sender/stickers_input.go — NEW FILE (CORRECTED IMPORT PATH)
+
+```go
+// sender/stickers_input.go — Sticker input types
+// Lives in sender/ because it contains InputFile (avoids tg/ → sender/ import cycle)
+
+package sender
+
+import "github.com/prilive-com/galigo/tg"
+
+// InputSticker represents a sticker to be uploaded
+type InputSticker struct {
+    Sticker      InputFile        `json:"-"` // Handled by multipart encoder
+    Format       string           `json:"format"` // "static", "animated", "video"
+    EmojiList    []string         `json:"emoji_list"`
+    MaskPosition *tg.MaskPosition `json:"mask_position,omitempty"`
+    Keywords     []string         `json:"keywords,omitempty"`
+}
+```
+
+---
+
+### sender/business_input.go — NEW FILE
+
+```go
+// sender/business_input.go — Business input types
+// Lives in sender/ because they may contain InputFile
+
+package sender
+
+// --- InputStoryContent ---
+
+// InputStoryContent represents content for a story
+type InputStoryContent interface {
+    inputStoryContentTag()
+}
+
+// InputStoryContentPhoto represents a photo for a story
+type InputStoryContentPhoto struct {
+    Photo InputFile `json:"-"` // Handled by multipart encoder
+}
+
+func (InputStoryContentPhoto) inputStoryContentTag() {}
+
+// InputStoryContentVideo represents a video for a story
+type InputStoryContentVideo struct {
+    Video          InputFile `json:"-"` // Handled by multipart encoder
+    Duration       float64   `json:"duration,omitempty"`
+    CoverFrameTime float64   `json:"cover_frame_time,omitempty"`
+    IsAnimation    bool      `json:"is_animation,omitempty"`
+}
+
+func (InputStoryContentVideo) inputStoryContentTag() {}
+
+// --- InputProfilePhoto ---
+
+// InputProfilePhoto represents a profile photo to set
+type InputProfilePhoto interface {
+    inputProfilePhotoTag()
+}
+
+// InputProfilePhotoStatic represents a static profile photo
+type InputProfilePhotoStatic struct {
+    Photo InputFile `json:"-"` // Handled by multipart encoder
+}
+
+func (InputProfilePhotoStatic) inputProfilePhotoTag() {}
+
+// InputProfilePhotoAnimated represents an animated profile photo
+type InputProfilePhotoAnimated struct {
+    Animation     InputFile `json:"-"` // Handled by multipart encoder
+    MainFrameTime float64   `json:"main_frame_time,omitempty"`
+}
+
+func (InputProfilePhotoAnimated) inputProfilePhotoTag() {}
+```
+
+---
+
+### sender/rate_limiter.go — NEW FILE
+
+```go
+// sender/rate_limiter.go — Optional proactive rate limiting
+
 package sender
 
 import (
-    "bufio"
     "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "strings"
-    
-    "github.com/example/galigo/tg"
+
+    "golang.org/x/time/rate"
 )
 
-// SendMessageDraftRequest contains parameters for sendMessageDraft
-type SendMessageDraftRequest struct {
-    BusinessConnectionID    string                       `json:"business_connection_id,omitempty"`
-    ChatID                  tg.ChatID                    `json:"chat_id"`
-    Text                    string                       `json:"text"`
-    ParseMode               tg.ParseMode                 `json:"parse_mode,omitempty"`
-    Entities                []tg.MessageEntity           `json:"entities,omitempty"`
-    LinkPreviewOptions      *tg.LinkPreviewOptions       `json:"link_preview_options,omitempty"`
-    MessageThreadID         *int                         `json:"message_thread_id,omitempty"`
-    DirectMessagesTopicID   *int                         `json:"direct_messages_topic_id,omitempty"`
-    DisableNotification     *bool                        `json:"disable_notification,omitempty"`
-    ProtectContent          *bool                        `json:"protect_content,omitempty"`
-    MessageEffectID         string                       `json:"message_effect_id,omitempty"`
-    ReplyParameters         *tg.ReplyParameters          `json:"reply_parameters,omitempty"`
-    ReplyMarkup             any                          `json:"reply_markup,omitempty"`
-    SuggestedPostParameters *tg.SuggestedPostParameters  `json:"suggested_post_parameters,omitempty"`
-}
-
-// DraftChunkCallback is called for each chunk in the draft stream
-type DraftChunkCallback func(chunk tg.DraftChunk) error
-
-// SendMessageDraft sends a message draft with streaming response.
-// The onChunk callback is called for each chunk received.
-// Returns the final message when the draft is complete.
+// WithRateLimiter configures optional proactive rate limiting.
+// The limiter is applied BEFORE each request (proactive pacing).
+//
+// This is separate from reactive 429 handling, which always respects retry_after.
+//
+// NOTE: Time-critical operations like AnswerPreCheckoutQuery skip the rate limiter
+// to avoid missing Telegram's 10-second response deadline.
 //
 // Example:
 //
-//	msg, err := client.SendMessageDraft(ctx, req, func(chunk tg.DraftChunk) error {
-//	    if chunk.Type == "text" {
-//	        fmt.Print(chunk.Text) // Print incremental text
-//	    }
-//	    return nil
-//	})
-func (c *Client) SendMessageDraft(
-    ctx context.Context,
-    req SendMessageDraftRequest,
-    onChunk DraftChunkCallback,
-) (*tg.Message, error) {
-    if req.ChatID.IsZero() {
-        return nil, tg.NewValidationError("chat_id", "is required")
+//	limiter := rate.NewLimiter(rate.Limit(30), 5) // 30 req/s, burst 5
+//	client := sender.New(token, sender.WithRateLimiter(limiter))
+func WithRateLimiter(limiter *rate.Limiter) Option {
+    return func(c *Client) {
+        c.rateLimiter = limiter
     }
-    if req.Text == "" {
-        return nil, tg.NewValidationError("text", "is required")
+}
+
+// waitForRateLimiter waits for the rate limiter if configured.
+// Returns nil immediately if no limiter is set.
+func (c *Client) waitForRateLimiter(ctx context.Context) error {
+    if c.rateLimiter == nil {
+        return nil
     }
-    
-    // Get the streaming response
-    stream, err := c.SendMessageDraftStream(ctx, req)
-    if err != nil {
+    return c.rateLimiter.Wait(ctx)
+}
+```
+
+---
+
+## Epic A: Payments & Stars (7 methods)
+
+**Blocked by:** PR0 (types)
+
+### Request Types (CORRECTED: *int vs int audit)
+
+```go
+// sender/payments.go
+
+type SendInvoiceRequest struct {
+    ChatID                    any               `json:"chat_id"`
+    MessageThreadID           int               `json:"message_thread_id,omitempty"` // Optional but 0 is invalid
+    Title                     string            `json:"title"`
+    Description               string            `json:"description"`
+    Payload                   string            `json:"payload"`
+    ProviderToken             string            `json:"provider_token"`
+    Currency                  string            `json:"currency"`
+    Prices                    []tg.LabeledPrice `json:"prices"`
+    MaxTipAmount              int               `json:"max_tip_amount,omitempty"`  // 0 = no tips
+    SuggestedTipAmounts       []int             `json:"suggested_tip_amounts,omitempty"`
+    StartParameter            string            `json:"start_parameter,omitempty"`
+    ProviderData              string            `json:"provider_data,omitempty"`
+    PhotoURL                  string            `json:"photo_url,omitempty"`
+    PhotoSize                 int               `json:"photo_size,omitempty"`
+    PhotoWidth                int               `json:"photo_width,omitempty"`
+    PhotoHeight               int               `json:"photo_height,omitempty"`
+    NeedName                  bool              `json:"need_name,omitempty"`
+    NeedPhoneNumber           bool              `json:"need_phone_number,omitempty"`
+    NeedEmail                 bool              `json:"need_email,omitempty"`
+    NeedShippingAddress       bool              `json:"need_shipping_address,omitempty"`
+    SendPhoneNumberToProvider bool              `json:"send_phone_number_to_provider,omitempty"`
+    SendEmailToProvider       bool              `json:"send_email_to_provider,omitempty"`
+    IsFlexible                bool              `json:"is_flexible,omitempty"`
+    DisableNotification       bool              `json:"disable_notification,omitempty"`
+    ProtectContent            bool              `json:"protect_content,omitempty"`
+    ReplyParameters           *tg.ReplyParameters      `json:"reply_parameters,omitempty"`
+    ReplyMarkup               *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+type CreateInvoiceLinkRequest struct {
+    Title               string            `json:"title"`
+    Description         string            `json:"description"`
+    Payload             string            `json:"payload"`
+    ProviderToken       string            `json:"provider_token"`
+    Currency            string            `json:"currency"`
+    Prices              []tg.LabeledPrice `json:"prices"`
+    MaxTipAmount        int               `json:"max_tip_amount,omitempty"`
+    SuggestedTipAmounts []int             `json:"suggested_tip_amounts,omitempty"`
+    ProviderData        string            `json:"provider_data,omitempty"`
+    PhotoURL            string            `json:"photo_url,omitempty"`
+    PhotoSize           int               `json:"photo_size,omitempty"`
+    PhotoWidth          int               `json:"photo_width,omitempty"`
+    PhotoHeight         int               `json:"photo_height,omitempty"`
+    NeedName            bool              `json:"need_name,omitempty"`
+    NeedPhoneNumber     bool              `json:"need_phone_number,omitempty"`
+    NeedEmail           bool              `json:"need_email,omitempty"`
+    NeedShippingAddress bool              `json:"need_shipping_address,omitempty"`
+    IsFlexible          bool              `json:"is_flexible,omitempty"`
+    SubscriptionPeriod  int               `json:"subscription_period,omitempty"` // 0 = not subscription
+}
+
+type AnswerShippingQueryRequest struct {
+    ShippingQueryID string              `json:"shipping_query_id"`
+    OK              bool                `json:"ok"`
+    ShippingOptions []tg.ShippingOption `json:"shipping_options,omitempty"`
+    ErrorMessage    string              `json:"error_message,omitempty"`
+}
+
+type AnswerPreCheckoutQueryRequest struct {
+    PreCheckoutQueryID string `json:"pre_checkout_query_id"`
+    OK                 bool   `json:"ok"`
+    ErrorMessage       string `json:"error_message,omitempty"`
+}
+
+type RefundStarPaymentRequest struct {
+    UserID                  int64  `json:"user_id"`
+    TelegramPaymentChargeID string `json:"telegram_payment_charge_id"`
+}
+
+// GetStarTransactionsRequest — Offset uses plain int (default 0 is meaningful)
+type GetStarTransactionsRequest struct {
+    Offset int `json:"offset,omitempty"` // Default 0, plain int is fine
+    Limit  int `json:"limit,omitempty"`  // Default 100, range 1-100
+}
+```
+
+### Method Implementations (CORRECTED: rate limiter handling)
+
+```go
+// sender/payments.go
+
+func (c *Client) SendInvoice(ctx context.Context, req SendInvoiceRequest) (*tg.Message, error) {
+    if err := c.waitForRateLimiter(ctx); err != nil {
         return nil, err
     }
-    defer stream.Close()
-    
-    // Process the stream
-    return c.processDraftStream(ctx, stream, onChunk)
+
+    if err := validateChatID(req.ChatID); err != nil {
+        return nil, err
+    }
+    if req.Title == "" {
+        return nil, tg.NewValidationError("title", "required")
+    }
+    if len(req.Title) > 32 {
+        return nil, tg.NewValidationError("title", "must be 1-32 characters")
+    }
+    if req.Description == "" {
+        return nil, tg.NewValidationError("description", "required")
+    }
+    if len(req.Description) > 255 {
+        return nil, tg.NewValidationError("description", "must be 1-255 characters")
+    }
+    if req.Payload == "" {
+        return nil, tg.NewValidationError("payload", "required")
+    }
+    if len(req.Payload) > 128 {
+        return nil, tg.NewValidationError("payload", "must be 1-128 bytes")
+    }
+    if req.Currency == "" {
+        return nil, tg.NewValidationError("currency", "required")
+    }
+    if len(req.Prices) == 0 {
+        return nil, tg.NewValidationError("prices", "at least one price required")
+    }
+
+    var result tg.Message
+    if err := c.callJSON(ctx, "sendInvoice", req, &result); err != nil {
+        return nil, err
+    }
+    return &result, nil
 }
 
-// SendMessageDraftStream returns a raw stream for advanced usage.
-// The caller is responsible for reading and closing the stream.
-func (c *Client) SendMessageDraftStream(
-    ctx context.Context,
-    req SendMessageDraftRequest,
-) (io.ReadCloser, error) {
-    if req.ChatID.IsZero() {
-        return nil, tg.NewValidationError("chat_id", "is required")
+func (c *Client) CreateInvoiceLink(ctx context.Context, req CreateInvoiceLinkRequest) (string, error) {
+    if err := c.waitForRateLimiter(ctx); err != nil {
+        return "", err
     }
-    if req.Text == "" {
-        return nil, tg.NewValidationError("text", "is required")
+
+    if req.Title == "" {
+        return "", tg.NewValidationError("title", "required")
     }
-    
-    // Build the request
-    body, err := json.Marshal(req)
-    if err != nil {
-        return nil, fmt.Errorf("failed to marshal request: %w", err)
+    if req.Description == "" {
+        return "", tg.NewValidationError("description", "required")
     }
-    
-    url := c.buildURL("sendMessageDraft")
-    httpReq, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(body)))
-    if err != nil {
-        return nil, fmt.Errorf("failed to create request: %w", err)
+    if req.Payload == "" {
+        return "", tg.NewValidationError("payload", "required")
     }
-    httpReq.Header.Set("Content-Type", "application/json")
-    httpReq.Header.Set("Accept", "text/event-stream") // SSE
-    
-    // Send the request (don't use standard executor - we need the raw response)
-    resp, err := c.httpClient.Do(httpReq)
-    if err != nil {
-        return nil, fmt.Errorf("failed to send request: %w", err)
+    if req.Currency == "" {
+        return "", tg.NewValidationError("currency", "required")
     }
-    
-    if resp.StatusCode != http.StatusOK {
-        defer resp.Body.Close()
-        // Try to parse error response
-        var apiErr tg.APIError
-        if err := json.NewDecoder(resp.Body).Decode(&apiErr); err == nil {
-            return nil, &apiErr
-        }
-        return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+    if len(req.Prices) == 0 {
+        return "", tg.NewValidationError("prices", "at least one price required")
     }
-    
-    return resp.Body, nil
+
+    var result string
+    if err := c.callJSON(ctx, "createInvoiceLink", req, &result); err != nil {
+        return "", err
+    }
+    return result, nil
 }
 
-// processDraftStream reads SSE events and calls the callback
-func (c *Client) processDraftStream(
-    ctx context.Context,
-    stream io.Reader,
-    onChunk DraftChunkCallback,
-) (*tg.Message, error) {
-    scanner := bufio.NewScanner(stream)
-    scanner.Buffer(make([]byte, 64*1024), 1024*1024) // 1MB max line
-    
-    var finalMessage *tg.Message
-    var dataBuffer strings.Builder
-    
-    for scanner.Scan() {
-        // Check for context cancellation
-        select {
-        case <-ctx.Done():
-            return nil, ctx.Err()
-        default:
-        }
-        
-        line := scanner.Text()
-        
-        // SSE format: "data: {...}\n\n"
-        if strings.HasPrefix(line, "data: ") {
-            data := strings.TrimPrefix(line, "data: ")
-            dataBuffer.WriteString(data)
-        } else if line == "" && dataBuffer.Len() > 0 {
-            // End of event - parse the accumulated data
-            var chunk tg.DraftChunk
-            if err := json.Unmarshal([]byte(dataBuffer.String()), &chunk); err != nil {
-                dataBuffer.Reset()
-                continue // Skip malformed chunks
-            }
-            dataBuffer.Reset()
-            
-            // Call the callback
-            if onChunk != nil {
-                if err := onChunk(chunk); err != nil {
-                    return nil, fmt.Errorf("callback error: %w", err)
-                }
-            }
-            
-            // Check for completion
-            if chunk.Type == "done" {
-                finalMessage = chunk.Message
-            } else if chunk.Type == "error" {
-                return nil, fmt.Errorf("draft error: %s", chunk.Error)
-            }
-        }
+func (c *Client) AnswerShippingQuery(ctx context.Context, req AnswerShippingQueryRequest) error {
+    if err := c.waitForRateLimiter(ctx); err != nil {
+        return err
     }
-    
-    if err := scanner.Err(); err != nil {
-        return nil, fmt.Errorf("stream read error: %w", err)
+
+    if req.ShippingQueryID == "" {
+        return tg.NewValidationError("shipping_query_id", "required")
     }
-    
-    if finalMessage == nil {
-        return nil, fmt.Errorf("stream ended without final message")
+    if req.OK && len(req.ShippingOptions) == 0 {
+        return tg.NewValidationError("shipping_options", "required when ok is true")
     }
-    
-    return finalMessage, nil
+    if !req.OK && req.ErrorMessage == "" {
+        return tg.NewValidationError("error_message", "required when ok is false")
+    }
+
+    return c.callJSON(ctx, "answerShippingQuery", req, nil)
+}
+
+// AnswerPreCheckoutQuery must be called within 10 seconds.
+// VALUE OPERATION — no retry to prevent double-charging.
+// NOTE: Skips rate limiter to avoid missing the 10s deadline.
+func (c *Client) AnswerPreCheckoutQuery(ctx context.Context, req AnswerPreCheckoutQueryRequest) error {
+    // SKIP rate limiter — time-critical operation (10s deadline)
+
+    if req.PreCheckoutQueryID == "" {
+        return tg.NewValidationError("pre_checkout_query_id", "required")
+    }
+    if !req.OK && req.ErrorMessage == "" {
+        return tg.NewValidationError("error_message", "required when ok is false")
+    }
+
+    // NO RETRY — value operation
+    return c.callJSON(ctx, "answerPreCheckoutQuery", req, nil)
+}
+
+// RefundStarPayment refunds a Telegram Stars payment.
+// VALUE OPERATION — no retry to prevent double-refund.
+func (c *Client) RefundStarPayment(ctx context.Context, req RefundStarPaymentRequest) error {
+    if err := c.waitForRateLimiter(ctx); err != nil {
+        return err
+    }
+
+    if req.UserID <= 0 {
+        return tg.NewValidationError("user_id", "must be positive")
+    }
+    if req.TelegramPaymentChargeID == "" {
+        return tg.NewValidationError("telegram_payment_charge_id", "required")
+    }
+
+    // NO RETRY — value operation
+    return c.callJSON(ctx, "refundStarPayment", req, nil)
+}
+
+func (c *Client) GetStarTransactions(ctx context.Context, req GetStarTransactionsRequest) (*tg.StarTransactions, error) {
+    if err := c.waitForRateLimiter(ctx); err != nil {
+        return nil, err
+    }
+
+    // Limit validation: 0 means default (100), explicit values must be 1-100
+    if req.Limit != 0 && (req.Limit < 1 || req.Limit > 100) {
+        return nil, tg.NewValidationError("limit", "must be 1-100")
+    }
+
+    var result tg.StarTransactions
+    if err := c.callJSON(ctx, "getStarTransactions", req, &result); err != nil {
+        return nil, err
+    }
+    return &result, nil
+}
+
+func (c *Client) GetMyStarBalance(ctx context.Context) (*tg.StarAmount, error) {
+    if err := c.waitForRateLimiter(ctx); err != nil {
+        return nil, err
+    }
+
+    var result tg.StarAmount
+    if err := c.callJSON(ctx, "getMyStarBalance", nil, &result); err != nil {
+        return nil, err
+    }
+    return &result, nil
 }
 ```
 
-### Usage Example
+---
+
+## Epic B-H: Remaining Epics
+
+*(Same structure as Epic A, with appropriate corrections applied)*
+
+**Key corrections applied to all epics:**
+1. Plain `int` with `omitempty` for fields where 0 is a valid default
+2. `*int` only for fields where 0 vs absent is meaningfully different
+3. Rate limiter skipped for time-critical operations
+4. Import path corrected to `github.com/prilive-com/galigo/tg`
+
+---
+
+## Implementation Summary
+
+### Total Methods: ~61
+
+| Epic | Methods | Value Ops | Multipart | Time-Critical |
+|------|---------|-----------|-----------|---------------|
+| **PR0: Types** | — | — | — | — |
+| A: Payments & Stars | 7 | 2 | 0 | 1 |
+| B: Stickers | 15 | 0 | 5 | 0 |
+| C: Games | 5 | 0 | 0 | 0 |
+| D: Business Account | 15 | 2 | 2 | 0 |
+| E: Verification | 4 | 0 | 0 | 0 |
+| F: Gifts | 5 | 3 | 0 | 0 |
+| G: Bot API 9.1-9.3 | 6 | 0 | 0 | 0 |
+| H: Inline & Other | 4 | 0 | 0 | 0 |
+| **Total** | **~61** | **7** | **7** | **1** |
+
+### Value Operations (NO RETRY)
+
+1. `AnswerPreCheckoutQuery` — **Also skips rate limiter** (10s deadline)
+2. `RefundStarPayment`
+3. `TransferBusinessAccountStars`
+4. `TransferGift`
+5. `SendGift`
+6. `UpgradeGift`
+7. `ConvertGiftToStars`
+
+### Polymorphic Types with Unknown Fallback
+
+| Type | Unknown Variant | Unmarshal Function |
+|------|-----------------|-------------------|
+| `TransactionPartner` | `TransactionPartnerUnknown` | `unmarshalTransactionPartner` |
+| `RevenueWithdrawalState` | `RevenueWithdrawalStateUnknown` | `unmarshalRevenueWithdrawalState` |
+| `ChatBoostSource` | `ChatBoostSourceUnknown` | `unmarshalChatBoostSource` |
+| `InlineQueryResult` | `InlineQueryResultUnknown` | *(not needed for send-only)* |
+| `PassportElementError` | *(send-only, no unmarshal)* | *(not needed)* |
+
+### `*int` vs `int` Guidelines
+
+| Use `int` with `omitempty` | Use `*int` |
+|---------------------------|------------|
+| Default 0 is meaningful (e.g., `Offset`) | 0 vs absent has different semantics |
+| 0 is a valid value (e.g., `Position`) | Required field with no default |
+| Telegram's default = 0 | Rare cases where explicit 0 matters |
+
+---
+
+## Testing Strategy
+
+### UnmarshalJSON Error Handling Tests
 
 ```go
-// Example: AI chatbot with streaming response
-func handleUserMessage(ctx context.Context, bot *galigo.Bot, chatID int64, userText string) error {
-    // Generate AI response text (your AI model)
-    aiResponse := generateAIResponse(userText)
-    
-    // Send as streaming draft
-    msg, err := bot.SendMessageDraft(ctx, sender.SendMessageDraftRequest{
-        ChatID: tg.ChatIDFromInt64(chatID),
-        Text:   aiResponse,
-    }, func(chunk tg.DraftChunk) error {
-        // Optional: log progress
-        if chunk.Type == "text" {
-            log.Printf("Chunk: %s", chunk.Text)
-        }
-        return nil
-    })
-    
-    if err != nil {
-        return fmt.Errorf("failed to send draft: %w", err)
-    }
-    
-    log.Printf("Final message ID: %d", msg.MessageID)
-    return nil
+func TestUnmarshalTransactionPartner_MalformedKnownType(t *testing.T) {
+    // "user" type with invalid field types should return Unknown
+    data := `{"type": "user", "user": "not_an_object"}`
+
+    result := unmarshalTransactionPartner(json.RawMessage(data))
+
+    unknown, ok := result.(tg.TransactionPartnerUnknown)
+    require.True(t, ok, "malformed known type should decode to Unknown")
+    assert.Equal(t, "user", unknown.Type)
+    assert.NotEmpty(t, unknown.Raw)
+}
+
+func TestUnmarshalTransactionPartner_FutureType(t *testing.T) {
+    data := `{"type": "future_partner", "new_field": "value"}`
+
+    result := unmarshalTransactionPartner(json.RawMessage(data))
+
+    unknown, ok := result.(tg.TransactionPartnerUnknown)
+    require.True(t, ok, "unknown type should decode to Unknown")
+    assert.Equal(t, "future_partner", unknown.Type)
+}
+
+func TestUnmarshalRevenueWithdrawalState_Unknown(t *testing.T) {
+    data := `{"type": "new_state", "extra": 123}`
+
+    result := unmarshalRevenueWithdrawalState(json.RawMessage(data))
+
+    unknown, ok := result.(tg.RevenueWithdrawalStateUnknown)
+    require.True(t, ok)
+    assert.Equal(t, "new_state", unknown.Type)
 }
 ```
 
-### Tests
+### Time-Critical Operation Test
 
 ```go
-func TestSendMessageDraft_Streaming(t *testing.T) {
-    // Create a fake streaming server
-    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "text/event-stream")
-        w.WriteHeader(http.StatusOK)
-        
-        flusher, ok := w.(http.Flusher)
-        require.True(t, ok)
-        
-        // Send chunks
-        chunks := []string{
-            `{"type":"text","text":"Hello "}`,
-            `{"type":"text","text":"world!"}`,
-            `{"type":"done","message":{"message_id":123,"text":"Hello world!"}}`,
-        }
-        
-        for _, chunk := range chunks {
-            fmt.Fprintf(w, "data: %s\n\n", chunk)
-            flusher.Flush()
-            time.Sleep(10 * time.Millisecond)
-        }
-    }))
-    defer server.Close()
-    
-    client := newTestClient(t, server.URL)
-    
-    var receivedChunks []tg.DraftChunk
-    msg, err := client.SendMessageDraft(ctx, SendMessageDraftRequest{
-        ChatID: tg.ChatIDFromInt64(123),
-        Text:   "test",
-    }, func(chunk tg.DraftChunk) error {
-        receivedChunks = append(receivedChunks, chunk)
-        return nil
-    })
-    
-    require.NoError(t, err)
-    assert.Equal(t, 123, msg.MessageID)
-    assert.Len(t, receivedChunks, 3)
-    assert.Equal(t, "text", receivedChunks[0].Type)
-    assert.Equal(t, "Hello ", receivedChunks[0].Text)
-}
+func TestAnswerPreCheckoutQuery_SkipsRateLimiter(t *testing.T) {
+    // Configure a very slow rate limiter
+    slowLimiter := rate.NewLimiter(rate.Every(time.Hour), 1)
+    slowLimiter.Allow() // Consume the one allowed request
 
-func TestSendMessageDraft_ContextCancellation(t *testing.T) {
-    // Test that context cancellation doesn't leak goroutines
-    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "text/event-stream")
-        w.WriteHeader(http.StatusOK)
-        
-        // Slow stream
-        for i := 0; i < 100; i++ {
-            fmt.Fprintf(w, "data: {\"type\":\"text\",\"text\":\"chunk %d\"}\n\n", i)
-            w.(http.Flusher).Flush()
-            time.Sleep(100 * time.Millisecond)
-        }
-    }))
-    defer server.Close()
-    
-    client := newTestClient(t, server.URL)
-    
-    ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+    client := sender.New(token, sender.WithRateLimiter(slowLimiter))
+
+    ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
     defer cancel()
-    
-    _, err := client.SendMessageDraft(ctx, SendMessageDraftRequest{
-        ChatID: tg.ChatIDFromInt64(123),
-        Text:   "test",
-    }, nil)
-    
-    assert.ErrorIs(t, err, context.DeadlineExceeded)
+
+    // This should NOT block on the rate limiter
+    err := client.AnswerPreCheckoutQuery(ctx, sender.AnswerPreCheckoutQueryRequest{
+        PreCheckoutQueryID: "test",
+        OK:                 true,
+    })
+
+    // Should fail fast (connection error or validation), not timeout
+    assert.NotEqual(t, context.DeadlineExceeded, err)
 }
 ```
 
-### Definition of Done (PR20)
+---
 
-- [ ] High-level `SendMessageDraft()` with callback
-- [ ] Low-level `SendMessageDraftStream()` for advanced users
-- [ ] SSE parsing implemented correctly
-- [ ] Context cancellation works without goroutine leaks
-- [ ] Tests with fake streaming server
-- [ ] Documentation with AI bot example
+## Definition of Done
+
+### PR0: Types
+- [ ] All new types compile
+- [ ] No import cycles (`tg/` ← `sender/`)
+- [ ] UnmarshalJSON tests pass (including malformed input)
+- [ ] Unknown fallback tests pass for all polymorphic types
+- [ ] `RevenueWithdrawalState` has Unknown variant + unmarshal function
+- [ ] `PassportElementError` documented as send-only (no unmarshal)
+
+### Per Epic
+- [ ] All methods use `callJSON` or `executeRequest`
+- [ ] All request types use typed structs
+- [ ] All validation uses `tg.NewValidationError()`
+- [ ] All void methods use `nil`
+- [ ] Value operations marked `// NO RETRY`
+- [ ] Time-critical operations skip rate limiter with comment
+- [ ] `int` vs `*int` follows guidelines (default 0 meaningful → `int`)
+- [ ] Coverage ≥ 80%
 
 ---
 
-## PR21-PR25: Remaining PRs
+## Acceptance Criteria
 
-(Same as v1.0 with minor updates)
-
-| PR | Title | Hours |
-|----|-------|-------|
-| PR21 | Webhooks | 4-6 |
-| PR22 | Passport + Boosts | 3-4 |
-| PR23 | Integration Tests | 6-8 |
-| PR24 | Docs + Coverage Matrix | 6-8 |
-| PR25 | Release v2.2.0/v3.0.0 | 2-3 |
-
----
-
-## Summary
-
-| PR | Title | Methods | Hours | New in v2.0 |
-|----|-------|---------|-------|-------------|
-| PR10 | Types + Safety | - | 10-12 | Safety rules |
-| PR11 | Payments | 9 | 6-8 | |
-| PR12 | Stickers | 16 | 6-8 | |
-| PR13 | Games | 3 | 3-4 | |
-| PR14 | Gifts | 10 | 6-8 | +4 methods |
-| PR15 | Verification | 4 | 2-3 | ✨NEW |
-| PR16 | Business | 12 | 8-10 | +4 methods |
-| PR17 | Stories | 5 | 4-5 | +repostStory |
-| PR18 | Suggested Posts | 2 | 3-4 | ✨NEW |
-| PR19 | Checklists | 2 | 4-5 | ✨NEW |
-| PR20 | Draft Streaming | 1 | 8-10 | ✨STREAMING |
-| PR21 | Webhooks | 3 | 4-6 | |
-| PR22 | Passport + Boosts | 3 | 3-4 | |
-| PR23 | Integration Tests | - | 6-8 | |
-| PR24 | Docs + Coverage | - | 6-8 | |
-| PR25 | Release | - | 2-3 | |
-| **TOTAL** | | **~72** | **84-106** | |
-
-**Timeline:** 8-10 weeks
-
----
-
-## Complete API Coverage After Tier 3
-
-| Tier | Methods | Cumulative |
-|------|---------|------------|
-| Tier 1 | 28 | 28 |
-| Tier 2 | 52 | 80 |
-| Tier 3 | 72 | **152** |
-
-**Coverage:** ~97% of Telegram Bot API 9.3
-
----
-
-## Bot API Coverage Matrix (PR24)
-
-Include a coverage matrix in the repository:
-
-```markdown
-| Category | Implemented | Total | Coverage |
-|----------|-------------|-------|----------|
-| Updates | 4 | 4 | 100% |
-| Messages | 25 | 26 | 96% |
-| Editing | 7 | 7 | 100% |
-| Chat Info | 5 | 5 | 100% |
-| Moderation | 10 | 10 | 100% |
-| Invite Links | 6 | 6 | 100% |
-| Chat Settings | 9 | 9 | 100% |
-| Bot Profile | 14 | 14 | 100% |
-| Forum Topics | 13 | 13 | 100% |
-| Inline Mode | 3 | 3 | 100% |
-| Payments | 9 | 9 | 100% |
-| Stickers | 16 | 16 | 100% |
-| Games | 3 | 3 | 100% |
-| Gifts | 10 | 10 | 100% |
-| Business | 14 | 14 | 100% |
-| Verification | 4 | 4 | 100% |
-| Suggested Posts | 2 | 2 | 100% |
-| Checklists | 2 | 2 | 100% |
-| Drafts | 1 | 1 | 100% |
-| Stories | 5 | 5 | 100% |
-| Webhooks | 3 | 3 | 100% |
-| Passport | 1 | 1 | 100% |
-| Chat Boosts | 2 | 2 | 100% |
-| **TOTAL** | **152** | **155** | **98%** |
-```
-
----
-
-## References
-
-- [Telegram Bot API 9.3](https://core.telegram.org/bots/api)
-- [Bot API Changelog](https://core.telegram.org/bots/api-changelog)
-- [Telegram Payments](https://core.telegram.org/bots/payments)
-- [Telegram Passport](https://core.telegram.org/passport)
-
----
-
-*Consolidated Tier 3 Plan v2.0 - January 2026*
-*Prerequisites: Tier 1 + Tier 2 must be complete*
-*Combines insights from multiple independent analyses*
+- [ ] `go test -race ./...` passes
+- [ ] No import cycles
+- [ ] All polymorphic types have Unknown fallback
+- [ ] All unmarshal functions return Unknown on error (not partial struct)
+- [ ] `AnswerPreCheckoutQuery` skips rate limiter
+- [ ] Import path is `github.com/prilive-com/galigo/tg`
+- [ ] Value operations do not retry
+- [ ] Multipart methods are retry-safe

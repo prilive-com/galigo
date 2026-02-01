@@ -150,6 +150,10 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 		case bool:
 			result.Params[fieldName] = strconv.FormatBool(v)
 
+		case []FilePart:
+			// Direct file parts (e.g., sticker uploads with attach:// references)
+			result.Files = append(result.Files, v...)
+
 		default:
 			// Complex types (structs, slices, maps) -> JSON encode
 			data, err := json.Marshal(v)

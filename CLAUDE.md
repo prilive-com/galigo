@@ -60,12 +60,16 @@ galigo/
 ├── cmd/
 │   └── galigo-testbot/ # Acceptance test bot
 │       ├── main.go     # CLI entry point (--run, --status flags)
-│       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter
+│       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter, Runtime (AdminUserID)
 │       ├── suites/     # Test scenario definitions
 │       │   ├── tier1.go       # Core messaging scenarios (S0-S5)
 │       │   ├── media.go       # Media scenarios (S6-S11)
 │       │   ├── keyboards.go   # Keyboard scenarios (S10)
 │       │   ├── chat_admin.go  # Chat administration scenarios (S15-S19)
+│       │   ├── stickers.go    # Sticker lifecycle scenarios (S20)
+│       │   ├── stars.go       # Star balance + invoice scenarios (S21-S22)
+│       │   ├── gifts.go       # Gift catalog scenarios (S23)
+│       │   ├── checklists.go  # Checklist lifecycle scenarios (S24, requires Premium)
 │       │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │       │   └── webhook.go    # Webhook scenarios (S13-S14, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
@@ -78,7 +82,7 @@ galigo/
 │       │   └── videonote.mp4  # Minimal H.264 MP4 (240x240, square)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
-│       ├── registry/   # Method coverage tracking (37 target methods)
+│       ├── registry/   # Method coverage tracking (48 target methods)
 │       └── cleanup/    # Message cleanup utilities
 └── examples/
     └── echo/           # Echo bot example
@@ -107,13 +111,18 @@ go tool cover -func=coverage.out
 go fmt ./...
 go vet ./...
 
-# Run acceptance tests (requires TELEGRAM_BOT_TOKEN and TESTBOT_CHAT_ID)
-go run ./cmd/galigo-testbot --run all
-go run ./cmd/galigo-testbot --run core        # Core messaging
-go run ./cmd/galigo-testbot --run media       # Media uploads
-go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards
-go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (requires supergroup)
-go run ./cmd/galigo-testbot --run interactive # Interactive (requires user click)
+# Run acceptance tests (requires TESTBOT_TOKEN, TESTBOT_CHAT_ID, TESTBOT_ADMINS)
+go run ./cmd/galigo-testbot --run all         # All non-interactive suites
+go run ./cmd/galigo-testbot --run core        # Core messaging (S0-S5)
+go run ./cmd/galigo-testbot --run media       # Media uploads (S6-S11)
+go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards (S10)
+go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (S15-S19, requires supergroup)
+go run ./cmd/galigo-testbot --run stickers    # Sticker set lifecycle (S20, requires TESTBOT_ADMINS)
+go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21-S22)
+go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
+go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
+go run ./cmd/galigo-testbot --run interactive # Interactive (S12, requires user click)
+go run ./cmd/galigo-testbot --run webhook     # Webhook lifecycle (S13-S14)
 go run ./cmd/galigo-testbot --status          # Show method coverage
 ```
 
@@ -341,6 +350,10 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | Media | S6-S11: Media Uploads, Media Groups, Edit Media, Get File, Edit Message Media | sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile |
 | Keyboards | S10: Inline Keyboard | sendMessage (with markup), editMessageReplyMarkup |
 | Chat Admin | S15-S19: Chat Info, Chat Settings, Pin Messages, Polls, Forum Stickers | getChat, getChatAdministrators, getChatMemberCount, getChatMember, setChatTitle, setChatDescription, pinChatMessage, unpinChatMessage, unpinAllChatMessages, sendPoll, stopPoll, getForumTopicIconStickers |
+| Stickers | S20: Sticker Set Lifecycle | createNewStickerSet, getStickerSet, addStickerToSet, setStickerPositionInSet, setStickerEmojiList, setStickerSetTitle, deleteStickerFromSet, deleteStickerSet |
+| Stars | S21-S22: Star Balance, Invoice | getMyStarBalance, getStarTransactions, sendInvoice |
+| Gifts | S23: Gift Catalog | getAvailableGifts |
+| Checklists | S24: Checklist Lifecycle | sendChecklist, editChecklist |
 | Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
 | Webhook | S13-S14: Webhook Lifecycle, GetUpdates (opt-in) | setWebhook, getWebhookInfo, deleteWebhook, getUpdates |
 
@@ -348,8 +361,9 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 
 ```bash
 # Set environment
-export TELEGRAM_BOT_TOKEN="your-token"
+export TESTBOT_TOKEN="your-token"
 export TESTBOT_CHAT_ID="your-chat-id"
+export TESTBOT_ADMINS="your-user-id"
 
 # Run all tests
 go run ./cmd/galigo-testbot --run all
@@ -366,7 +380,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `stickers`, `sticker-lifecycle`, `stars`, `star-balance`, `invoice`, `gifts`, `checklists`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
 
 ### Test Fixtures
 
@@ -529,8 +543,43 @@ The multipart encoder calls `InputFile.OpenReader()` which returns `Source()` if
 - `SendPoll` - Send native polls (regular and quiz)
 - `StopPoll` - Stop a running poll
 
+### Chat Photo
+- `SetChatPhoto` - Set chat photo (multipart upload)
+- `DeleteChatPhoto` - Delete chat photo
+
+### Chat Moderation
+- `BanChatMember` / `UnbanChatMember` / `RestrictChatMember` - Member moderation
+- `PromoteChatMember` / `DemoteChatMember` - Admin promotion/demotion
+- `SetChatAdministratorCustomTitle` - Set admin custom title
+- `SetChatPermissions` - Set default chat permissions
+- `LeaveChat` - Leave a chat
+
 ### Forum Topics
+- `CreateForumTopic` / `EditForumTopic` / `CloseForumTopic` / `ReopenForumTopic` / `DeleteForumTopic`
+- `EditGeneralForumTopic` / `CloseGeneralForumTopic` / `ReopenGeneralForumTopic`
+- `HideGeneralForumTopic` / `UnhideGeneralForumTopic`
+- `UnpinAllForumTopicMessages` / `UnpinAllGeneralForumTopicMessages`
 - `GetForumTopicIconStickers` - Get available topic icon stickers
+
+### Stickers
+- `CreateNewStickerSet` / `GetStickerSet` / `DeleteStickerSet`
+- `AddStickerToSet` / `DeleteStickerFromSet` / `ReplaceStickerInSet`
+- `SetStickerPositionInSet` / `SetStickerEmojiList` / `SetStickerSetTitle`
+- `UploadStickerFile` / `SetStickerSetThumbnail`
+
+### Payments & Stars
+- `SendInvoice` / `CreateInvoiceLink`
+- `GetStarTransactions` / `GetMyStarBalance` / `RefundStarPayment`
+
+### Gifts
+- `GetAvailableGifts` / `SendGift` / `TransferGift` / `UpgradeGift` / `ConvertGiftToStars`
+
+### Checklists
+- `SendChecklist` - Send checklist (nested `InputChecklist` field, requires Premium)
+- `EditChecklist` - Edit checklist
+
+### Inline Queries
+- `AnswerInlineQuery` / `AnswerWebAppQuery` / `SavePreparedInlineMessage`
 
 ### Utilities
 - `GetFile` - Get file info for download

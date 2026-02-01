@@ -1,0 +1,228 @@
+{
+  "run_id": "20260127-033702",
+  "start_time": "2026-01-27T03:37:02.202793343Z",
+  "end_time": "2026-01-27T03:37:17.028477881Z",
+  "duration": 14825684519,
+  "success": true,
+  "scenarios": [
+    {
+      "scenario_name": "S0-Smoke",
+      "covers": [
+        "getMe",
+        "sendMessage",
+        "deleteMessage"
+      ],
+      "start_time": "2026-01-27T03:37:02.202815735Z",
+      "end_time": "2026-01-27T03:37:05.934791904Z",
+      "duration": 3731976149,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "getMe",
+          "duration": 69506078,
+          "success": true,
+          "evidence": {
+            "first_name": "galigo_test_bot",
+            "id": 8434949118,
+            "username": "galigo_test_bot"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "sendMessage",
+          "duration": 39837648,
+          "success": true,
+          "message_ids": [
+            4
+          ],
+          "evidence": {
+            "message_id": 4,
+            "text": "galigo-testbot: smoke test"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "deleteMessage",
+          "duration": 20538462,
+          "success": true,
+          "evidence": {
+            "deleted_message_id": 4
+          }
+        }
+      ]
+    },
+    {
+      "scenario_name": "S1-Identity",
+      "covers": [
+        "getMe"
+      ],
+      "start_time": "2026-01-27T03:37:05.93491815Z",
+      "end_time": "2026-01-27T03:37:07.147183807Z",
+      "duration": 1212265658,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "getMe",
+          "duration": 11857051,
+          "success": true,
+          "evidence": {
+            "first_name": "galigo_test_bot",
+            "id": 8434949118,
+            "username": "galigo_test_bot"
+          }
+        }
+      ]
+    },
+    {
+      "scenario_name": "S2-MessageLifecycle",
+      "covers": [
+        "sendMessage",
+        "editMessageText",
+        "deleteMessage"
+      ],
+      "start_time": "2026-01-27T03:37:07.147282161Z",
+      "end_time": "2026-01-27T03:37:10.837455393Z",
+      "duration": 3690173283,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "sendMessage",
+          "duration": 34904437,
+          "success": true,
+          "message_ids": [
+            5
+          ],
+          "evidence": {
+            "message_id": 5,
+            "text": "galigo-testbot: message lifecycle test"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "editMessageText",
+          "duration": 30092751,
+          "success": true,
+          "evidence": {
+            "message_id": 5,
+            "new_text": "galigo-testbot: EDITED message"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "deleteMessage",
+          "duration": 23522143,
+          "success": true,
+          "evidence": {
+            "deleted_message_id": 5
+          }
+        }
+      ]
+    },
+    {
+      "scenario_name": "S4-ForwardCopy",
+      "covers": [
+        "sendMessage",
+        "forwardMessage",
+        "copyMessage"
+      ],
+      "start_time": "2026-01-27T03:37:10.83768858Z",
+      "end_time": "2026-01-27T03:37:15.805862837Z",
+      "duration": 4968174248,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "sendMessage",
+          "duration": 32403316,
+          "success": true,
+          "message_ids": [
+            6
+          ],
+          "evidence": {
+            "message_id": 6,
+            "text": "galigo-testbot: source message for forward/copy"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "forwardMessage",
+          "duration": 40673900,
+          "success": true,
+          "message_ids": [
+            7
+          ],
+          "evidence": {
+            "forwarded_message_id": 7,
+            "original_message_id": 6,
+            "to_chat_id": 5655214276
+          }
+        },
+        {
+          "step_name": "",
+          "method": "copyMessage",
+          "duration": 34772359,
+          "success": true,
+          "message_ids": [
+            8
+          ],
+          "evidence": {
+            "copied_message_id": 8,
+            "original_message_id": 6,
+            "to_chat_id": 5655214276
+          }
+        },
+        {
+          "step_name": "",
+          "method": "deleteMessage",
+          "duration": 58395942,
+          "success": true,
+          "evidence": {
+            "deleted_count": 3
+          }
+        }
+      ]
+    },
+    {
+      "scenario_name": "S5-ChatAction",
+      "covers": [
+        "sendChatAction"
+      ],
+      "start_time": "2026-01-27T03:37:15.805988322Z",
+      "end_time": "2026-01-27T03:37:17.028387293Z",
+      "duration": 1222398931,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "sendChatAction",
+          "duration": 21926403,
+          "success": true,
+          "evidence": {
+            "action": "typing"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_scenarios": 5,
+    "passed_scenarios": 5,
+    "failed_scenarios": 0,
+    "total_steps": 12,
+    "passed_steps": 12,
+    "failed_steps": 0,
+    "methods_covered": [
+      "getMe",
+      "sendMessage",
+      "deleteMessage",
+      "editMessageText",
+      "forwardMessage",
+      "copyMessage",
+      "sendChatAction"
+    ],
+    "total_duration": "14.825684519s"
+  }
+}

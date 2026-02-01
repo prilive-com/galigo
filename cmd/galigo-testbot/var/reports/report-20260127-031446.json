@@ -1,0 +1,70 @@
+{
+  "run_id": "20260127-031446",
+  "start_time": "2026-01-27T03:14:46.600804866Z",
+  "end_time": "2026-01-27T03:14:50.403209318Z",
+  "duration": 3802404452,
+  "success": true,
+  "scenarios": [
+    {
+      "scenario_name": "S0-Smoke",
+      "covers": [
+        "getMe",
+        "sendMessage",
+        "deleteMessage"
+      ],
+      "start_time": "2026-01-27T03:14:46.600847395Z",
+      "end_time": "2026-01-27T03:14:50.403008083Z",
+      "duration": 3802160688,
+      "success": true,
+      "steps": [
+        {
+          "step_name": "",
+          "method": "getMe",
+          "duration": 76738135,
+          "success": true,
+          "evidence": {
+            "first_name": "galigo_test_bot",
+            "id": 8434949118,
+            "username": "galigo_test_bot"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "sendMessage",
+          "duration": 98537421,
+          "success": true,
+          "message_ids": [
+            3
+          ],
+          "evidence": {
+            "message_id": 3,
+            "text": "galigo-testbot: smoke test"
+          }
+        },
+        {
+          "step_name": "",
+          "method": "deleteMessage",
+          "duration": 25396355,
+          "success": true,
+          "evidence": {
+            "deleted_message_id": 3
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 1,
+    "failed_scenarios": 0,
+    "total_steps": 3,
+    "passed_steps": 3,
+    "failed_steps": 0,
+    "methods_covered": [
+      "deleteMessage",
+      "getMe",
+      "sendMessage"
+    ],
+    "total_duration": "3.802404452s"
+  }
+}

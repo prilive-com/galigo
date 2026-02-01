@@ -241,6 +241,12 @@ func (s *CleanupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, er
 	rt.CreatedMessages = rt.CreatedMessages[:0]
 	rt.LastMessage = nil
 
+	// Clean up sticker sets (best-effort)
+	for _, name := range rt.CreatedStickerSets {
+		_ = rt.Sender.DeleteStickerSet(ctx, name)
+	}
+	rt.CreatedStickerSets = rt.CreatedStickerSets[:0]
+
 	result := &StepResult{
 		Method: "deleteMessage",
 		Evidence: map[string]any{

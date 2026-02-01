@@ -2,8 +2,23 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/prilive-com/galigo/tg"
 )
+
+// isNotModifiedErr returns true if the error is a Telegram "not modified" 400 error.
+// These are idempotent no-ops, not real failures (e.g. "chat title is not modified").
+func isNotModifiedErr(err error) bool {
+	var apiErr *tg.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == 400 {
+		desc := strings.ToLower(apiErr.Description)
+		return strings.Contains(desc, "not modified")
+	}
+	return false
+}
 
 // ================= Tier 2: Chat Info Steps =================
 
@@ -109,7 +124,7 @@ func (s *SetChatTitleStep) Name() string { return "setChatTitle" }
 
 func (s *SetChatTitleStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	err := rt.Sender.SetChatTitle(ctx, rt.ChatID, s.Title)
-	if err != nil {
+	if err != nil && !isNotModifiedErr(err) {
 		return nil, err
 	}
 
@@ -130,7 +145,7 @@ func (s *SetChatDescriptionStep) Name() string { return "setChatDescription" }
 
 func (s *SetChatDescriptionStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	err := rt.Sender.SetChatDescription(ctx, rt.ChatID, s.Description)
-	if err != nil {
+	if err != nil && !isNotModifiedErr(err) {
 		return nil, err
 	}
 
@@ -354,13 +369,13 @@ func (s *RestoreChatTitleStep) Name() string { return "restore chat settings" }
 func (s *RestoreChatTitleStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	title := rt.CapturedFileIDs["original_title"]
 	if title != "" {
-		if err := rt.Sender.SetChatTitle(ctx, rt.ChatID, title); err != nil {
+		if err := rt.Sender.SetChatTitle(ctx, rt.ChatID, title); err != nil && !isNotModifiedErr(err) {
 			return nil, fmt.Errorf("restore title: %w", err)
 		}
 	}
 
 	desc := rt.CapturedFileIDs["original_description"]
-	if err := rt.Sender.SetChatDescription(ctx, rt.ChatID, desc); err != nil {
+	if err := rt.Sender.SetChatDescription(ctx, rt.ChatID, desc); err != nil && !isNotModifiedErr(err) {
 		return nil, fmt.Errorf("restore description: %w", err)
 	}
 

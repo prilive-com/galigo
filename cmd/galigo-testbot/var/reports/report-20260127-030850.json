@@ -1,0 +1,55 @@
+{
+  "run_id": "20260127-030850",
+  "start_time": "2026-01-27T03:08:50.345435309Z",
+  "end_time": "2026-01-27T03:08:55.273699859Z",
+  "duration": 4928264580,
+  "success": false,
+  "scenarios": [
+    {
+      "scenario_name": "S0-Smoke",
+      "covers": [
+        "getMe",
+        "sendMessage",
+        "deleteMessage"
+      ],
+      "start_time": "2026-01-27T03:08:50.345462449Z",
+      "end_time": "2026-01-27T03:08:55.273660707Z",
+      "duration": 4928198307,
+      "success": false,
+      "error": "step \"sendMessage\" failed: galigo: sendMessage failed: Bad Request: chat not found (code=400)",
+      "steps": [
+        {
+          "step_name": "",
+          "method": "getMe",
+          "duration": 3702126436,
+          "success": true,
+          "evidence": {
+            "first_name": "galigo_test_bot",
+            "id": 8434949118,
+            "username": "galigo_test_bot"
+          }
+        },
+        {
+          "step_name": "sendMessage",
+          "duration": 25376116,
+          "success": false,
+          "error": "galigo: sendMessage failed: Bad Request: chat not found (code=400)"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 2,
+    "passed_steps": 1,
+    "failed_steps": 1,
+    "methods_covered": [
+      "sendMessage",
+      "deleteMessage",
+      "getMe"
+    ],
+    "total_duration": "4.92826458s"
+  }
+}

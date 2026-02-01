@@ -580,12 +580,12 @@ Set environment variables or create a `.env` file in the project root:
 
 ```bash
 # Required
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TESTBOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 TESTBOT_CHAT_ID=123456789
+TESTBOT_ADMINS=123456789          # Comma-separated human user IDs (required for sticker tests)
 
 # Optional
 TESTBOT_MODE=polling              # polling (default) or webhook
-TESTBOT_ADMINS=123456789          # Comma-separated user IDs for interactive mode
 TESTBOT_SEND_INTERVAL=1s          # Delay between API calls (default: 1s)
 TESTBOT_MAX_MESSAGES=100          # Max messages per run (default: 100)
 TESTBOT_STORAGE_DIR=var/reports   # Report output directory
@@ -595,13 +595,18 @@ TESTBOT_LOG_LEVEL=info            # info or debug
 ### Running Acceptance Tests
 
 ```bash
-# Run all scenarios (Phase A + B + C)
+# Run all scenarios (Phase A + B + C + D + E, excludes interactive/webhook/checklists)
 go run ./cmd/galigo-testbot --run all
 
 # Run by phase
-go run ./cmd/galigo-testbot --run core       # Phase A: core messaging
-go run ./cmd/galigo-testbot --run media      # Phase B: media uploads
-go run ./cmd/galigo-testbot --run keyboards  # Phase C: keyboards
+go run ./cmd/galigo-testbot --run core        # Phase A: core messaging (S0-S5)
+go run ./cmd/galigo-testbot --run media       # Phase B: media uploads (S6-S11)
+go run ./cmd/galigo-testbot --run keyboards   # Phase C: keyboards (S10)
+go run ./cmd/galigo-testbot --run chat-admin  # Phase D: chat administration (S15-S19)
+go run ./cmd/galigo-testbot --run stickers    # Phase E: sticker lifecycle (S20)
+go run ./cmd/galigo-testbot --run stars       # Phase E: star balance + transactions (S21-S22)
+go run ./cmd/galigo-testbot --run gifts       # Phase E: gift catalog (S23)
+go run ./cmd/galigo-testbot --run checklists  # Phase E: checklist lifecycle (S24, requires Premium)
 
 # Run individual scenarios
 go run ./cmd/galigo-testbot --run smoke            # S0: Quick sanity check
@@ -615,6 +620,14 @@ go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
 go run ./cmd/galigo-testbot --run get-file             # S9: File download info
 go run ./cmd/galigo-testbot --run edit-message-media   # S11: Edit message media
 go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + edit markup
+go run ./cmd/galigo-testbot --run chat-info            # S15: Chat info
+go run ./cmd/galigo-testbot --run chat-settings        # S16: Chat title/description
+go run ./cmd/galigo-testbot --run pin-messages         # S17: Pin/unpin
+go run ./cmd/galigo-testbot --run polls                # S18: Polls
+go run ./cmd/galigo-testbot --run forum-stickers       # S19: Forum stickers
+go run ./cmd/galigo-testbot --run sticker-lifecycle    # S20: Full sticker lifecycle
+go run ./cmd/galigo-testbot --run star-balance         # S21: Star balance
+go run ./cmd/galigo-testbot --run invoice              # S22: Invoice
 
 # Interactive scenarios (requires user interaction, excluded from "all")
 go run ./cmd/galigo-testbot --run interactive           # S12: Callback query (click button)
@@ -666,6 +679,30 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 |----------|---------|-------------|
 | S10-InlineKeyboard | sendMessage (with markup), editMessageReplyMarkup | Send, edit, and remove inline keyboard |
 
+#### Phase D: Chat Administration (S15-S19)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S15-ChatInfo | getChat, getChatAdministrators, getChatMemberCount, getChatMember | Chat info retrieval |
+| S16-ChatSettings | setChatTitle, setChatDescription | Set and restore chat title/description |
+| S17-PinMessages | pinChatMessage, unpinChatMessage, unpinAllChatMessages | Pin/unpin operations |
+| S18-Polls | sendPoll, stopPoll | Simple poll, quiz poll, stop poll |
+| S19-ForumStickers | getForumTopicIconStickers | Forum topic icon stickers |
+
+Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "not modified" 400 errors.
+
+#### Phase E: Extended (S20-S24)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S20-StickerLifecycle | createNewStickerSet, getStickerSet, addStickerToSet, setStickerPositionInSet, setStickerEmojiList, setStickerSetTitle, deleteStickerFromSet, deleteStickerSet | Full sticker set lifecycle |
+| S21-StarBalance | getMyStarBalance, getStarTransactions | Star balance and transactions |
+| S22-Invoice | sendInvoice | Send a star invoice |
+| S23-Gifts | getAvailableGifts | Gift catalog |
+| S24-Checklists | sendChecklist, editChecklist | Checklist lifecycle (requires Premium) |
+
+S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 requires Telegram Premium and is excluded from `--run all`.
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -685,9 +722,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current coverage: **25/25 methods** (100%)
+Current registry: **48 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-**Covered:** getMe, sendMessage, editMessageText, deleteMessage, forwardMessage, copyMessage, sendChatAction, sendPhoto, sendDocument, sendAnimation, sendAudio, sendVoice, sendVideo, sendSticker, sendVideoNote, sendMediaGroup, editMessageCaption, editMessageMedia, getFile, editMessageReplyMarkup, answerCallbackQuery, setWebhook, getWebhookInfo, deleteWebhook, getUpdates
+All 48 methods have acceptance test coverage. Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -738,15 +775,22 @@ Each test run generates a JSON report in `var/reports/`:
 cmd/galigo-testbot/
 ├── main.go         # CLI entry, flag parsing, suite dispatch
 ├── engine/
-│   ├── scenario.go # Scenario, Step, Runtime, SenderClient interface, MediaInput
-│   ├── steps.go    # Step implementations (GetMeStep, SendPhotoStep, etc.)
-│   ├── runner.go   # Scenario executor with timing and error handling
-│   └── adapter.go  # SenderAdapter: wraps sender.Client to SenderClient interface
+│   ├── scenario.go      # Scenario, Step, Runtime (AdminUserID), SenderClient interface, MediaInput
+│   ├── steps.go         # Core step implementations (GetMeStep, SendPhotoStep, etc.)
+│   ├── steps_chat_admin.go # Chat admin steps (GetChat, SetChatTitle, Pin, Polls, Forum)
+│   ├── steps_extended.go   # Extended steps (Stickers, Stars, Gifts, Checklists)
+│   ├── runner.go        # Scenario executor with timing and error handling
+│   └── adapter.go       # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
 │   ├── tier1.go       # Phase A scenarios (S0-S5)
 │   ├── media.go       # Phase B scenarios (S6-S11)
 │   ├── keyboards.go   # Phase C scenarios (S10+)
-│   ├── interactive.go # Interactive scenarios (S12+, opt-in)
+│   ├── chat_admin.go  # Phase D scenarios (S15-S19)
+│   ├── stickers.go    # Phase E: Sticker lifecycle (S20)
+│   ├── stars.go       # Phase E: Stars + Invoice (S21-S22)
+│   ├── gifts.go       # Phase E: Gifts (S23)
+│   ├── checklists.go  # Phase E: Checklists (S24, Premium)
+│   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
 │   ├── fixtures.go # go:embed declarations and accessor functions

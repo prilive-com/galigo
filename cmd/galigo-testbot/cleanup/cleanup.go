@@ -39,6 +39,16 @@ func (c *Cleaner) CleanupMessages(ctx context.Context, rt *engine.Runtime) (dele
 	rt.CreatedMessages = rt.CreatedMessages[:0]
 	rt.LastMessage = nil
 
+	// Clean up sticker sets (best-effort)
+	for _, name := range rt.CreatedStickerSets {
+		if err := c.sender.DeleteStickerSet(ctx, name); err != nil {
+			c.logger.Warn("failed to delete sticker set", "name", name, "error", err)
+		} else {
+			c.logger.Debug("deleted sticker set", "name", name)
+		}
+	}
+	rt.CreatedStickerSets = rt.CreatedStickerSets[:0]
+
 	c.logger.Info("cleanup completed", "deleted", deleted, "errors", errors)
 
 	return deleted, errors

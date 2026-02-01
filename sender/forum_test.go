@@ -247,6 +247,52 @@ func TestUnhideGeneralForumTopic(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// ==================== EditGeneralForumTopic ====================
+
+func TestEditGeneralForumTopic(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/editGeneralForumTopic", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.EditGeneralForumTopic(context.Background(), int64(-100123), "New General Name")
+	assert.NoError(t, err)
+}
+
+func TestEditGeneralForumTopic_Validation_InvalidChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.EditGeneralForumTopic(context.Background(), nil, "Name")
+	require.Error(t, err)
+	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
+}
+
+// ==================== UnpinAllGeneralForumTopicMessages ====================
+
+func TestUnpinAllGeneralForumTopicMessages(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/unpinAllGeneralForumTopicMessages", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.UnpinAllGeneralForumTopicMessages(context.Background(), int64(-100123))
+	assert.NoError(t, err)
+}
+
+func TestUnpinAllGeneralForumTopicMessages_Validation_InvalidChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.UnpinAllGeneralForumTopicMessages(context.Background(), nil)
+	require.Error(t, err)
+	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
+}
+
 // ==================== GetForumTopicIconStickers ====================
 
 func TestGetForumTopicIconStickers(t *testing.T) {

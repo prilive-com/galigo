@@ -1,0 +1,152 @@
+# galigo golangci-lint Configuration
+# Tailored for Telegram Bot API library with strict quality standards
+
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  # Skip generated files and test fixtures
+  skip-dirs:
+    - cmd/galigo-testbot/fixtures
+    - cmd/galigo-testbot/var
+
+linters:
+  default: standard
+  enable:
+    # ====== Bug Detection (Critical) ======
+    - bodyclose        # HTTP response body must be closed
+    - contextcheck     # Non-inherited context detection
+    - errcheck         # Unchecked errors (essential for API library)
+    - errorlint        # Error wrapping issues (Go 1.13+)
+    - govet            # Official Go vet checks
+    - nilerr           # Returns nil when err != nil
+    - staticcheck      # 150+ checks, gold standard
+
+    # ====== Security ======
+    - gosec            # Security vulnerability detection
+
+    # ====== Performance ======
+    - prealloc         # Slice pre-allocation
+    - unconvert        # Unnecessary type conversions
+
+    # ====== Code Quality ======
+    - gocritic         # Extensive diagnostic checks
+    - gocyclo          # Cyclomatic complexity
+    - gocognit         # Cognitive complexity
+    - unparam          # Unused function parameters
+    - ineffassign      # Ineffective assignments
+
+    # ====== Style & Formatting ======
+    - gofmt            # Format checks
+    - goimports        # Import organization
+    - misspell         # Spelling mistakes in comments
+    - revive           # Modern golint replacement
+
+    # ====== Go 1.25 Modern Linters ======
+    - sloglint         # log/slog consistency (important for galigo)
+    - intrange         # Use integer range loops where applicable
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      # These functions are OK to ignore error returns
+      exclude-functions:
+        - (*github.com/prilive-com/galigo/sender.Client).Close
+        - io.Copy
+        - io.WriteString
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment  # Not critical for API library
+
+    gocyclo:
+      min-complexity: 15
+
+    gocognit:
+      min-complexity: 20
+
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G104  # Unhandled errors (covered by errcheck)
+        - G304  # File path from variable (needed for InputFile)
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint  # Allow nolint without explanation in tests
+
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+          arguments:
+            - "checkPrivateReceivers"
+        - name: var-naming
+          disabled: false
+        - name: package-comments
+          disabled: false
+
+    sloglint:
+      kv-only: false
+      attr-only: false
+      context-only: false
+      static-msg: false
+      no-mixed-args: true
+      no-global: "all"
+      no-raw-keys: false
+
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+
+    rules:
+      # Allow longer functions in tests
+      - path: _test\.go
+        linters:
+          - funlen
+          - dupl
+          - gosec
+          - gocyclo
+          - gocognit
+
+      # Allow complexity in testbot scenarios
+      - path: cmd/galigo-testbot/
+        linters:
+          - gocyclo
+          - gocognit
+          - funlen
+
+      # Allow unused parameters in interface implementations
+      - linters:
+          - unparam
+        text: "always receives"
+
+      # Ignore specific patterns
+      - linters:
+          - gocritic
+        text: "hugeParam"
+        path: "tg/"
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: github.com/prilive-com/galigo
+
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true

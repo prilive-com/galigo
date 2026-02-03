@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/prilive-com/galigo#readme
+    about: Read the documentation before opening an issue
+  - name: 💬 Discussions
+    url: https://github.com/prilive-com/galigo/discussions
+    about: Ask questions and discuss ideas
+  - name: 📚 Telegram Bot API Docs
+    url: https://core.telegram.org/bots/api
+    about: Official Telegram Bot API documentation

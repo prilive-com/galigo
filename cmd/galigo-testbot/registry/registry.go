@@ -59,6 +59,23 @@ var AllMethods = []Method{
 	// Files
 	{Name: "getFile", Category: CategoryMessaging},
 
+	// Location & Contact
+	{Name: "sendLocation", Category: CategoryMessaging},
+	{Name: "sendVenue", Category: CategoryMessaging},
+	{Name: "sendContact", Category: CategoryMessaging},
+	{Name: "sendDice", Category: CategoryMessaging},
+
+	// Reactions
+	{Name: "setMessageReaction", Category: CategoryMessaging},
+
+	// Bulk operations
+	{Name: "forwardMessages", Category: CategoryMessaging},
+	{Name: "copyMessages", Category: CategoryMessaging},
+	{Name: "deleteMessages", Category: CategoryMessaging},
+
+	// User info
+	{Name: "getUserProfilePhotos", Category: CategoryMessaging},
+
 	// === Chat Administration Methods ===
 	// Chat info
 	{Name: "getChat", Category: CategoryChatAdmin},
@@ -69,6 +86,12 @@ var AllMethods = []Method{
 	// Chat settings
 	{Name: "setChatTitle", Category: CategoryChatAdmin},
 	{Name: "setChatDescription", Category: CategoryChatAdmin},
+	{Name: "setChatPhoto", Category: CategoryChatAdmin},
+	{Name: "deleteChatPhoto", Category: CategoryChatAdmin},
+	{Name: "setChatPermissions", Category: CategoryChatAdmin},
+
+	// Boosts
+	{Name: "getUserChatBoosts", Category: CategoryChatAdmin},
 
 	// Pin messages
 	{Name: "pinChatMessage", Category: CategoryChatAdmin},

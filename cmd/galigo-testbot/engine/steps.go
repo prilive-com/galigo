@@ -150,9 +150,9 @@ func (s *ForwardMessageStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 		Method:     "forwardMessage",
 		MessageIDs: []int{msg.MessageID},
 		Evidence: map[string]any{
-			"original_message_id": rt.LastMessage.MessageID,
+			"original_message_id":  rt.LastMessage.MessageID,
 			"forwarded_message_id": msg.MessageID,
-			"to_chat_id":          toChatID,
+			"to_chat_id":           toChatID,
 		},
 	}, nil
 }

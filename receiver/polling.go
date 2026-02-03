@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	telegramAPIBaseURL     = "https://api.telegram.org/bot"
-	maxPollResponseSize    = 50 << 20 // 50MB for updates
+	telegramAPIBaseURL  = "https://api.telegram.org/bot"
+	maxPollResponseSize = 50 << 20 // 50MB for updates
 )
 
 // PollingClient polls Telegram's getUpdates API for updates.
@@ -64,8 +64,8 @@ type PollingClient struct {
 	offset            atomic.Int64 // P1.1: Use atomic for thread-safe access
 	consecutiveErrors atomic.Int32
 	stopCh            chan struct{}
-	stopped           atomic.Bool  // P1.3: Track if stopped for restart capability
-	mu                sync.Mutex   // P1.3: Protects stopCh recreation
+	stopped           atomic.Bool // P1.3: Track if stopped for restart capability
+	mu                sync.Mutex  // P1.3: Protects stopCh recreation
 	wg                sync.WaitGroup
 }
 

@@ -60,7 +60,7 @@ galigo/
 ├── cmd/
 │   └── galigo-testbot/ # Acceptance test bot
 │       ├── main.go     # CLI entry point (--run, --status flags)
-│       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter, Runtime (AdminUserID)
+│       ├── engine/     # Scenario runner, steps, SenderClient interface, adapter, Runtime, ChatContext, SkipError
 │       ├── suites/     # Test scenario definitions
 │       │   ├── tier1.go       # Core messaging scenarios (S0-S5)
 │       │   ├── media.go       # Media scenarios (S6-S11)
@@ -70,6 +70,7 @@ galigo/
 │       │   ├── stars.go       # Star balance + invoice scenarios (S21-S22)
 │       │   ├── gifts.go       # Gift catalog scenarios (S23)
 │       │   ├── checklists.go  # Checklist lifecycle scenarios (S24, requires Premium)
+│       │   ├── extras.go      # Extras scenarios (S25-S32: geo, bulk, reactions, user info, chat settings)
 │       │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │       │   └── webhook.go    # Webhook scenarios (S13-S14, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
@@ -82,7 +83,7 @@ galigo/
 │       │   └── videonote.mp4  # Minimal H.264 MP4 (240x240, square)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
-│       ├── registry/   # Method coverage tracking (48 target methods)
+│       ├── registry/   # Method coverage tracking (64 target methods)
 │       └── cleanup/    # Message cleanup utilities
 └── examples/
     └── echo/           # Echo bot example
@@ -121,6 +122,7 @@ go run ./cmd/galigo-testbot --run stickers    # Sticker set lifecycle (S20, requ
 go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21-S22)
 go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
+go run ./cmd/galigo-testbot --run extras      # Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
 go run ./cmd/galigo-testbot --run interactive # Interactive (S12, requires user click)
 go run ./cmd/galigo-testbot --run webhook     # Webhook lifecycle (S13-S14)
 go run ./cmd/galigo-testbot --status          # Show method coverage
@@ -354,6 +356,7 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | Stars | S21-S22: Star Balance, Invoice | getMyStarBalance, getStarTransactions, sendInvoice |
 | Gifts | S23: Gift Catalog | getAvailableGifts |
 | Checklists | S24: Checklist Lifecycle | sendChecklist, editChecklist |
+| Extras | S25-S32: Geo, Bulk, Reactions, User Info, Chat Settings | sendLocation, sendVenue, sendContact, sendDice, forwardMessages, copyMessages, deleteMessages, setMessageReaction, getUserProfilePhotos, getUserChatBoosts, setChatPhoto, deleteChatPhoto, setChatPermissions |
 | Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
 | Webhook | S13-S14: Webhook Lifecycle, GetUpdates (opt-in) | setWebhook, getWebhookInfo, deleteWebhook, getUpdates |
 
@@ -380,7 +383,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `stickers`, `sticker-lifecycle`, `stars`, `star-balance`, `invoice`, `gifts`, `checklists`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `stickers`, `sticker-lifecycle`, `stars`, `star-balance`, `invoice`, `gifts`, `checklists`, `extras`, `geo`, `venue`, `contact-dice`, `bulk`, `reactions`, `user-info`, `chat-photo`, `chat-permissions`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
 
 ### Test Fixtures
 
@@ -585,6 +588,7 @@ The multipart encoder calls `InputFile.OpenReader()` which returns `Source()` if
 - `GetFile` - Get file info for download
 - `SendChatAction` - Send typing indicator, etc.
 - `GetUserProfilePhotos` - Get user's profile photos
+- `GetUserChatBoosts` - Get user's chat boosts
 
 ### Location & Contact
 - `SendLocation` - Send location

@@ -1,0 +1,186 @@
+# galigo CI Pipeline
+# Runs on every push and PR - unit tests, linting, coverage
+# Combined best practices from multiple security consultants (Feb 2026)
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COVERAGE_THRESHOLD: 80
+
+jobs:
+  # ============================================================
+  # JOB 1: Lint - Fast feedback on code quality
+  # ============================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod  # Use version from go.mod
+
+      - name: Check gofmt
+        run: test -z "$(gofmt -l .)"
+
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1
+          args: --timeout=5m
+          only-new-issues: ${{ github.event_name == 'pull_request' }}
+
+  # ============================================================
+  # JOB 2: Test Matrix - Cross-platform, multi-version testing
+  # ============================================================
+  test:
+    name: Test (${{ matrix.os }}, Go ${{ matrix.go }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: [stable, oldstable]  # Current + previous Go version
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Run tests
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            go test ./... -race -shuffle=on -count=1 -timeout=10m
+          else
+            go test ./... -shuffle=on -count=1 -timeout=10m
+          fi
+
+  # ============================================================
+  # JOB 3: Coverage - Track test coverage with threshold
+  # ============================================================
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests with coverage
+        run: |
+          go test -coverprofile=coverage.out -covermode=atomic \
+            -shuffle=on -count=1 -timeout=10m ./...
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: ${COVERAGE}%"
+          
+          # Check threshold using awk (more portable than bc)
+          if awk "BEGIN {exit !($COVERAGE < ${{ env.COVERAGE_THRESHOLD }})}"; then
+            echo "::error::Coverage ${COVERAGE}% is below ${{ env.COVERAGE_THRESHOLD }}% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage meets threshold"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 30
+
+  # ============================================================
+  # JOB 4: Build - Verify all packages compile
+  # ============================================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Build testbot binary
+        run: go build -o galigo-testbot ./cmd/galigo-testbot
+
+      - name: Build examples
+        run: |
+          go build ./examples/echo
+          go build ./examples/keyboard
+          go build ./examples/webhook
+
+  # ============================================================
+  # JOB 5: Testbot Status - API method coverage check (NO SECRETS)
+  # ============================================================
+  testbot-status:
+    name: API Coverage Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check Telegram API method coverage
+        run: |
+          go run ./cmd/galigo-testbot --status | tee method-coverage.txt
+          
+          # Add to GitHub Step Summary
+          echo "## 📊 Telegram API Method Coverage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat method-coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================
+  # JOB 6: Dependency Review - Block vulnerable deps in PRs
+  # ============================================================
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0

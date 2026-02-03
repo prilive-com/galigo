@@ -18,10 +18,10 @@ func TestGetBusinessConnection(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/getBusinessConnection", func(w http.ResponseWriter, r *http.Request) {
 		testutil.ReplyOK(w, map[string]any{
-			"id":        "bc_123",
-			"user":      map[string]any{"id": int64(456), "is_bot": false, "first_name": "Alice"},
-			"date":      1700000000,
-			"can_reply": true,
+			"id":         "bc_123",
+			"user":       map[string]any{"id": int64(456), "is_bot": false, "first_name": "Alice"},
+			"date":       1700000000,
+			"can_reply":  true,
 			"is_enabled": true,
 		})
 	})

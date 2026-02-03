@@ -30,7 +30,7 @@ func (c *Client) GetChat(ctx context.Context, chatID tg.ChatID) (*tg.ChatFullInf
 	}
 
 	var result tg.ChatFullInfo
-	if err := c.callJSON(ctx, "getChat", GetChatRequest{ChatID: chatID}, &result); err != nil {
+	if err := c.callJSON(ctx, "getChat", GetChatRequest{ChatID: chatID}, &result, extractChatID(chatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -42,7 +42,7 @@ func (c *Client) GetChatAdministrators(ctx context.Context, chatID tg.ChatID) ([
 		return nil, err
 	}
 
-	resp, err := c.executeRequest(ctx, "getChatAdministrators", GetChatRequest{ChatID: chatID})
+	resp, err := c.executeRequest(ctx, "getChatAdministrators", GetChatRequest{ChatID: chatID}, extractChatID(chatID))
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (c *Client) GetChatMemberCount(ctx context.Context, chatID tg.ChatID) (int,
 	}
 
 	var result int
-	if err := c.callJSON(ctx, "getChatMemberCount", GetChatRequest{ChatID: chatID}, &result); err != nil {
+	if err := c.callJSON(ctx, "getChatMemberCount", GetChatRequest{ChatID: chatID}, &result, extractChatID(chatID)); err != nil {
 		return 0, err
 	}
 	return result, nil
@@ -90,7 +90,7 @@ func (c *Client) GetChatMember(ctx context.Context, chatID tg.ChatID, userID int
 	resp, err := c.executeRequest(ctx, "getChatMember", GetChatMemberRequest{
 		ChatID: chatID,
 		UserID: userID,
-	})
+	}, extractChatID(chatID))
 	if err != nil {
 		return nil, err
 	}

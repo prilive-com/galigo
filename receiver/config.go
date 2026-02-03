@@ -64,15 +64,15 @@ type Config struct {
 	RetryBackoffFactor float64       // Backoff multiplier
 
 	// Common configuration
-	UpdateBufferSize  int           // Channel buffer size
-	RateLimitRequests float64       // Requests per second
-	RateLimitBurst    int           // Burst size
-	MaxBodySize       int64         // Max webhook body size
+	UpdateBufferSize  int     // Channel buffer size
+	RateLimitRequests float64 // Requests per second
+	RateLimitBurst    int     // Burst size
+	MaxBodySize       int64   // Max webhook body size
 
 	// Update delivery policy (for long polling)
-	UpdateDeliveryPolicy  UpdateDeliveryPolicy  // Behavior when update channel is full
-	UpdateDeliveryTimeout time.Duration         // Max time to wait in Block mode (0 = block forever)
-	OnUpdateDropped       func(int, string)     // Callback when update is dropped (updateID, reason)
+	UpdateDeliveryPolicy  UpdateDeliveryPolicy // Behavior when update channel is full
+	UpdateDeliveryTimeout time.Duration        // Max time to wait in Block mode (0 = block forever)
+	OnUpdateDropped       func(int, string)    // Callback when update is dropped (updateID, reason)
 
 	// Circuit breaker
 	BreakerMaxRequests uint32

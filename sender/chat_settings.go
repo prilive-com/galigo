@@ -55,7 +55,7 @@ func (c *Client) SetChatPermissions(ctx context.Context, chatID tg.ChatID, permi
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "setChatPermissions", req, nil)
+	return c.callJSON(ctx, "setChatPermissions", req, nil, extractChatID(chatID))
 }
 
 // SetChatPhoto sets a new chat photo.
@@ -68,7 +68,7 @@ func (c *Client) SetChatPhoto(ctx context.Context, chatID tg.ChatID, photo Input
 	return c.callJSON(ctx, "setChatPhoto", SetChatPhotoRequest{
 		ChatID: chatID,
 		Photo:  photo,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // DeleteChatPhoto deletes the chat photo.
@@ -80,7 +80,7 @@ func (c *Client) DeleteChatPhoto(ctx context.Context, chatID tg.ChatID) error {
 
 	return c.callJSON(ctx, "deleteChatPhoto", DeleteChatPhotoRequest{
 		ChatID: chatID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // SetChatTitle changes the title of a chat.
@@ -99,7 +99,7 @@ func (c *Client) SetChatTitle(ctx context.Context, chatID tg.ChatID, title strin
 	return c.callJSON(ctx, "setChatTitle", SetChatTitleRequest{
 		ChatID: chatID,
 		Title:  title,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // SetChatDescription changes the description of a chat.
@@ -115,7 +115,7 @@ func (c *Client) SetChatDescription(ctx context.Context, chatID tg.ChatID, descr
 	return c.callJSON(ctx, "setChatDescription", SetChatDescriptionRequest{
 		ChatID:      chatID,
 		Description: description,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // ================== Options ==================

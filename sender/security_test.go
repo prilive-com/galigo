@@ -2,9 +2,11 @@ package sender
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +16,7 @@ func TestNoTokenInErrors(t *testing.T) {
 
 	// Simulate a DNS error containing the token in the URL
 	origErr := fmt.Errorf(`Get "https://api.telegram.org/bot%s/getMe": dial tcp: no such host`, token.Value())
-	scrubbed := scrubTokenFromError(origErr, token)
+	scrubbed := scrub.TokenFromError(origErr, token)
 
 	assert.NotContains(t, scrubbed.Error(), token.Value())
 	assert.NotContains(t, scrubbed.Error(), "ABCdef")
@@ -22,14 +24,14 @@ func TestNoTokenInErrors(t *testing.T) {
 }
 
 func TestScrubTokenFromError_Nil(t *testing.T) {
-	result := scrubTokenFromError(nil, "sometoken")
+	result := scrub.TokenFromError(nil, "sometoken")
 	assert.Nil(t, result)
 }
 
 func TestScrubTokenFromError_NoToken(t *testing.T) {
 	token := tg.SecretToken("123456789:ABCdefGHIjklMNOpqrSTUvwxYZ")
 	origErr := fmt.Errorf("connection refused")
-	result := scrubTokenFromError(origErr, token)
+	result := scrub.TokenFromError(origErr, token)
 	// Should return original error unchanged
 	assert.Equal(t, origErr, result)
 }
@@ -38,14 +40,13 @@ func TestScrubTokenFromError_PreservesUnwrap(t *testing.T) {
 	token := tg.SecretToken("123456789:ABCdefGHIjklMNOpqrSTUvwxYZ")
 	inner := fmt.Errorf("inner error")
 	origErr := fmt.Errorf(`Get "https://api.telegram.org/bot%s/getMe": %w`, token.Value(), inner)
-	scrubbed := scrubTokenFromError(origErr, token)
+	scrubbed := scrub.TokenFromError(origErr, token)
 
 	// Scrubbed message should not contain token
 	assert.NotContains(t, scrubbed.Error(), token.Value())
 
 	// Unwrap chain should be preserved
-	unwrapped := scrubbed.(*scrubbedError)
-	assert.NotNil(t, unwrapped.Unwrap())
+	assert.True(t, errors.Is(scrubbed, inner))
 }
 
 func TestBreakerSuccess_400IsSuccess(t *testing.T) {
@@ -66,10 +67,10 @@ func TestBreakerSuccess_404IsSuccess(t *testing.T) {
 	assert.True(t, isBreakerSuccess(err))
 }
 
-func TestBreakerSuccess_429IsFailure(t *testing.T) {
-	// 429 Too Many Requests SHOULD trip the breaker
+func TestBreakerSuccess_429IsSuccess(t *testing.T) {
+	// 429 Too Many Requests should NOT trip the breaker — handle via retry_after
 	err := tg.NewAPIError("sendMessage", 429, "Too Many Requests: retry after 30")
-	assert.False(t, isBreakerSuccess(err))
+	assert.True(t, isBreakerSuccess(err))
 }
 
 func TestBreakerSuccess_500IsFailure(t *testing.T) {

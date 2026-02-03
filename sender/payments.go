@@ -10,31 +10,31 @@ import (
 
 // SendInvoiceRequest represents a sendInvoice request.
 type SendInvoiceRequest struct {
-	ChatID                    any               `json:"chat_id"`
-	MessageThreadID           int               `json:"message_thread_id,omitempty"`
-	Title                     string            `json:"title"`
-	Description               string            `json:"description"`
-	Payload                   string            `json:"payload"`
-	ProviderToken             string            `json:"provider_token,omitempty"`
-	Currency                  string            `json:"currency"`
-	Prices                    []tg.LabeledPrice `json:"prices"`
-	MaxTipAmount              int               `json:"max_tip_amount,omitempty"`
-	SuggestedTipAmounts       []int             `json:"suggested_tip_amounts,omitempty"`
-	StartParameter            string            `json:"start_parameter,omitempty"`
-	ProviderData              string            `json:"provider_data,omitempty"`
-	PhotoURL                  string            `json:"photo_url,omitempty"`
-	PhotoSize                 int               `json:"photo_size,omitempty"`
-	PhotoWidth                int               `json:"photo_width,omitempty"`
-	PhotoHeight               int               `json:"photo_height,omitempty"`
-	NeedName                  bool              `json:"need_name,omitempty"`
-	NeedPhoneNumber           bool              `json:"need_phone_number,omitempty"`
-	NeedEmail                 bool              `json:"need_email,omitempty"`
-	NeedShippingAddress       bool              `json:"need_shipping_address,omitempty"`
-	SendPhoneNumberToProvider bool              `json:"send_phone_number_to_provider,omitempty"`
-	SendEmailToProvider       bool              `json:"send_email_to_provider,omitempty"`
-	IsFlexible                bool              `json:"is_flexible,omitempty"`
-	DisableNotification       bool              `json:"disable_notification,omitempty"`
-	ProtectContent            bool              `json:"protect_content,omitempty"`
+	ChatID                    any                      `json:"chat_id"`
+	MessageThreadID           int                      `json:"message_thread_id,omitempty"`
+	Title                     string                   `json:"title"`
+	Description               string                   `json:"description"`
+	Payload                   string                   `json:"payload"`
+	ProviderToken             string                   `json:"provider_token,omitempty"`
+	Currency                  string                   `json:"currency"`
+	Prices                    []tg.LabeledPrice        `json:"prices"`
+	MaxTipAmount              int                      `json:"max_tip_amount,omitempty"`
+	SuggestedTipAmounts       []int                    `json:"suggested_tip_amounts,omitempty"`
+	StartParameter            string                   `json:"start_parameter,omitempty"`
+	ProviderData              string                   `json:"provider_data,omitempty"`
+	PhotoURL                  string                   `json:"photo_url,omitempty"`
+	PhotoSize                 int                      `json:"photo_size,omitempty"`
+	PhotoWidth                int                      `json:"photo_width,omitempty"`
+	PhotoHeight               int                      `json:"photo_height,omitempty"`
+	NeedName                  bool                     `json:"need_name,omitempty"`
+	NeedPhoneNumber           bool                     `json:"need_phone_number,omitempty"`
+	NeedEmail                 bool                     `json:"need_email,omitempty"`
+	NeedShippingAddress       bool                     `json:"need_shipping_address,omitempty"`
+	SendPhoneNumberToProvider bool                     `json:"send_phone_number_to_provider,omitempty"`
+	SendEmailToProvider       bool                     `json:"send_email_to_provider,omitempty"`
+	IsFlexible                bool                     `json:"is_flexible,omitempty"`
+	DisableNotification       bool                     `json:"disable_notification,omitempty"`
+	ProtectContent            bool                     `json:"protect_content,omitempty"`
 	ReplyParameters           *tg.ReplyParameters      `json:"reply_parameters,omitempty"`
 	ReplyMarkup               *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
@@ -122,7 +122,7 @@ func (c *Client) SendInvoice(ctx context.Context, req SendInvoiceRequest) (*tg.M
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "sendInvoice", req, &result); err != nil {
+	if err := c.callJSON(ctx, "sendInvoice", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil

@@ -13,25 +13,25 @@ import (
 
 // Report represents a test run report.
 type Report struct {
-	RunID      string                   `json:"run_id"`
-	StartTime  time.Time                `json:"start_time"`
-	EndTime    time.Time                `json:"end_time"`
-	Duration   time.Duration            `json:"duration"`
-	Success    bool                     `json:"success"`
-	Scenarios  []*engine.ScenarioResult `json:"scenarios"`
-	Summary    Summary                  `json:"summary"`
+	RunID     string                   `json:"run_id"`
+	StartTime time.Time                `json:"start_time"`
+	EndTime   time.Time                `json:"end_time"`
+	Duration  time.Duration            `json:"duration"`
+	Success   bool                     `json:"success"`
+	Scenarios []*engine.ScenarioResult `json:"scenarios"`
+	Summary   Summary                  `json:"summary"`
 }
 
 // Summary contains aggregate statistics.
 type Summary struct {
-	TotalScenarios   int      `json:"total_scenarios"`
-	PassedScenarios  int      `json:"passed_scenarios"`
-	FailedScenarios  int      `json:"failed_scenarios"`
-	TotalSteps       int      `json:"total_steps"`
-	PassedSteps      int      `json:"passed_steps"`
-	FailedSteps      int      `json:"failed_steps"`
-	MethodsCovered   []string `json:"methods_covered"`
-	TotalDuration    string   `json:"total_duration"`
+	TotalScenarios  int      `json:"total_scenarios"`
+	PassedScenarios int      `json:"passed_scenarios"`
+	FailedScenarios int      `json:"failed_scenarios"`
+	TotalSteps      int      `json:"total_steps"`
+	PassedSteps     int      `json:"passed_steps"`
+	FailedSteps     int      `json:"failed_steps"`
+	MethodsCovered  []string `json:"methods_covered"`
+	TotalDuration   string   `json:"total_duration"`
 }
 
 // NewReport creates a new report.

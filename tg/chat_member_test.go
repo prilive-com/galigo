@@ -56,7 +56,7 @@ func TestUnmarshalChatMember_AdminFields(t *testing.T) {
 		"status":              "administrator",
 		"user":                map[string]any{"id": 456, "first_name": "Admin", "is_bot": false},
 		"can_be_edited":       true,
-		"can_delete_messages":  true,
+		"can_delete_messages": true,
 		"can_promote_members": false,
 		"can_post_messages":   canPost,
 		"custom_title":        "Mod",
@@ -77,12 +77,12 @@ func TestUnmarshalChatMember_AdminFields(t *testing.T) {
 
 func TestUnmarshalChatMember_RestrictedFields(t *testing.T) {
 	data, _ := json.Marshal(map[string]any{
-		"status":              "restricted",
-		"user":                map[string]any{"id": 789, "first_name": "Restricted", "is_bot": false},
-		"is_member":           true,
-		"can_send_messages":   false,
-		"can_send_photos":     true,
-		"until_date":          int64(1700000000),
+		"status":            "restricted",
+		"user":              map[string]any{"id": 789, "first_name": "Restricted", "is_bot": false},
+		"is_member":         true,
+		"can_send_messages": false,
+		"can_send_photos":   true,
+		"until_date":        int64(1700000000),
 	})
 
 	member, err := UnmarshalChatMember(data)

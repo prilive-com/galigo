@@ -1,0 +1,35 @@
+# galigo Code Owners
+# These owners will be automatically requested for review on PRs
+
+# Default owners for everything
+* @prilive-com/galigo-maintainers
+
+# Core packages - require maintainer review
+/sender/ @prilive-com/galigo-maintainers
+/receiver/ @prilive-com/galigo-maintainers
+/tg/ @prilive-com/galigo-maintainers
+/bot.go @prilive-com/galigo-maintainers
+
+# Security-sensitive files - require security review
+/tg/secret.go @prilive-com/galigo-maintainers
+/sender/client.go @prilive-com/galigo-maintainers
+/receiver/webhook.go @prilive-com/galigo-maintainers
+/.github/workflows/security.yml @prilive-com/galigo-maintainers
+
+# Dependencies - careful review required
+go.mod @prilive-com/galigo-maintainers
+go.sum @prilive-com/galigo-maintainers
+
+# CI/CD configuration
+/.github/ @prilive-com/galigo-maintainers
+/.golangci.yml @prilive-com/galigo-maintainers
+/Makefile @prilive-com/galigo-maintainers
+
+# Documentation can have broader review
+/docs/ @prilive-com/galigo-maintainers
+/*.md @prilive-com/galigo-maintainers
+/examples/ @prilive-com/galigo-maintainers
+
+# Test infrastructure
+/internal/testutil/ @prilive-com/galigo-maintainers
+/cmd/galigo-testbot/ @prilive-com/galigo-maintainers

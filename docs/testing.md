@@ -637,6 +637,17 @@ go run ./cmd/galigo-testbot --run webhook               # S13+S14: All webhook t
 go run ./cmd/galigo-testbot --run webhook-lifecycle      # S13: Set, verify, delete webhook
 go run ./cmd/galigo-testbot --run get-updates            # S14: Non-blocking getUpdates
 
+# Extras scenarios (S25-S32)
+go run ./cmd/galigo-testbot --run extras                 # All extras tests
+go run ./cmd/galigo-testbot --run geo                    # S25: Location
+go run ./cmd/galigo-testbot --run venue                  # S26: Venue
+go run ./cmd/galigo-testbot --run contact-dice           # S27: Contact + Dice
+go run ./cmd/galigo-testbot --run bulk                   # S28: Bulk operations
+go run ./cmd/galigo-testbot --run reactions              # S29: Reactions
+go run ./cmd/galigo-testbot --run user-info              # S30: User profile photos + boosts
+go run ./cmd/galigo-testbot --run chat-photo             # S31: Chat photo lifecycle
+go run ./cmd/galigo-testbot --run chat-permissions       # S32: Chat permissions lifecycle
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -703,6 +714,21 @@ Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "no
 
 S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 requires Telegram Premium and is excluded from `--run all`.
 
+#### Phase F: Extras (S25-S32)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S25-GeoLocation | sendLocation | GPS location |
+| S26-GeoVenue | sendVenue | Venue with title and address |
+| S27-ContactAndDice | sendContact, sendDice | Phone contact and animated dice |
+| S28-BulkOps | forwardMessages, copyMessages, deleteMessages | Bulk message operations |
+| S29-Reactions | setMessageReaction | Emoji reactions on messages |
+| S30-UserInfo | getUserProfilePhotos, getUserChatBoosts | User profile and boost info |
+| S31-ChatPhotoLifecycle | setChatPhoto, deleteChatPhoto | Chat photo save/restore with FromFileID |
+| S32-ChatPermissionsLifecycle | setChatPermissions | Permissions save/restore using tg.AllPermissions() |
+
+S31-S32 require admin with `can_change_info` / `can_restrict_members` permissions. Uses `SkipError` framework for graceful prerequisite handling.
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -722,9 +748,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **48 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **64 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-All 48 methods have acceptance test coverage. Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+All 64 methods have acceptance test coverage. Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -775,11 +801,18 @@ Each test run generates a JSON report in `var/reports/`:
 cmd/galigo-testbot/
 ├── main.go         # CLI entry, flag parsing, suite dispatch
 ├── engine/
-│   ├── scenario.go      # Scenario, Step, Runtime (AdminUserID), SenderClient interface, MediaInput
+│   ├── scenario.go      # Scenario, Step, Runtime (AdminUserID, ChatCtx), SenderClient interface
 │   ├── steps.go         # Core step implementations (GetMeStep, SendPhotoStep, etc.)
 │   ├── steps_chat_admin.go # Chat admin steps (GetChat, SetChatTitle, Pin, Polls, Forum)
 │   ├── steps_extended.go   # Extended steps (Stickers, Stars, Gifts, Checklists)
-│   ├── runner.go        # Scenario executor with timing and error handling
+│   ├── steps_geo.go        # Geo steps (SendLocation, SendVenue, SendContact)
+│   ├── steps_misc.go       # Misc steps (SendDice, SetMessageReaction, GetUserProfilePhotos, GetUserChatBoosts)
+│   ├── steps_bulk.go       # Bulk steps (SeedMessages, ForwardMessages, CopyMessages, DeleteMessages)
+│   ├── steps_chat_settings.go # Chat settings (SetChatPhoto, SetChatPermissions with save/restore)
+│   ├── errors.go        # SkipError for graceful prerequisite handling
+│   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
+│   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
+│   ├── runner.go        # Scenario executor with timing, error handling, skip support
 │   └── adapter.go       # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
 │   ├── tier1.go       # Phase A scenarios (S0-S5)
@@ -790,6 +823,7 @@ cmd/galigo-testbot/
 │   ├── stars.go       # Phase E: Stars + Invoice (S21-S22)
 │   ├── gifts.go       # Phase E: Gifts (S23)
 │   ├── checklists.go  # Phase E: Checklists (S24, Premium)
+│   ├── extras.go      # Phase F: Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
@@ -797,7 +831,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking
+├── registry/       # Target method list and coverage checking (64 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

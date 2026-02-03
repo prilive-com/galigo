@@ -15,10 +15,11 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 	"github.com/sony/gobreaker/v2"
 	"golang.org/x/time/rate"
@@ -80,25 +81,26 @@ func (realSleeper) Sleep(ctx context.Context, d time.Duration) error {
 
 // Client is the main sender client for Telegram Bot API.
 type Client struct {
-	config         Config
-	httpClient     *http.Client
-	logger         *slog.Logger
-	globalLimiter  *rate.Limiter
-	chatLimiters   map[string]*chatLimiterEntry // P1.2: Track last used time
-	limiterMu      sync.RWMutex
-	breaker        *gobreaker.CircuitBreaker[*apiResponse]
+	config          Config
+	httpClient      *http.Client
+	logger          *slog.Logger
+	globalLimiter   *rate.Limiter
+	chatLimiters    map[string]*chatLimiterEntry // P1.2: Track last used time
+	limiterMu       sync.RWMutex
+	breaker         *gobreaker.CircuitBreaker[*apiResponse]
 	breakerSettings CircuitBreakerSettings
-	sleeper        Sleeper // For testing retry logic
+	sleeper         Sleeper // For testing retry logic
 
 	// P1.2: Cleanup
 	cleanupTicker *time.Ticker
 	cleanupDone   chan struct{}
 }
 
-// chatLimiterEntry wraps a rate limiter with last used timestamp
+// chatLimiterEntry wraps a rate limiter with last used timestamp.
+// lastUsed uses atomic.Int64 (Unix nanos) to avoid write-lock contention on the hot path.
 type chatLimiterEntry struct {
 	limiter  *rate.Limiter
-	lastUsed time.Time
+	lastUsed atomic.Int64 // UnixNano timestamp
 }
 
 type apiResponse struct {
@@ -170,6 +172,15 @@ func WithPerChatRateLimit(rps float64, burst int) Option {
 	}
 }
 
+// WithGroupRateLimit sets the per-chat rate limit for group chats (negative chat IDs).
+// Telegram limits groups to ~20 messages/minute. Default: 0.33 RPS, burst 2.
+func WithGroupRateLimit(rps float64, burst int) Option {
+	return func(c *Client) {
+		c.config.GroupRPS = rps
+		c.config.GroupBurst = burst
+	}
+}
+
 // WithCircuitBreakerSettings configures the circuit breaker.
 func WithCircuitBreakerSettings(settings CircuitBreakerSettings) Option {
 	return func(c *Client) {
@@ -189,7 +200,7 @@ func createHTTPClient(cfg Config) *http.Client {
 			MaxIdleConns:          cfg.MaxIdleConns,
 			IdleConnTimeout:       cfg.IdleTimeout,
 			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: cfg.RequestTimeout,
+			ResponseHeaderTimeout: 10 * time.Second, // Time to receive response headers; shorter than total timeout
 			ForceAttemptHTTP2:     true,
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
@@ -244,11 +255,11 @@ func New(token string, opts ...Option) (*Client, error) {
 
 	// Circuit breaker
 	c.breaker = gobreaker.NewCircuitBreaker[*apiResponse](gobreaker.Settings{
-		Name:        "galigo-sender",
-		MaxRequests: c.breakerSettings.MaxRequests,
-		Interval:    c.breakerSettings.Interval,
-		Timeout:     c.breakerSettings.Timeout,
-		ReadyToTrip: c.breakerSettings.ReadyToTrip,
+		Name:         "galigo-sender",
+		MaxRequests:  c.breakerSettings.MaxRequests,
+		Interval:     c.breakerSettings.Interval,
+		Timeout:      c.breakerSettings.Timeout,
+		ReadyToTrip:  c.breakerSettings.ReadyToTrip,
 		IsSuccessful: isBreakerSuccess,
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			c.logger.Info("circuit breaker state changed",
@@ -304,11 +315,11 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 	}
 
 	c.breaker = gobreaker.NewCircuitBreaker[*apiResponse](gobreaker.Settings{
-		Name:        "galigo-sender",
-		MaxRequests: c.breakerSettings.MaxRequests,
-		Interval:    c.breakerSettings.Interval,
-		Timeout:     c.breakerSettings.Timeout,
-		ReadyToTrip: c.breakerSettings.ReadyToTrip,
+		Name:         "galigo-sender",
+		MaxRequests:  c.breakerSettings.MaxRequests,
+		Interval:     c.breakerSettings.Interval,
+		Timeout:      c.breakerSettings.Timeout,
+		ReadyToTrip:  c.breakerSettings.ReadyToTrip,
 		IsSuccessful: isBreakerSuccess,
 	})
 
@@ -358,9 +369,9 @@ func (c *Client) cleanupStaleLimiters() {
 	c.limiterMu.Lock()
 	defer c.limiterMu.Unlock()
 
-	threshold := time.Now().Add(-10 * time.Minute)
+	threshold := time.Now().Add(-10 * time.Minute).UnixNano()
 	for chatID, entry := range c.chatLimiters {
-		if entry.lastUsed.Before(threshold) {
+		if entry.lastUsed.Load() < threshold {
 			delete(c.chatLimiters, chatID)
 		}
 	}
@@ -376,6 +387,9 @@ func (c *Client) ChatLimiterCount() int {
 
 // SendMessage sends a text message.
 func (c *Client) SendMessage(ctx context.Context, req SendMessageRequest) (*tg.Message, error) {
+	if err := validateChatID(req.ChatID); err != nil {
+		return nil, err
+	}
 	return withRetry(c, ctx, req.ChatID, func() (*tg.Message, error) {
 		return c.sendMessageOnce(ctx, req)
 	})
@@ -383,6 +397,9 @@ func (c *Client) SendMessage(ctx context.Context, req SendMessageRequest) (*tg.M
 
 // SendPhoto sends a photo.
 func (c *Client) SendPhoto(ctx context.Context, req SendPhotoRequest) (*tg.Message, error) {
+	if err := validateChatID(req.ChatID); err != nil {
+		return nil, err
+	}
 	return withRetry(c, ctx, req.ChatID, func() (*tg.Message, error) {
 		return c.sendPhotoOnce(ctx, req)
 	})
@@ -390,7 +407,7 @@ func (c *Client) SendPhoto(ctx context.Context, req SendPhotoRequest) (*tg.Messa
 
 // EditMessageText edits message text.
 func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "editMessageText", req)
+	resp, err := c.executeRequest(ctx, "editMessageText", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +416,7 @@ func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest
 
 // EditMessageCaption edits message caption.
 func (c *Client) EditMessageCaption(ctx context.Context, req EditMessageCaptionRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "editMessageCaption", req)
+	resp, err := c.executeRequest(ctx, "editMessageCaption", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +425,7 @@ func (c *Client) EditMessageCaption(ctx context.Context, req EditMessageCaptionR
 
 // EditMessageReplyMarkup edits message reply markup.
 func (c *Client) EditMessageReplyMarkup(ctx context.Context, req EditMessageReplyMarkupRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "editMessageReplyMarkup", req)
+	resp, err := c.executeRequest(ctx, "editMessageReplyMarkup", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +434,7 @@ func (c *Client) EditMessageReplyMarkup(ctx context.Context, req EditMessageRepl
 
 // EditMessageMedia edits the media content of a message.
 func (c *Client) EditMessageMedia(ctx context.Context, req EditMessageMediaRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "editMessageMedia", req)
+	resp, err := c.executeRequest(ctx, "editMessageMedia", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -426,13 +443,13 @@ func (c *Client) EditMessageMedia(ctx context.Context, req EditMessageMediaReque
 
 // DeleteMessage deletes a message.
 func (c *Client) DeleteMessage(ctx context.Context, req DeleteMessageRequest) error {
-	_, err := c.executeRequest(ctx, "deleteMessage", req)
+	_, err := c.executeRequest(ctx, "deleteMessage", req, extractChatID(req.ChatID))
 	return err
 }
 
 // ForwardMessage forwards a message.
 func (c *Client) ForwardMessage(ctx context.Context, req ForwardMessageRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "forwardMessage", req)
+	resp, err := c.executeRequest(ctx, "forwardMessage", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +458,7 @@ func (c *Client) ForwardMessage(ctx context.Context, req ForwardMessageRequest) 
 
 // CopyMessage copies a message.
 func (c *Client) CopyMessage(ctx context.Context, req CopyMessageRequest) (*tg.MessageID, error) {
-	resp, err := c.executeRequest(ctx, "copyMessage", req)
+	resp, err := c.executeRequest(ctx, "copyMessage", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -547,50 +564,34 @@ func (c *Client) Acknowledge(ctx context.Context, cb *tg.CallbackQuery) error {
 // Internal methods
 
 func (c *Client) sendMessageOnce(ctx context.Context, req SendMessageRequest) (*tg.Message, error) {
-	chatID := extractChatID(req.ChatID)
-	if err := c.waitForRateLimit(ctx, chatID); err != nil {
-		// Return context errors directly (Canceled, DeadlineExceeded)
-		// ErrRateLimited is reserved for Telegram 429 responses
-		return nil, err
-	}
-
-	resp, err := c.breaker.Execute(func() (*apiResponse, error) {
-		return c.doRequest(ctx, "sendMessage", req)
-	})
-
+	resp, err := c.executeRequest(ctx, "sendMessage", req, extractChatID(req.ChatID))
 	if err != nil {
 		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
 			return nil, fmt.Errorf("%w: %v", ErrCircuitOpen, err)
 		}
 		return nil, err
 	}
-
 	return parseMessage(resp)
 }
 
 func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.Message, error) {
-	chatID := extractChatID(req.ChatID)
-	if err := c.waitForRateLimit(ctx, chatID); err != nil {
-		// Return context errors directly (Canceled, DeadlineExceeded)
-		// ErrRateLimited is reserved for Telegram 429 responses
-		return nil, err
-	}
-
-	resp, err := c.breaker.Execute(func() (*apiResponse, error) {
-		return c.doRequest(ctx, "sendPhoto", req)
-	})
-
+	resp, err := c.executeRequest(ctx, "sendPhoto", req, extractChatID(req.ChatID))
 	if err != nil {
 		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
 			return nil, fmt.Errorf("%w: %v", ErrCircuitOpen, err)
 		}
 		return nil, err
 	}
-
 	return parseMessage(resp)
 }
 
-func (c *Client) executeRequest(ctx context.Context, method string, payload any) (*apiResponse, error) {
+func (c *Client) executeRequest(ctx context.Context, method string, payload any, chatIDs ...string) (*apiResponse, error) {
+	// Apply rate limiting if a chatID is provided
+	if len(chatIDs) > 0 && chatIDs[0] != "" {
+		if err := c.waitForRateLimit(ctx, chatIDs[0]); err != nil {
+			return nil, err
+		}
+	}
 	return c.breaker.Execute(func() (*apiResponse, error) {
 		return c.doRequest(ctx, method, payload)
 	})
@@ -651,7 +652,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", scrubTokenFromError(err, c.config.Token))
+		return nil, fmt.Errorf("request failed: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 	defer resp.Body.Close()
 
@@ -692,17 +693,14 @@ func (c *Client) waitForRateLimit(ctx context.Context, chatID string) error {
 }
 
 func (c *Client) getChatLimiter(chatID string) *rate.Limiter {
-	now := time.Now()
+	now := time.Now().UnixNano()
 
 	c.limiterMu.RLock()
 	entry, exists := c.chatLimiters[chatID]
 	c.limiterMu.RUnlock()
 
 	if exists {
-		// Update last used time (P1.2)
-		c.limiterMu.Lock()
-		entry.lastUsed = now
-		c.limiterMu.Unlock()
+		entry.lastUsed.Store(now) // Lock-free atomic update
 		return entry.limiter
 	}
 
@@ -711,15 +709,44 @@ func (c *Client) getChatLimiter(chatID string) *rate.Limiter {
 
 	// Double-check after acquiring write lock
 	if entry, exists = c.chatLimiters[chatID]; exists {
-		entry.lastUsed = now
+		entry.lastUsed.Store(now)
 		return entry.limiter
+	}
+
+	// Use lower rate for group chats (negative numeric IDs)
+	rps := c.config.PerChatRPS
+	burst := c.config.PerChatBurst
+	if c.config.GroupRPS > 0 {
+		if id, err := strconv.ParseInt(chatID, 10, 64); err == nil && id < 0 {
+			rps = c.config.GroupRPS
+			burst = c.config.GroupBurst
+		}
+	}
+
+	// Evict oldest if at capacity
+	maxLimiters := c.config.MaxChatLimiters
+	if maxLimiters <= 0 {
+		maxLimiters = 10000
+	}
+	if len(c.chatLimiters) >= maxLimiters {
+		var oldestKey string
+		var oldestTime int64 = now
+		for k, e := range c.chatLimiters {
+			if t := e.lastUsed.Load(); t < oldestTime {
+				oldestTime = t
+				oldestKey = k
+			}
+		}
+		if oldestKey != "" {
+			delete(c.chatLimiters, oldestKey)
+		}
 	}
 
 	// Create new entry with limiter
 	entry = &chatLimiterEntry{
-		limiter:  rate.NewLimiter(rate.Limit(c.config.PerChatRPS), c.config.PerChatBurst),
-		lastUsed: now,
+		limiter: rate.NewLimiter(rate.Limit(rps), burst),
 	}
+	entry.lastUsed.Store(now)
 	c.chatLimiters[chatID] = entry
 	return entry.limiter
 }
@@ -825,20 +852,18 @@ func parseMessage(resp *apiResponse) (*tg.Message, error) {
 }
 
 // isBreakerSuccess determines if an error should count as a circuit breaker failure.
-// Only server errors (5xx), 429 (rate limit), and network errors trip the breaker.
-// Client errors (4xx except 429) are NOT breaker failures — they indicate caller
-// mistakes, not service degradation.
+// Only server errors (5xx) and network errors trip the breaker.
+// Client errors (4xx) including 429 are NOT breaker failures.
+// 429 is rate pressure (self-inflicted), not service degradation — handle via retry_after.
 func isBreakerSuccess(err error) bool {
 	if err == nil {
 		return true
 	}
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
-		// 429 = rate limited, treat as server-side pressure → trip breaker
-		if apiErr.Code == 429 {
-			return false
-		}
-		// Other 4xx = client error, not a server problem → don't trip breaker
+		// All 4xx = client-side issues, don't trip breaker.
+		// 429 = rate limited — handle via retry_after, not breaker.
+		// 5xx = server failure → trip breaker.
 		return apiErr.Code >= 400 && apiErr.Code < 500
 	}
 	// Context cancellation is not a service failure
@@ -847,33 +872,6 @@ func isBreakerSuccess(err error) bool {
 	}
 	// Network errors, timeouts → breaker failure
 	return false
-}
-
-// scrubbedError wraps an error with a token-scrubbed message while preserving the error chain.
-type scrubbedError struct {
-	msg string
-	err error
-}
-
-func (e *scrubbedError) Error() string { return e.msg }
-func (e *scrubbedError) Unwrap() error { return e.err }
-
-// scrubTokenFromError removes the bot token from error messages.
-// Go's http.Client.Do() includes the request URL (containing the token) in error strings.
-// Preserves the error chain for errors.Is/As.
-func scrubTokenFromError(err error, token tg.SecretToken) error {
-	if err == nil {
-		return nil
-	}
-	msg := err.Error()
-	tokenVal := token.Value()
-	if tokenVal != "" && strings.Contains(msg, tokenVal) {
-		return &scrubbedError{
-			msg: strings.ReplaceAll(msg, tokenVal, "[REDACTED]"),
-			err: err,
-		}
-	}
-	return err
 }
 
 // parseRetryAfter extracts retry_after from JSON body (primary) or HTTP header (fallback).

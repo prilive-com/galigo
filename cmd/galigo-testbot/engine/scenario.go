@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/prilive-com/galigo/sender"
@@ -58,6 +59,8 @@ type ScenarioResult struct {
 	EndTime      time.Time     `json:"end_time"`
 	Duration     time.Duration `json:"duration"`
 	Success      bool          `json:"success"`
+	Skipped      bool          `json:"skipped,omitempty"`
+	SkipReason   string        `json:"skip_reason,omitempty"`
 	Error        string        `json:"error,omitempty"`
 	Steps        []StepResult  `json:"steps"`
 }
@@ -66,6 +69,33 @@ type ScenarioResult struct {
 type CreatedMessage struct {
 	ChatID    int64
 	MessageID int
+}
+
+// ChatContext holds probed chat capabilities.
+type ChatContext struct {
+	ChatID   int64
+	ChatType string // "private", "group", "supergroup", "channel"
+	IsForum  bool
+
+	// Bot capabilities (probed via getChatMember)
+	BotIsAdmin         bool
+	CanChangeInfo      bool
+	CanDeleteMessages  bool
+	CanRestrictMembers bool
+	CanPinMessages     bool
+	CanManageTopics    bool
+	CanInviteUsers     bool
+}
+
+// ChatPhotoSnapshot stores state for restore.
+type ChatPhotoSnapshot struct {
+	HadPhoto bool
+	FileID   string // BigFileID for restore via FromFileID
+}
+
+// PermissionsSnapshot stores permissions for restore.
+type PermissionsSnapshot struct {
+	Permissions *tg.ChatPermissions
 }
 
 // Runtime provides context for step execution.
@@ -80,8 +110,20 @@ type Runtime struct {
 	CreatedMessages    []CreatedMessage
 	LastMessage        *tg.Message
 	LastMessageID      *tg.MessageID
+	BulkMessageIDs     []int             // For bulk operations
 	CapturedFileIDs    map[string]string // name -> file_id for reuse
 	CreatedStickerSets []string          // sticker set names to clean up
+
+	// Probed capabilities
+	ChatCtx *ChatContext
+
+	// Snapshots for save/restore
+	OriginalChatPhoto   *ChatPhotoSnapshot
+	OriginalPermissions *PermissionsSnapshot
+
+	// Optional chat IDs from config
+	ForumChatID int64
+	TestUserID  int64
 
 	// CallbackChan receives callback queries from polling (interactive scenarios only).
 	CallbackChan chan *tg.CallbackQuery
@@ -97,6 +139,59 @@ func NewRuntime(sender SenderClient, chatID int64, adminUserID int64) *Runtime {
 		CapturedFileIDs:    make(map[string]string),
 		CreatedStickerSets: make([]string, 0),
 	}
+}
+
+// ProbeChat discovers chat capabilities by calling getChat and getChatMember.
+func (rt *Runtime) ProbeChat(ctx context.Context) error {
+	chat, err := rt.Sender.GetChat(ctx, rt.ChatID)
+	if err != nil {
+		return fmt.Errorf("probeChat: %w", err)
+	}
+
+	rt.ChatCtx = &ChatContext{
+		ChatID:   chat.ID,
+		ChatType: chat.Type,
+		IsForum:  chat.IsForum,
+	}
+
+	me, err := rt.Sender.GetMe(ctx)
+	if err != nil {
+		return fmt.Errorf("probeChat getMe: %w", err)
+	}
+
+	member, err := rt.Sender.GetChatMember(ctx, rt.ChatID, me.ID)
+	if err != nil {
+		// Not a member or can't query — that's OK, just not admin
+		return nil
+	}
+
+	status := member.Status()
+	if status == "creator" {
+		rt.ChatCtx.BotIsAdmin = true
+		rt.ChatCtx.CanChangeInfo = true
+		rt.ChatCtx.CanDeleteMessages = true
+		rt.ChatCtx.CanRestrictMembers = true
+		rt.ChatCtx.CanPinMessages = true
+		rt.ChatCtx.CanManageTopics = true
+		rt.ChatCtx.CanInviteUsers = true
+	} else if status == "administrator" {
+		rt.ChatCtx.BotIsAdmin = true
+		if admin, ok := member.(*tg.ChatMemberAdministrator); ok {
+			rt.ChatCtx.CanChangeInfo = admin.CanChangeInfo
+			rt.ChatCtx.CanDeleteMessages = admin.CanDeleteMessages
+			rt.ChatCtx.CanRestrictMembers = admin.CanRestrictMembers
+			rt.ChatCtx.CanInviteUsers = admin.CanInviteUsers
+			// Pointer fields — dereference safely
+			if admin.CanPinMessages != nil {
+				rt.ChatCtx.CanPinMessages = *admin.CanPinMessages
+			}
+			if admin.CanManageTopics != nil {
+				rt.ChatCtx.CanManageTopics = *admin.CanManageTopics
+			}
+		}
+	}
+
+	return nil
 }
 
 // TrackMessage adds a message to the cleanup list.
@@ -186,6 +281,27 @@ type SenderClient interface {
 	// Extended: Checklists
 	SendChecklist(ctx context.Context, chatID int64, title string, tasks []string) (*tg.Message, error)
 	EditChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error)
+
+	// Geo & Contact
+	SendLocation(ctx context.Context, chatID int64, lat, lon float64) (*tg.Message, error)
+	SendVenue(ctx context.Context, chatID int64, lat, lon float64, title, address string) (*tg.Message, error)
+	SendContact(ctx context.Context, chatID int64, phone, firstName, lastName string) (*tg.Message, error)
+	SendDice(ctx context.Context, chatID int64, emoji string) (*tg.Message, error)
+
+	// Reactions & User info
+	SetMessageReaction(ctx context.Context, chatID int64, messageID int, emoji string, isBig bool) error
+	GetUserProfilePhotos(ctx context.Context, userID int64) (*tg.UserProfilePhotos, error)
+	GetUserChatBoosts(ctx context.Context, chatID, userID int64) (*tg.UserChatBoosts, error)
+
+	// Bulk operations
+	ForwardMessages(ctx context.Context, chatID, fromChatID int64, messageIDs []int) ([]tg.MessageID, error)
+	CopyMessages(ctx context.Context, chatID, fromChatID int64, messageIDs []int) ([]tg.MessageID, error)
+	DeleteMessages(ctx context.Context, chatID int64, messageIDs []int) error
+
+	// Chat settings
+	SetChatPhoto(ctx context.Context, chatID int64, photo sender.InputFile) error
+	DeleteChatPhoto(ctx context.Context, chatID int64) error
+	SetChatPermissions(ctx context.Context, chatID int64, perms tg.ChatPermissions) error
 
 	// Webhook management methods
 	SetWebhook(ctx context.Context, url string) error

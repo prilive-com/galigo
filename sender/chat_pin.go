@@ -51,7 +51,7 @@ func (c *Client) PinChatMessage(ctx context.Context, chatID tg.ChatID, messageID
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "pinChatMessage", req, nil)
+	return c.callJSON(ctx, "pinChatMessage", req, nil, extractChatID(chatID))
 }
 
 // UnpinChatMessage unpins a message in a chat.
@@ -66,7 +66,7 @@ func (c *Client) UnpinChatMessage(ctx context.Context, chatID tg.ChatID, message
 		req.MessageID = &messageID
 	}
 
-	return c.callJSON(ctx, "unpinChatMessage", req, nil)
+	return c.callJSON(ctx, "unpinChatMessage", req, nil, extractChatID(chatID))
 }
 
 // UnpinAllChatMessages unpins all pinned messages in a chat.
@@ -77,7 +77,7 @@ func (c *Client) UnpinAllChatMessages(ctx context.Context, chatID tg.ChatID) err
 
 	return c.callJSON(ctx, "unpinAllChatMessages", UnpinAllChatMessagesRequest{
 		ChatID: chatID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // LeaveChat makes the bot leave a group, supergroup, or channel.
@@ -88,7 +88,7 @@ func (c *Client) LeaveChat(ctx context.Context, chatID tg.ChatID) error {
 
 	return c.callJSON(ctx, "leaveChat", LeaveChatRequest{
 		ChatID: chatID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // ================== Options ==================

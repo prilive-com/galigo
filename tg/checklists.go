@@ -5,7 +5,7 @@ type InputChecklist struct {
 	Title                    string               `json:"title"`
 	ParseMode                string               `json:"parse_mode,omitempty"`
 	TitleEntities            []MessageEntity      `json:"title_entities,omitempty"`
-	Tasks                    []InputChecklistTask  `json:"tasks"`
+	Tasks                    []InputChecklistTask `json:"tasks"`
 	OthersCanAddTasks        bool                 `json:"others_can_add_tasks,omitempty"`
 	OthersCanMarkTasksAsDone bool                 `json:"others_can_mark_tasks_as_done,omitempty"`
 }

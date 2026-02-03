@@ -10,8 +10,8 @@ import (
 
 // SetPassportDataErrorsRequest represents a setPassportDataErrors request.
 type SetPassportDataErrorsRequest struct {
-	UserID int64                      `json:"user_id"`
-	Errors []tg.PassportElementError  `json:"errors"`
+	UserID int64                     `json:"user_id"`
+	Errors []tg.PassportElementError `json:"errors"`
 }
 
 // VerifyUserRequest represents a verifyUser request.
@@ -65,7 +65,7 @@ func (c *Client) VerifyChat(ctx context.Context, req VerifyChatRequest) error {
 		return err
 	}
 
-	return c.callJSON(ctx, "verifyChat", req, nil)
+	return c.callJSON(ctx, "verifyChat", req, nil, extractChatID(req.ChatID))
 }
 
 // RemoveUserVerification removes verification from a previously verified user.
@@ -83,5 +83,5 @@ func (c *Client) RemoveChatVerification(ctx context.Context, chatID tg.ChatID) e
 		return err
 	}
 
-	return c.callJSON(ctx, "removeChatVerification", RemoveChatVerificationRequest{ChatID: chatID}, nil)
+	return c.callJSON(ctx, "removeChatVerification", RemoveChatVerificationRequest{ChatID: chatID}, nil, extractChatID(chatID))
 }

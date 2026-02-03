@@ -49,8 +49,8 @@ type ChatBoostSourcePremium struct {
 	User   User   `json:"user"`
 }
 
-func (ChatBoostSourcePremium) chatBoostSourceTag()        {}
-func (ChatBoostSourcePremium) GetSource() string          { return "premium" }
+func (ChatBoostSourcePremium) chatBoostSourceTag() {}
+func (ChatBoostSourcePremium) GetSource() string   { return "premium" }
 
 // ChatBoostSourceGiftCode represents a boost from a gift code.
 type ChatBoostSourceGiftCode struct {
@@ -58,8 +58,8 @@ type ChatBoostSourceGiftCode struct {
 	User   User   `json:"user"`
 }
 
-func (ChatBoostSourceGiftCode) chatBoostSourceTag()        {}
-func (ChatBoostSourceGiftCode) GetSource() string          { return "gift_code" }
+func (ChatBoostSourceGiftCode) chatBoostSourceTag() {}
+func (ChatBoostSourceGiftCode) GetSource() string   { return "gift_code" }
 
 // ChatBoostSourceGiveaway represents a boost from a giveaway.
 type ChatBoostSourceGiveaway struct {
@@ -70,8 +70,8 @@ type ChatBoostSourceGiveaway struct {
 	IsUnclaimed       bool   `json:"is_unclaimed,omitempty"`
 }
 
-func (ChatBoostSourceGiveaway) chatBoostSourceTag()        {}
-func (ChatBoostSourceGiveaway) GetSource() string          { return "giveaway" }
+func (ChatBoostSourceGiveaway) chatBoostSourceTag() {}
+func (ChatBoostSourceGiveaway) GetSource() string   { return "giveaway" }
 
 // ChatBoostSourceUnknown is a fallback for future boost source types.
 type ChatBoostSourceUnknown struct {
@@ -79,8 +79,8 @@ type ChatBoostSourceUnknown struct {
 	Raw    json.RawMessage `json:"-"`
 }
 
-func (ChatBoostSourceUnknown) chatBoostSourceTag()        {}
-func (s ChatBoostSourceUnknown) GetSource() string        { return s.Source }
+func (ChatBoostSourceUnknown) chatBoostSourceTag() {}
+func (s ChatBoostSourceUnknown) GetSource() string { return s.Source }
 
 // unmarshalChatBoostSource decodes a ChatBoostSource from JSON.
 // Returns ChatBoostSourceUnknown on any error.

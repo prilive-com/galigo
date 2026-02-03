@@ -109,10 +109,10 @@ type OrderInfo struct {
 
 // PollAnswer represents an answer of a user in a non-anonymous poll.
 type PollAnswer struct {
-	PollID    string  `json:"poll_id"`
-	VoterChat *Chat   `json:"voter_chat,omitempty"`
-	User      *User   `json:"user,omitempty"`
-	OptionIDs []int   `json:"option_ids"`
+	PollID    string `json:"poll_id"`
+	VoterChat *Chat  `json:"voter_chat,omitempty"`
+	User      *User  `json:"user,omitempty"`
+	OptionIDs []int  `json:"option_ids"`
 }
 
 // ChatMemberUpdated represents changes in the status of a chat member.

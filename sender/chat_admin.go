@@ -56,7 +56,7 @@ func (c *Client) PromoteChatMember(ctx context.Context, chatID tg.ChatID, userID
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "promoteChatMember", req, nil)
+	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
 }
 
 // PromoteChatMemberWithRights promotes a user with the given rights.
@@ -89,7 +89,7 @@ func (c *Client) PromoteChatMemberWithRights(ctx context.Context, chatID tg.Chat
 		CanManageTopics:     rights.CanManageTopics,
 	}
 
-	return c.callJSON(ctx, "promoteChatMember", req, nil)
+	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
 }
 
 // DemoteChatMember removes all admin privileges from a user.
@@ -117,7 +117,7 @@ func (c *Client) DemoteChatMember(ctx context.Context, chatID tg.ChatID, userID 
 		CanPinMessages:      &f,
 	}
 
-	return c.callJSON(ctx, "promoteChatMember", req, nil)
+	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
 }
 
 // SetChatAdministratorCustomTitle sets a custom title for an administrator.
@@ -137,7 +137,7 @@ func (c *Client) SetChatAdministratorCustomTitle(ctx context.Context, chatID tg.
 		ChatID:      chatID,
 		UserID:      userID,
 		CustomTitle: customTitle,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // ================== Options ==================

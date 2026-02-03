@@ -65,7 +65,7 @@ func (c *Client) BanChatMember(ctx context.Context, chatID tg.ChatID, userID int
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "banChatMember", req, nil)
+	return c.callJSON(ctx, "banChatMember", req, nil, extractChatID(chatID))
 }
 
 // UnbanChatMember unbans a previously banned user in a supergroup or channel.
@@ -85,7 +85,7 @@ func (c *Client) UnbanChatMember(ctx context.Context, chatID tg.ChatID, userID i
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "unbanChatMember", req, nil)
+	return c.callJSON(ctx, "unbanChatMember", req, nil, extractChatID(chatID))
 }
 
 // RestrictChatMember restricts a user in a supergroup.
@@ -107,7 +107,7 @@ func (c *Client) RestrictChatMember(ctx context.Context, chatID tg.ChatID, userI
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "restrictChatMember", req, nil)
+	return c.callJSON(ctx, "restrictChatMember", req, nil, extractChatID(chatID))
 }
 
 // BanChatSenderChat bans a channel chat in a supergroup or channel.
@@ -119,7 +119,7 @@ func (c *Client) BanChatSenderChat(ctx context.Context, chatID tg.ChatID, sender
 	return c.callJSON(ctx, "banChatSenderChat", BanChatSenderChatRequest{
 		ChatID:       chatID,
 		SenderChatID: senderChatID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // UnbanChatSenderChat unbans a previously banned channel chat.
@@ -131,7 +131,7 @@ func (c *Client) UnbanChatSenderChat(ctx context.Context, chatID tg.ChatID, send
 	return c.callJSON(ctx, "unbanChatSenderChat", UnbanChatSenderChatRequest{
 		ChatID:       chatID,
 		SenderChatID: senderChatID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // ================== Options ==================

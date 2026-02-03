@@ -41,7 +41,7 @@ func (c *Client) CloseBot(ctx context.Context) error {
 
 // SendDocument sends a document.
 func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendDocument", req)
+	resp, err := c.executeRequest(ctx, "sendDocument", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg
 
 // SendVideo sends a video.
 func (c *Client) SendVideo(ctx context.Context, req SendVideoRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendVideo", req)
+	resp, err := c.executeRequest(ctx, "sendVideo", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (c *Client) SendVideo(ctx context.Context, req SendVideoRequest) (*tg.Messa
 
 // SendAudio sends an audio file.
 func (c *Client) SendAudio(ctx context.Context, req SendAudioRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendAudio", req)
+	resp, err := c.executeRequest(ctx, "sendAudio", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *Client) SendAudio(ctx context.Context, req SendAudioRequest) (*tg.Messa
 
 // SendVoice sends a voice message.
 func (c *Client) SendVoice(ctx context.Context, req SendVoiceRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendVoice", req)
+	resp, err := c.executeRequest(ctx, "sendVoice", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (c *Client) SendVoice(ctx context.Context, req SendVoiceRequest) (*tg.Messa
 
 // SendAnimation sends an animation (GIF or H.264/MPEG-4 AVC video without sound).
 func (c *Client) SendAnimation(ctx context.Context, req SendAnimationRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendAnimation", req)
+	resp, err := c.executeRequest(ctx, "sendAnimation", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *Client) SendAnimation(ctx context.Context, req SendAnimationRequest) (*
 
 // SendVideoNote sends a video note (round video up to 1 minute).
 func (c *Client) SendVideoNote(ctx context.Context, req SendVideoNoteRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendVideoNote", req)
+	resp, err := c.executeRequest(ctx, "sendVideoNote", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (c *Client) SendVideoNote(ctx context.Context, req SendVideoNoteRequest) (*
 
 // SendSticker sends a sticker.
 func (c *Client) SendSticker(ctx context.Context, req SendStickerRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendSticker", req)
+	resp, err := c.executeRequest(ctx, "sendSticker", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (c *Client) SendSticker(ctx context.Context, req SendStickerRequest) (*tg.M
 
 // SendMediaGroup sends a group of photos, videos, documents or audios as an album.
 func (c *Client) SendMediaGroup(ctx context.Context, req SendMediaGroupRequest) ([]*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendMediaGroup", req)
+	resp, err := c.executeRequest(ctx, "sendMediaGroup", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (c *Client) SendChatAction(ctx context.Context, chatID tg.ChatID, action st
 	_, err := c.executeRequest(ctx, "sendChatAction", SendChatActionRequest{
 		ChatID: chatID,
 		Action: action,
-	})
+	}, extractChatID(chatID))
 	return err
 }
 
@@ -160,7 +160,7 @@ func (c *Client) GetUserProfilePhotos(ctx context.Context, userID int64, opts ..
 
 // SendLocation sends a location.
 func (c *Client) SendLocation(ctx context.Context, req SendLocationRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendLocation", req)
+	resp, err := c.executeRequest(ctx, "sendLocation", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (c *Client) SendLocation(ctx context.Context, req SendLocationRequest) (*tg
 
 // SendVenue sends a venue.
 func (c *Client) SendVenue(ctx context.Context, req SendVenueRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendVenue", req)
+	resp, err := c.executeRequest(ctx, "sendVenue", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (c *Client) SendVenue(ctx context.Context, req SendVenueRequest) (*tg.Messa
 
 // SendContact sends a phone contact.
 func (c *Client) SendContact(ctx context.Context, req SendContactRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendContact", req)
+	resp, err := c.executeRequest(ctx, "sendContact", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (c *Client) SendContact(ctx context.Context, req SendContactRequest) (*tg.M
 
 // SendPoll sends a native poll.
 func (c *Client) SendPoll(ctx context.Context, req SendPollRequest) (*tg.Message, error) {
-	resp, err := c.executeRequest(ctx, "sendPoll", req)
+	resp, err := c.executeRequest(ctx, "sendPoll", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (c *Client) SendDice(ctx context.Context, chatID tg.ChatID, opts ...SendDic
 	for _, opt := range opts {
 		opt(&req)
 	}
-	resp, err := c.executeRequest(ctx, "sendDice", req)
+	resp, err := c.executeRequest(ctx, "sendDice", req, extractChatID(chatID))
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (c *Client) SendDice(ctx context.Context, chatID tg.ChatID, opts ...SendDic
 
 // ForwardMessages forwards multiple messages at once.
 func (c *Client) ForwardMessages(ctx context.Context, req ForwardMessagesRequest) ([]tg.MessageID, error) {
-	resp, err := c.executeRequest(ctx, "forwardMessages", req)
+	resp, err := c.executeRequest(ctx, "forwardMessages", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *Client) ForwardMessages(ctx context.Context, req ForwardMessagesRequest
 
 // CopyMessages copies multiple messages at once.
 func (c *Client) CopyMessages(ctx context.Context, req CopyMessagesRequest) ([]tg.MessageID, error) {
-	resp, err := c.executeRequest(ctx, "copyMessages", req)
+	resp, err := c.executeRequest(ctx, "copyMessages", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
@@ -240,13 +240,13 @@ func (c *Client) DeleteMessages(ctx context.Context, chatID tg.ChatID, messageID
 	_, err := c.executeRequest(ctx, "deleteMessages", DeleteMessagesRequest{
 		ChatID:     chatID,
 		MessageIDs: messageIDs,
-	})
+	}, extractChatID(chatID))
 	return err
 }
 
 // SetMessageReaction sets a reaction on a message.
 func (c *Client) SetMessageReaction(ctx context.Context, req SetMessageReactionRequest) error {
-	_, err := c.executeRequest(ctx, "setMessageReaction", req)
+	_, err := c.executeRequest(ctx, "setMessageReaction", req, extractChatID(req.ChatID))
 	return err
 }
 

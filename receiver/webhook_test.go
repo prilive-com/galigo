@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/prilive-com/galigo/receiver"
 	"github.com/prilive-com/galigo/tg"
@@ -209,9 +210,15 @@ func TestWebhook_ValidUpdate_ForwardsToChannel(t *testing.T) {
 	assert.Equal(t, "Hello", received.Message.Text)
 }
 
-func TestWebhook_ChannelFull_Returns503(t *testing.T) {
+func TestWebhook_ChannelFull_DropNewest_Returns200(t *testing.T) {
 	updates := make(chan tg.Update) // Unbuffered channel - will block
-	handler := receiver.NewWebhookHandler(testLogger(), updates, testConfig())
+	cfg := testConfig()
+	cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyDropNewest
+	var droppedID int
+	cfg.OnUpdateDropped = func(id int, reason string) {
+		droppedID = id
+	}
+	handler := receiver.NewWebhookHandler(testLogger(), updates, cfg)
 
 	update := tg.Update{UpdateID: 200}
 	body, _ := json.Marshal(update)
@@ -223,7 +230,30 @@ func TestWebhook_ChannelFull_Returns503(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	// Webhook should always return 200 OK to Telegram, even when dropping
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 200, droppedID)
+}
+
+func TestWebhook_ChannelFull_BlockWithTimeout_Returns200(t *testing.T) {
+	updates := make(chan tg.Update) // Unbuffered channel - will block
+	cfg := testConfig()
+	cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyBlock
+	cfg.UpdateDeliveryTimeout = 10 * time.Millisecond
+	handler := receiver.NewWebhookHandler(testLogger(), updates, cfg)
+
+	update := tg.Update{UpdateID: 201}
+	body, _ := json.Marshal(update)
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", "test-secret-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	// Should return 200 even on timeout to prevent Telegram retry storms
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
 // ==================== Body Size Limit ====================
@@ -283,6 +313,26 @@ func TestWebhook_CorrectDomain_Accepts(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
 	req.Host = "allowed.example.com"
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", "test-secret-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestWebhook_CorrectDomainWithPort_Accepts(t *testing.T) {
+	updates := make(chan tg.Update, 10)
+	cfg := testConfig()
+	cfg.AllowedDomain = "allowed.example.com"
+	handler := receiver.NewWebhookHandler(testLogger(), updates, cfg)
+
+	update := tg.Update{UpdateID: 123}
+	body, _ := json.Marshal(update)
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req.Host = "allowed.example.com:8443"
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", "test-secret-token")
 	rec := httptest.NewRecorder()

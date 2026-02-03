@@ -1,14 +1,17 @@
 package receiver
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/prilive-com/galigo/tg"
 	"github.com/sony/gobreaker/v2"
@@ -23,6 +26,11 @@ type WebhookHandler struct {
 	webhookSecret string
 	allowedDomain string
 	updates       chan<- tg.Update
+	updatesBidi   chan tg.Update // bidirectional ref for DropOldest; may be nil
+
+	deliveryPolicy  UpdateDeliveryPolicy
+	deliveryTimeout time.Duration
+	onUpdateDropped func(int, string)
 
 	limiter     *rate.Limiter
 	breaker     *gobreaker.CircuitBreaker[any]
@@ -61,9 +69,10 @@ func WithWebhookMaxBodySize(size int64) WebhookOption {
 }
 
 // NewWebhookHandler creates a new webhook handler.
+// The updates channel must be bidirectional (chan tg.Update) if using DeliveryPolicyDropOldest.
 func NewWebhookHandler(
 	logger *slog.Logger,
-	updates chan<- tg.Update,
+	updates chan tg.Update,
 	cfg Config,
 	opts ...WebhookOption,
 ) *WebhookHandler {
@@ -72,12 +81,16 @@ func NewWebhookHandler(
 	}
 
 	h := &WebhookHandler{
-		logger:        logger,
-		webhookSecret: cfg.WebhookSecret,
-		allowedDomain: cfg.AllowedDomain,
-		updates:       updates,
-		limiter:       rate.NewLimiter(rate.Limit(cfg.RateLimitRequests), cfg.RateLimitBurst),
-		maxBodySize:   cfg.MaxBodySize,
+		logger:          logger,
+		webhookSecret:   cfg.WebhookSecret,
+		allowedDomain:   cfg.AllowedDomain,
+		updates:         updates,
+		updatesBidi:     updates,
+		deliveryPolicy:  cfg.UpdateDeliveryPolicy,
+		deliveryTimeout: cfg.UpdateDeliveryTimeout,
+		onUpdateDropped: cfg.OnUpdateDropped,
+		limiter:         rate.NewLimiter(rate.Limit(cfg.RateLimitRequests), cfg.RateLimitBurst),
+		maxBodySize:     cfg.MaxBodySize,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				b := make([]byte, cfg.MaxBodySize)
@@ -113,9 +126,15 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// This prevents attackers from tripping the breaker with bad credentials
 
 	// Domain validation
-	if h.allowedDomain != "" && r.Host != h.allowedDomain {
-		h.fail(w, "forbidden", http.StatusForbidden)
-		return
+	if h.allowedDomain != "" {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		if host != h.allowedDomain {
+			h.fail(w, "forbidden", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Secret validation (constant-time comparison)
@@ -182,16 +201,101 @@ func (h *WebhookHandler) processUpdate(w http.ResponseWriter, r *http.Request) e
 		return &WebhookError{Code: http.StatusBadRequest, Message: "invalid JSON", Err: err}
 	}
 
-	// Send to channel
-	select {
-	case h.updates <- update:
-		// P1.8 FIX: Use Debug level for per-update logging
-		h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+	// Deliver using configured policy.
+	// Unlike polling, webhook ALWAYS returns nil (200 OK) to Telegram,
+	// even when dropping updates — returning non-200 causes Telegram retry storms.
+	return h.deliverUpdate(r.Context(), update)
+}
+
+// deliverUpdate delivers a single update using the configured policy.
+// Always returns nil to ensure Telegram gets 200 OK (prevents retry storms).
+// Errors are only returned for actual processing failures (bad JSON, oversized body).
+func (h *WebhookHandler) deliverUpdate(ctx context.Context, update tg.Update) error {
+	switch h.deliveryPolicy {
+	case DeliveryPolicyBlock:
+		return h.webhookDeliverBlocking(ctx, update)
+	case DeliveryPolicyDropNewest:
+		return h.webhookDeliverDropNewest(update)
+	case DeliveryPolicyDropOldest:
+		return h.webhookDeliverDropOldest(ctx, update)
 	default:
-		return ErrChannelBlocked
+		return h.webhookDeliverBlocking(ctx, update)
+	}
+}
+
+// webhookDeliverBlocking waits for channel space with optional timeout.
+func (h *WebhookHandler) webhookDeliverBlocking(ctx context.Context, update tg.Update) error {
+	deliveryCtx := ctx
+	var cancel context.CancelFunc
+
+	if h.deliveryTimeout > 0 {
+		deliveryCtx, cancel = context.WithTimeout(ctx, h.deliveryTimeout)
+		defer cancel()
 	}
 
+	select {
+	case h.updates <- update:
+		h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+		return nil
+	case <-deliveryCtx.Done():
+		if ctx.Err() != nil {
+			// Client disconnected — Telegram will retry, that's fine
+			return nil
+		}
+		// Delivery timeout — drop and return 200 OK to prevent retry storm
+		h.logger.Warn("webhook delivery timeout, dropping",
+			"update_id", update.UpdateID,
+			"timeout", h.deliveryTimeout,
+		)
+		if h.onUpdateDropped != nil {
+			h.onUpdateDropped(update.UpdateID, "webhook_delivery_timeout")
+		}
+		return nil
+	}
+}
+
+// webhookDeliverDropNewest drops the current update if channel is full.
+func (h *WebhookHandler) webhookDeliverDropNewest(update tg.Update) error {
+	select {
+	case h.updates <- update:
+		h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+	default:
+		h.logger.Warn("webhook channel full, dropping newest",
+			"update_id", update.UpdateID,
+		)
+		if h.onUpdateDropped != nil {
+			h.onUpdateDropped(update.UpdateID, "webhook_channel_full_drop_newest")
+		}
+	}
 	return nil
+}
+
+// webhookDeliverDropOldest drops the oldest update to make room.
+func (h *WebhookHandler) webhookDeliverDropOldest(ctx context.Context, update tg.Update) error {
+	if h.updatesBidi == nil {
+		// Fallback: can't drain from send-only channel
+		return h.webhookDeliverDropNewest(update)
+	}
+	for {
+		select {
+		case h.updates <- update:
+			h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+			return nil
+		default:
+			select {
+			case dropped := <-h.updatesBidi:
+				h.logger.Warn("webhook channel full, dropping oldest",
+					"dropped_id", dropped.UpdateID,
+					"new_id", update.UpdateID,
+				)
+				if h.onUpdateDropped != nil {
+					h.onUpdateDropped(dropped.UpdateID, "webhook_channel_full_drop_oldest")
+				}
+			case <-ctx.Done():
+				return nil
+			}
+		}
+	}
 }
 
 func (h *WebhookHandler) fail(w http.ResponseWriter, msg string, code int) {

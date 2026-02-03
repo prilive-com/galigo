@@ -137,8 +137,8 @@ func ReplyUser(w http.ResponseWriter) {
 // ReplyWebhookInfo writes a successful getWebhookInfo response.
 func ReplyWebhookInfo(w http.ResponseWriter, url string, pendingCount int) {
 	ReplyOK(w, map[string]any{
-		"url":                  url,
+		"url":                    url,
 		"has_custom_certificate": false,
-		"pending_update_count": pendingCount,
+		"pending_update_count":   pendingCount,
 	})
 }

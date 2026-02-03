@@ -10,11 +10,11 @@ import (
 
 // AnswerInlineQueryRequest represents an answerInlineQuery request.
 type AnswerInlineQueryRequest struct {
-	InlineQueryID string                 `json:"inline_query_id"`
-	Results       []tg.InlineQueryResult `json:"results"`
-	CacheTime     int                    `json:"cache_time,omitempty"`
-	IsPersonal    bool                   `json:"is_personal,omitempty"`
-	NextOffset    string                 `json:"next_offset,omitempty"`
+	InlineQueryID string                       `json:"inline_query_id"`
+	Results       []tg.InlineQueryResult       `json:"results"`
+	CacheTime     int                          `json:"cache_time,omitempty"`
+	IsPersonal    bool                         `json:"is_personal,omitempty"`
+	NextOffset    string                       `json:"next_offset,omitempty"`
 	Button        *tg.InlineQueryResultsButton `json:"button,omitempty"`
 }
 
@@ -26,11 +26,11 @@ type AnswerWebAppQueryRequest struct {
 
 // SendChecklistRequest represents a sendChecklist request.
 type SendChecklistRequest struct {
-	ChatID              tg.ChatID         `json:"chat_id"`
-	Checklist           tg.InputChecklist `json:"checklist"`
-	MessageThreadID     int               `json:"message_thread_id,omitempty"`
-	DisableNotification bool              `json:"disable_notification,omitempty"`
-	ProtectContent      bool              `json:"protect_content,omitempty"`
+	ChatID              tg.ChatID           `json:"chat_id"`
+	Checklist           tg.InputChecklist   `json:"checklist"`
+	MessageThreadID     int                 `json:"message_thread_id,omitempty"`
+	DisableNotification bool                `json:"disable_notification,omitempty"`
+	ProtectContent      bool                `json:"protect_content,omitempty"`
 	ReplyParameters     *tg.ReplyParameters `json:"reply_parameters,omitempty"`
 }
 
@@ -84,7 +84,7 @@ func (c *Client) SendChecklist(ctx context.Context, req SendChecklistRequest) (*
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "sendChecklist", req, &result); err != nil {
+	if err := c.callJSON(ctx, "sendChecklist", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -100,7 +100,7 @@ func (c *Client) EditChecklist(ctx context.Context, req EditChecklistRequest) (*
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "editChecklist", req, &result); err != nil {
+	if err := c.callJSON(ctx, "editChecklist", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil

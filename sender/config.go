@@ -21,10 +21,13 @@ type Config struct {
 	IdleTimeout    time.Duration
 
 	// Rate limiting
-	GlobalRPS     float64
-	GlobalBurst   int
-	PerChatRPS    float64
-	PerChatBurst  int
+	GlobalRPS    float64
+	GlobalBurst  int
+	PerChatRPS   float64
+	PerChatBurst int
+	GroupRPS        float64 // Rate limit for group chats (negative chat IDs). 0 = use PerChatRPS.
+	GroupBurst      int     // Burst for group chats. 0 = use PerChatBurst.
+	MaxChatLimiters int     // Maximum number of per-chat limiters to prevent memory exhaustion. 0 = 10000.
 
 	// Circuit breaker
 	BreakerMaxRequests uint32
@@ -54,6 +57,9 @@ func DefaultConfig() Config {
 		GlobalBurst:        10,
 		PerChatRPS:         1,
 		PerChatBurst:       3,
+		GroupRPS:           0.33, // ~20/min — Telegram's group chat limit
+		GroupBurst:         2,
+		MaxChatLimiters:    10000,
 		BreakerMaxRequests: 5,
 		BreakerInterval:    60 * time.Second,
 		BreakerTimeout:     30 * time.Second,
@@ -94,6 +100,14 @@ func LoadConfig() (*Config, error) {
 
 	if i, err := strconv.Atoi(getEnv("PER_CHAT_BURST", "3")); err == nil {
 		cfg.PerChatBurst = i
+	}
+
+	if f, err := strconv.ParseFloat(getEnv("GROUP_RPS", "0.33"), 64); err == nil {
+		cfg.GroupRPS = f
+	}
+
+	if i, err := strconv.Atoi(getEnv("GROUP_BURST", "2")); err == nil {
+		cfg.GroupBurst = i
 	}
 
 	if i, err := strconv.ParseUint(getEnv("BREAKER_MAX_REQUESTS", "5"), 10, 32); err == nil {

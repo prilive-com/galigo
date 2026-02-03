@@ -10,12 +10,12 @@ import (
 
 // SavePreparedInlineMessageRequest represents a savePreparedInlineMessage request.
 type SavePreparedInlineMessageRequest struct {
-	UserID              int64                `json:"user_id"`
-	Result              tg.InlineQueryResult `json:"result"`
-	AllowUserChats      bool                 `json:"allow_user_chats,omitempty"`
-	AllowBotChats       bool                 `json:"allow_bot_chats,omitempty"`
-	AllowGroupChats     bool                 `json:"allow_group_chats,omitempty"`
-	AllowChannelChats   bool                 `json:"allow_channel_chats,omitempty"`
+	UserID            int64                `json:"user_id"`
+	Result            tg.InlineQueryResult `json:"result"`
+	AllowUserChats    bool                 `json:"allow_user_chats,omitempty"`
+	AllowBotChats     bool                 `json:"allow_bot_chats,omitempty"`
+	AllowGroupChats   bool                 `json:"allow_group_chats,omitempty"`
+	AllowChannelChats bool                 `json:"allow_channel_chats,omitempty"`
 }
 
 // GetUserChatBoostsRequest represents a getUserChatBoosts request.
@@ -47,9 +47,9 @@ type EditChatSubscriptionInviteLinkRequest struct {
 
 // GetOwnedGiftsRequest represents a getOwnedGifts request.
 type GetOwnedGiftsRequest struct {
-	UserID         int64  `json:"user_id"`
-	Offset         string `json:"offset,omitempty"`
-	Limit          int    `json:"limit,omitempty"`
+	UserID int64  `json:"user_id"`
+	Offset string `json:"offset,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
 }
 
 // ================== Bot API 9.1-9.3 Methods ==================
@@ -80,7 +80,7 @@ func (c *Client) GetUserChatBoosts(ctx context.Context, req GetUserChatBoostsReq
 	}
 
 	var result tg.UserChatBoosts
-	if err := c.callJSON(ctx, "getUserChatBoosts", req, &result); err != nil {
+	if err := c.callJSON(ctx, "getUserChatBoosts", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -108,7 +108,7 @@ func (c *Client) CreateChatSubscriptionInviteLink(ctx context.Context, req Creat
 	}
 
 	var result tg.ChatInviteLink
-	if err := c.callJSON(ctx, "createChatSubscriptionInviteLink", req, &result); err != nil {
+	if err := c.callJSON(ctx, "createChatSubscriptionInviteLink", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -124,7 +124,7 @@ func (c *Client) EditChatSubscriptionInviteLink(ctx context.Context, req EditCha
 	}
 
 	var result tg.ChatInviteLink
-	if err := c.callJSON(ctx, "editChatSubscriptionInviteLink", req, &result); err != nil {
+	if err := c.callJSON(ctx, "editChatSubscriptionInviteLink", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil

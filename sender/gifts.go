@@ -53,7 +53,7 @@ func (c *Client) SendGift(ctx context.Context, req SendGiftRequest) error {
 	}
 
 	// NO RETRY — value operation
-	return c.callJSON(ctx, "sendGift", req, nil)
+	return c.callJSON(ctx, "sendGift", req, nil, extractChatID(tg.ChatID(req.UserID)))
 }
 
 // GetAvailableGifts returns the list of gifts that can be sent by the bot.

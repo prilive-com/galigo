@@ -45,11 +45,11 @@ func FullAdminRights() ChatAdministratorRights {
 // ModeratorRights returns typical moderator permissions (no promote, no change info).
 func ModeratorRights() ChatAdministratorRights {
 	return ChatAdministratorRights{
-		CanManageChat:       true,
-		CanDeleteMessages:   true,
-		CanRestrictMembers:  true,
-		CanInviteUsers:      true,
-		CanPinMessages:      boolPtr(true),
+		CanManageChat:      true,
+		CanDeleteMessages:  true,
+		CanRestrictMembers: true,
+		CanInviteUsers:     true,
+		CanPinMessages:     boolPtr(true),
 	}
 }
 

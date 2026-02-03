@@ -480,6 +480,116 @@ func (a *SenderAdapter) EditChecklist(ctx context.Context, chatID int64, message
 	})
 }
 
+// ================= Geo & Contact =================
+
+// SendLocation sends a GPS location.
+func (a *SenderAdapter) SendLocation(ctx context.Context, chatID int64, lat, lon float64) (*tg.Message, error) {
+	return a.client.SendLocation(ctx, sender.SendLocationRequest{
+		ChatID:    chatID,
+		Latitude:  lat,
+		Longitude: lon,
+	})
+}
+
+// SendVenue sends a venue.
+func (a *SenderAdapter) SendVenue(ctx context.Context, chatID int64, lat, lon float64, title, address string) (*tg.Message, error) {
+	return a.client.SendVenue(ctx, sender.SendVenueRequest{
+		ChatID:    chatID,
+		Latitude:  lat,
+		Longitude: lon,
+		Title:     title,
+		Address:   address,
+	})
+}
+
+// SendContact sends a phone contact.
+func (a *SenderAdapter) SendContact(ctx context.Context, chatID int64, phone, firstName, lastName string) (*tg.Message, error) {
+	return a.client.SendContact(ctx, sender.SendContactRequest{
+		ChatID:      chatID,
+		PhoneNumber: phone,
+		FirstName:   firstName,
+		LastName:    lastName,
+	})
+}
+
+// SendDice sends an animated dice emoji.
+func (a *SenderAdapter) SendDice(ctx context.Context, chatID int64, emoji string) (*tg.Message, error) {
+	var opts []sender.SendDiceOption
+	if emoji != "" {
+		opts = append(opts, sender.WithDiceEmoji(emoji))
+	}
+	return a.client.SendDice(ctx, chatID, opts...)
+}
+
+// ================= Reactions & User Info =================
+
+// SetMessageReaction sets a reaction on a message.
+func (a *SenderAdapter) SetMessageReaction(ctx context.Context, chatID int64, messageID int, emoji string, isBig bool) error {
+	return a.client.SetMessageReaction(ctx, sender.SetMessageReactionRequest{
+		ChatID:    chatID,
+		MessageID: messageID,
+		Reaction: []sender.ReactionType{
+			{Type: "emoji", Emoji: emoji},
+		},
+		IsBig: isBig,
+	})
+}
+
+// GetUserProfilePhotos returns a user's profile pictures.
+func (a *SenderAdapter) GetUserProfilePhotos(ctx context.Context, userID int64) (*tg.UserProfilePhotos, error) {
+	return a.client.GetUserProfilePhotos(ctx, userID)
+}
+
+// GetUserChatBoosts returns a user's boosts in the chat.
+func (a *SenderAdapter) GetUserChatBoosts(ctx context.Context, chatID, userID int64) (*tg.UserChatBoosts, error) {
+	return a.client.GetUserChatBoosts(ctx, sender.GetUserChatBoostsRequest{
+		ChatID: chatID,
+		UserID: userID,
+	})
+}
+
+// ================= Bulk Operations =================
+
+// ForwardMessages forwards multiple messages.
+func (a *SenderAdapter) ForwardMessages(ctx context.Context, chatID, fromChatID int64, messageIDs []int) ([]tg.MessageID, error) {
+	return a.client.ForwardMessages(ctx, sender.ForwardMessagesRequest{
+		ChatID:     chatID,
+		FromChatID: fromChatID,
+		MessageIDs: messageIDs,
+	})
+}
+
+// CopyMessages copies multiple messages.
+func (a *SenderAdapter) CopyMessages(ctx context.Context, chatID, fromChatID int64, messageIDs []int) ([]tg.MessageID, error) {
+	return a.client.CopyMessages(ctx, sender.CopyMessagesRequest{
+		ChatID:     chatID,
+		FromChatID: fromChatID,
+		MessageIDs: messageIDs,
+	})
+}
+
+// DeleteMessages deletes multiple messages.
+func (a *SenderAdapter) DeleteMessages(ctx context.Context, chatID int64, messageIDs []int) error {
+	return a.client.DeleteMessages(ctx, chatID, messageIDs)
+}
+
+// ================= Chat Settings =================
+
+// SetChatPhoto sets the chat photo.
+func (a *SenderAdapter) SetChatPhoto(ctx context.Context, chatID int64, photo sender.InputFile) error {
+	return a.client.SetChatPhoto(ctx, chatID, photo)
+}
+
+// DeleteChatPhoto deletes the chat photo.
+func (a *SenderAdapter) DeleteChatPhoto(ctx context.Context, chatID int64) error {
+	return a.client.DeleteChatPhoto(ctx, chatID)
+}
+
+// SetChatPermissions sets the default chat permissions.
+func (a *SenderAdapter) SetChatPermissions(ctx context.Context, chatID int64, perms tg.ChatPermissions) error {
+	return a.client.SetChatPermissions(ctx, chatID, perms)
+}
+
 // SetWebhook sets a webhook URL.
 func (a *SenderAdapter) SetWebhook(ctx context.Context, webhookURL string) error {
 	return receiver.SetWebhook(ctx, a.httpClient, a.token, webhookURL, "")

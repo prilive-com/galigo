@@ -10,13 +10,13 @@ import (
 
 // SendGameRequest represents a sendGame request.
 type SendGameRequest struct {
-	ChatID          int64                    `json:"chat_id"`
-	GameShortName   string                   `json:"game_short_name"`
-	MessageThreadID int                      `json:"message_thread_id,omitempty"`
-	DisableNotification bool                 `json:"disable_notification,omitempty"`
-	ProtectContent  bool                     `json:"protect_content,omitempty"`
-	ReplyParameters *tg.ReplyParameters      `json:"reply_parameters,omitempty"`
-	ReplyMarkup     *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ChatID              int64                    `json:"chat_id"`
+	GameShortName       string                   `json:"game_short_name"`
+	MessageThreadID     int                      `json:"message_thread_id,omitempty"`
+	DisableNotification bool                     `json:"disable_notification,omitempty"`
+	ProtectContent      bool                     `json:"protect_content,omitempty"`
+	ReplyParameters     *tg.ReplyParameters      `json:"reply_parameters,omitempty"`
+	ReplyMarkup         *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
 // SetGameScoreRequest represents a setGameScore request.
@@ -50,7 +50,7 @@ func (c *Client) SendGame(ctx context.Context, req SendGameRequest) (*tg.Message
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "sendGame", req, &result); err != nil {
+	if err := c.callJSON(ctx, "sendGame", req, &result, extractChatID(tg.ChatID(req.ChatID))); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -76,7 +76,7 @@ func (c *Client) SetGameScore(ctx context.Context, req SetGameScoreRequest) (*tg
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "setGameScore", req, &result); err != nil {
+	if err := c.callJSON(ctx, "setGameScore", req, &result, extractChatID(tg.ChatID(req.ChatID))); err != nil {
 		return nil, err
 	}
 	return &result, nil

@@ -30,12 +30,12 @@ type UploadStickerFileRequest struct {
 
 // CreateNewStickerSetRequest represents a createNewStickerSet request.
 type CreateNewStickerSetRequest struct {
-	UserID          int64    `json:"user_id"`
-	Name            string   `json:"name"`
-	Title           string   `json:"title"`
-	Stickers        []InputSticker `json:"-"` // Handled specially
-	StickerType     string   `json:"sticker_type,omitempty"` // "regular", "mask", "custom_emoji"
-	NeedsRepainting bool     `json:"needs_repainting,omitempty"`
+	UserID          int64          `json:"user_id"`
+	Name            string         `json:"name"`
+	Title           string         `json:"title"`
+	Stickers        []InputSticker `json:"-"`                      // Handled specially
+	StickerType     string         `json:"sticker_type,omitempty"` // "regular", "mask", "custom_emoji"
+	NeedsRepainting bool           `json:"needs_repainting,omitempty"`
 }
 
 // AddStickerToSetRequest represents an addStickerToSet request.
@@ -98,7 +98,7 @@ type ReplaceStickerInSetRequest struct {
 	UserID     int64        `json:"user_id"`
 	Name       string       `json:"name"`
 	OldSticker string       `json:"old_sticker"` // file_id of sticker to replace
-	Sticker    InputSticker `json:"-"`            // Handled specially
+	Sticker    InputSticker `json:"-"`           // Handled specially
 }
 
 // ================== Sticker Methods ==================

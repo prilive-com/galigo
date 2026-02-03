@@ -278,7 +278,7 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `DeleteStory` - Delete a story
 
 ### Chat Boosts & Subscriptions
-- `GetUserChatBoosts` - Get user's chat boosts
+- `GetUserChatBoosts` - Get user's chat boosts (acceptance tested)
 - `CreateChatSubscriptionInviteLink` - Create subscription invite link
 - `EditChatSubscriptionInviteLink` - Edit subscription invite link
 
@@ -599,6 +599,7 @@ go run ./cmd/galigo-testbot --run stickers    # Sticker set lifecycle (S20)
 go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21-S22)
 go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
+go run ./cmd/galigo-testbot --run extras      # Extras (S25-S32: geo, bulk, reactions, user info, chat photo, permissions)
 
 # Check method coverage
 go run ./cmd/galigo-testbot --status

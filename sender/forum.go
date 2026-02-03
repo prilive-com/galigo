@@ -54,7 +54,7 @@ func (c *Client) CreateForumTopic(ctx context.Context, chatID tg.ChatID, name st
 	}
 
 	var topic tg.ForumTopic
-	if err := c.callJSON(ctx, "createForumTopic", req, &topic); err != nil {
+	if err := c.callJSON(ctx, "createForumTopic", req, &topic, extractChatID(chatID)); err != nil {
 		return nil, err
 	}
 	return &topic, nil
@@ -77,7 +77,7 @@ func (c *Client) EditForumTopic(ctx context.Context, chatID tg.ChatID, messageTh
 		opt(&req)
 	}
 
-	return c.callJSON(ctx, "editForumTopic", req, nil)
+	return c.callJSON(ctx, "editForumTopic", req, nil, extractChatID(chatID))
 }
 
 // CloseForumTopic closes an open topic.
@@ -92,7 +92,7 @@ func (c *Client) CloseForumTopic(ctx context.Context, chatID tg.ChatID, messageT
 	return c.callJSON(ctx, "closeForumTopic", ForumTopicRequest{
 		ChatID:          chatID,
 		MessageThreadID: messageThreadID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // ReopenForumTopic reopens a closed topic.
@@ -107,7 +107,7 @@ func (c *Client) ReopenForumTopic(ctx context.Context, chatID tg.ChatID, message
 	return c.callJSON(ctx, "reopenForumTopic", ForumTopicRequest{
 		ChatID:          chatID,
 		MessageThreadID: messageThreadID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // DeleteForumTopic deletes a topic along with all its messages.
@@ -122,7 +122,7 @@ func (c *Client) DeleteForumTopic(ctx context.Context, chatID tg.ChatID, message
 	return c.callJSON(ctx, "deleteForumTopic", ForumTopicRequest{
 		ChatID:          chatID,
 		MessageThreadID: messageThreadID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // UnpinAllForumTopicMessages unpins all messages in a topic.
@@ -137,7 +137,7 @@ func (c *Client) UnpinAllForumTopicMessages(ctx context.Context, chatID tg.ChatI
 	return c.callJSON(ctx, "unpinAllForumTopicMessages", ForumTopicRequest{
 		ChatID:          chatID,
 		MessageThreadID: messageThreadID,
-	}, nil)
+	}, nil, extractChatID(chatID))
 }
 
 // EditGeneralForumTopic edits the name of the General topic.
@@ -149,7 +149,7 @@ func (c *Client) EditGeneralForumTopic(ctx context.Context, chatID tg.ChatID, na
 	return c.callJSON(ctx, "editGeneralForumTopic", struct {
 		ChatID tg.ChatID `json:"chat_id"`
 		Name   string    `json:"name"`
-	}{ChatID: chatID, Name: name}, nil)
+	}{ChatID: chatID, Name: name}, nil, extractChatID(chatID))
 }
 
 // CloseGeneralForumTopic closes the General topic.
@@ -160,7 +160,7 @@ func (c *Client) CloseGeneralForumTopic(ctx context.Context, chatID tg.ChatID) e
 
 	return c.callJSON(ctx, "closeGeneralForumTopic", struct {
 		ChatID tg.ChatID `json:"chat_id"`
-	}{ChatID: chatID}, nil)
+	}{ChatID: chatID}, nil, extractChatID(chatID))
 }
 
 // ReopenGeneralForumTopic reopens the General topic.
@@ -171,7 +171,7 @@ func (c *Client) ReopenGeneralForumTopic(ctx context.Context, chatID tg.ChatID) 
 
 	return c.callJSON(ctx, "reopenGeneralForumTopic", struct {
 		ChatID tg.ChatID `json:"chat_id"`
-	}{ChatID: chatID}, nil)
+	}{ChatID: chatID}, nil, extractChatID(chatID))
 }
 
 // HideGeneralForumTopic hides the General topic.
@@ -182,7 +182,7 @@ func (c *Client) HideGeneralForumTopic(ctx context.Context, chatID tg.ChatID) er
 
 	return c.callJSON(ctx, "hideGeneralForumTopic", struct {
 		ChatID tg.ChatID `json:"chat_id"`
-	}{ChatID: chatID}, nil)
+	}{ChatID: chatID}, nil, extractChatID(chatID))
 }
 
 // UnhideGeneralForumTopic unhides the General topic.
@@ -193,7 +193,7 @@ func (c *Client) UnhideGeneralForumTopic(ctx context.Context, chatID tg.ChatID) 
 
 	return c.callJSON(ctx, "unhideGeneralForumTopic", struct {
 		ChatID tg.ChatID `json:"chat_id"`
-	}{ChatID: chatID}, nil)
+	}{ChatID: chatID}, nil, extractChatID(chatID))
 }
 
 // UnpinAllGeneralForumTopicMessages unpins all messages in the General topic.
@@ -204,7 +204,7 @@ func (c *Client) UnpinAllGeneralForumTopicMessages(ctx context.Context, chatID t
 
 	return c.callJSON(ctx, "unpinAllGeneralForumTopicMessages", struct {
 		ChatID tg.ChatID `json:"chat_id"`
-	}{ChatID: chatID}, nil)
+	}{ChatID: chatID}, nil, extractChatID(chatID))
 }
 
 // GetForumTopicIconStickers returns custom emoji stickers usable as topic icons.

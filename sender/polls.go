@@ -19,7 +19,7 @@ type SendPollRequest struct {
 	CorrectOptionID       *int              `json:"correct_option_id,omitempty"` // For quiz
 	Explanation           string            `json:"explanation,omitempty"`
 	ExplanationParseMode  tg.ParseMode      `json:"explanation_parse_mode,omitempty"`
-	OpenPeriod            int               `json:"open_period,omitempty"`   // 5-600 seconds
+	OpenPeriod            int               `json:"open_period,omitempty"` // 5-600 seconds
 	CloseDate             int64             `json:"close_date,omitempty"`
 	IsClosed              bool              `json:"is_closed,omitempty"`
 	DisableNotification   bool              `json:"disable_notification,omitempty"`
@@ -74,7 +74,7 @@ func (c *Client) SendPollSimple(ctx context.Context, chatID tg.ChatID, question 
 	}
 
 	var msg tg.Message
-	if err := c.callJSON(ctx, "sendPoll", req, &msg); err != nil {
+	if err := c.callJSON(ctx, "sendPoll", req, &msg, extractChatID(chatID)); err != nil {
 		return nil, err
 	}
 	return &msg, nil
@@ -106,7 +106,7 @@ func (c *Client) SendQuiz(ctx context.Context, chatID tg.ChatID, question string
 	}
 
 	var msg tg.Message
-	if err := c.callJSON(ctx, "sendPoll", req, &msg); err != nil {
+	if err := c.callJSON(ctx, "sendPoll", req, &msg, extractChatID(chatID)); err != nil {
 		return nil, err
 	}
 	return &msg, nil
@@ -130,7 +130,7 @@ func (c *Client) StopPoll(ctx context.Context, chatID tg.ChatID, messageID int, 
 	}
 
 	var poll tg.Poll
-	if err := c.callJSON(ctx, "stopPoll", req, &poll); err != nil {
+	if err := c.callJSON(ctx, "stopPoll", req, &poll, extractChatID(chatID)); err != nil {
 		return nil, err
 	}
 	return &poll, nil

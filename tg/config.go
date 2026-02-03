@@ -22,12 +22,12 @@ type Config struct {
 	RetryMaxWait  time.Duration // Default: 30s
 
 	// Rate limiting
-	RateLimit       float64 // Requests per second, 0 = disabled
-	RateLimitBurst  int     // Burst size for rate limiter
-	PerChatRPS      float64 // Per-chat rate limit
-	PerChatBurst    int     // Per-chat burst size
-	GlobalRPS       float64 // Global rate limit
-	GlobalBurst     int     // Global burst size
+	RateLimit      float64 // Requests per second, 0 = disabled
+	RateLimitBurst int     // Burst size for rate limiter
+	PerChatRPS     float64 // Per-chat rate limit
+	PerChatBurst   int     // Per-chat burst size
+	GlobalRPS      float64 // Global rate limit
+	GlobalBurst    int     // Global burst size
 
 	// Circuit breaker
 	CircuitBreakerEnabled   bool
@@ -36,37 +36,37 @@ type Config struct {
 	CircuitBreakerTimeout   time.Duration // Reset timeout
 
 	// Default message options
-	DefaultParseMode          ParseMode
-	DisableWebPagePreview     bool
-	DisableNotification       bool
-	ProtectContent            bool
-	AllowSendingWithoutReply  bool
+	DefaultParseMode         ParseMode
+	DisableWebPagePreview    bool
+	DisableNotification      bool
+	ProtectContent           bool
+	AllowSendingWithoutReply bool
 }
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		BaseURL:                   "https://api.telegram.org",
-		RequestTimeout:            30 * time.Second,
-		ConnectTimeout:            10 * time.Second,
-		MaxRetries:                3,
-		RetryBaseWait:             time.Second,
-		RetryMaxWait:              30 * time.Second,
-		RateLimit:                 30, // Telegram limit: ~30 msg/s
-		RateLimitBurst:            5,
-		PerChatRPS:                1,  // 1 msg/s per chat recommended
-		PerChatBurst:              3,
-		GlobalRPS:                 30,
-		GlobalBurst:               10,
-		CircuitBreakerEnabled:     true,
-		CircuitBreakerThreshold:   5,
-		CircuitBreakerInterval:    60 * time.Second,
-		CircuitBreakerTimeout:     30 * time.Second,
-		DefaultParseMode:          "",
-		DisableWebPagePreview:     false,
-		DisableNotification:       false,
-		ProtectContent:            false,
-		AllowSendingWithoutReply:  true,
+		BaseURL:                  "https://api.telegram.org",
+		RequestTimeout:           30 * time.Second,
+		ConnectTimeout:           10 * time.Second,
+		MaxRetries:               3,
+		RetryBaseWait:            time.Second,
+		RetryMaxWait:             30 * time.Second,
+		RateLimit:                30, // Telegram limit: ~30 msg/s
+		RateLimitBurst:           5,
+		PerChatRPS:               1, // 1 msg/s per chat recommended
+		PerChatBurst:             3,
+		GlobalRPS:                30,
+		GlobalBurst:              10,
+		CircuitBreakerEnabled:    true,
+		CircuitBreakerThreshold:  5,
+		CircuitBreakerInterval:   60 * time.Second,
+		CircuitBreakerTimeout:    30 * time.Second,
+		DefaultParseMode:         "",
+		DisableWebPagePreview:    false,
+		DisableNotification:      false,
+		ProtectContent:           false,
+		AllowSendingWithoutReply: true,
 	}
 }
 

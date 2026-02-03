@@ -56,8 +56,8 @@ func TestRateLimit_PerChatLimiter(t *testing.T) {
 	// Create client with per-chat rate limit
 	client, err := sender.New(testutil.TestToken,
 		sender.WithBaseURL(server.BaseURL()),
-		sender.WithRateLimit(100, 100),       // High global limit
-		sender.WithPerChatRateLimit(2, 1),    // Low per-chat limit
+		sender.WithRateLimit(100, 100),    // High global limit
+		sender.WithPerChatRateLimit(2, 1), // Low per-chat limit
 		sender.WithCircuitBreakerSettings(testutil.CircuitBreakerNeverTrip()),
 		sender.WithRetries(0),
 	)
@@ -87,8 +87,8 @@ func TestRateLimit_DifferentChatsNotThrottled(t *testing.T) {
 	// Create client with per-chat rate limit
 	client, err := sender.New(testutil.TestToken,
 		sender.WithBaseURL(server.BaseURL()),
-		sender.WithRateLimit(100, 100),       // High global limit
-		sender.WithPerChatRateLimit(1, 1),    // 1 RPS per chat
+		sender.WithRateLimit(100, 100),    // High global limit
+		sender.WithPerChatRateLimit(1, 1), // 1 RPS per chat
 		sender.WithCircuitBreakerSettings(testutil.CircuitBreakerNeverTrip()),
 		sender.WithRetries(0),
 	)
@@ -211,7 +211,7 @@ func TestRateLimit_ConcurrentRequests(t *testing.T) {
 				ChatID: chatID,
 				Text:   "Hello",
 			})
-		}(int64(i))
+		}(int64(i + 1))
 	}
 	wg.Wait()
 

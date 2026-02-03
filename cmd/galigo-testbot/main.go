@@ -91,6 +91,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllChecklistScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
+	scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -201,6 +202,25 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S13_WebhookLifecycle()}
 	case "get-updates":
 		scenarios = []engine.Scenario{suites.S14_GetUpdates()}
+	// Extras (S25-S32)
+	case "extras":
+		scenarios = suites.AllExtrasScenarios()
+	case "geo":
+		scenarios = []engine.Scenario{suites.S25_GeoLocation()}
+	case "venue":
+		scenarios = []engine.Scenario{suites.S26_GeoVenue()}
+	case "contact-dice":
+		scenarios = []engine.Scenario{suites.S27_ContactAndDice()}
+	case "bulk":
+		scenarios = []engine.Scenario{suites.S28_BulkOps()}
+	case "reactions":
+		scenarios = []engine.Scenario{suites.S29_Reactions()}
+	case "user-info":
+		scenarios = []engine.Scenario{suites.S30_UserInfo()}
+	case "chat-photo":
+		scenarios = []engine.Scenario{suites.S31_ChatPhotoLifecycle()}
+	case "chat-permissions":
+		scenarios = []engine.Scenario{suites.S32_ChatPermissionsLifecycle()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -208,10 +228,11 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllStickerScenarios()...)
 		scenarios = append(scenarios, suites.AllStarsScenarios()...)
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
+		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, all")
 		os.Exit(1)
 	}
 
@@ -530,6 +551,25 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S18_Polls()}
 	case "forum-stickers":
 		scenarios = []engine.Scenario{suites.S19_ForumStickers()}
+	// Extras (S25-S32)
+	case "extras":
+		scenarios = suites.AllExtrasScenarios()
+	case "geo":
+		scenarios = []engine.Scenario{suites.S25_GeoLocation()}
+	case "venue":
+		scenarios = []engine.Scenario{suites.S26_GeoVenue()}
+	case "contact-dice":
+		scenarios = []engine.Scenario{suites.S27_ContactAndDice()}
+	case "bulk":
+		scenarios = []engine.Scenario{suites.S28_BulkOps()}
+	case "reactions":
+		scenarios = []engine.Scenario{suites.S29_Reactions()}
+	case "user-info":
+		scenarios = []engine.Scenario{suites.S30_UserInfo()}
+	case "chat-photo":
+		scenarios = []engine.Scenario{suites.S31_ChatPhotoLifecycle()}
+	case "chat-permissions":
+		scenarios = []engine.Scenario{suites.S32_ChatPermissionsLifecycle()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -537,6 +577,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(scenarios, suites.AllStickerScenarios()...)
 		scenarios = append(scenarios, suites.AllStarsScenarios()...)
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
+		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
@@ -578,6 +619,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllChecklistScenarios()...)
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
+	scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {

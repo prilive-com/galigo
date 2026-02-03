@@ -1038,9 +1038,9 @@ func TestPollingOption_WithPollingRetryConfig(t *testing.T) {
 		pollingTestLogger(),
 		cfg,
 		receiver.WithPollingRetryConfig(
-			100*time.Millisecond,  // initial
-			1*time.Second,         // max
-			1.5,                   // factor
+			100*time.Millisecond, // initial
+			1*time.Second,        // max
+			1.5,                  // factor
 		),
 	)
 

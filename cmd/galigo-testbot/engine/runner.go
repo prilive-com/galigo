@@ -85,6 +85,13 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 		result.Steps = append(result.Steps, *stepResult)
 
 		if err != nil {
+			if IsSkip(err) {
+				result.Success = true
+				result.Skipped = true
+				result.SkipReason = err.Error()
+				r.logger.Info("scenario skipped", "step", step.Name(), "reason", err.Error())
+				break
+			}
 			result.Success = false
 			result.Error = fmt.Sprintf("step %q failed: %v", step.Name(), err)
 			break

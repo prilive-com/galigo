@@ -16,8 +16,8 @@ import (
 //	    return nil, err
 //	}
 //	return &result, nil
-func (c *Client) callJSON(ctx context.Context, method string, payload any, out any) error {
-	resp, err := c.executeRequest(ctx, method, payload)
+func (c *Client) callJSON(ctx context.Context, method string, payload any, out any, chatIDs ...string) error {
+	resp, err := c.executeRequest(ctx, method, payload, chatIDs...)
 	if err != nil {
 		return err
 	}
@@ -36,9 +36,9 @@ func (c *Client) callJSON(ctx context.Context, method string, payload any, out a
 // Usage:
 //
 //	info, err := callJSONResult[tg.ChatFullInfo](c, ctx, "getChat", req)
-func callJSONResult[T any](c *Client, ctx context.Context, method string, payload any) (T, error) {
+func callJSONResult[T any](c *Client, ctx context.Context, method string, payload any, chatIDs ...string) (T, error) {
 	var result T
-	if err := c.callJSON(ctx, method, payload, &result); err != nil {
+	if err := c.callJSON(ctx, method, payload, &result, chatIDs...); err != nil {
 		var zero T
 		return zero, err
 	}

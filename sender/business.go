@@ -36,20 +36,20 @@ type SetBusinessAccountUsernameRequest struct {
 
 // SetBusinessAccountGiftSettingsRequest represents a setBusinessAccountGiftSettings request.
 type SetBusinessAccountGiftSettingsRequest struct {
-	BusinessConnectionID string              `json:"business_connection_id"`
-	ShowGiftButton       bool                `json:"show_gift_button"`
+	BusinessConnectionID string               `json:"business_connection_id"`
+	ShowGiftButton       bool                 `json:"show_gift_button"`
 	AcceptedGiftTypes    tg.AcceptedGiftTypes `json:"accepted_gift_types"`
 }
 
 // PostStoryRequest represents a postStory request.
 type PostStoryRequest struct {
-	BusinessConnectionID string              `json:"business_connection_id"`
-	Content              InputStoryContent   `json:"-"` // Handled by multipart
-	ActivePeriod         int                 `json:"active_period,omitempty"`
-	Caption              string              `json:"caption,omitempty"`
-	ParseMode            string              `json:"parse_mode,omitempty"`
-	CaptionEntities      []tg.MessageEntity  `json:"caption_entities,omitempty"`
-	ProtectContent       bool                `json:"protect_content,omitempty"`
+	BusinessConnectionID string             `json:"business_connection_id"`
+	Content              InputStoryContent  `json:"-"` // Handled by multipart
+	ActivePeriod         int                `json:"active_period,omitempty"`
+	Caption              string             `json:"caption,omitempty"`
+	ParseMode            string             `json:"parse_mode,omitempty"`
+	CaptionEntities      []tg.MessageEntity `json:"caption_entities,omitempty"`
+	ProtectContent       bool               `json:"protect_content,omitempty"`
 }
 
 // EditStoryRequest represents an editStory request.
@@ -286,14 +286,14 @@ func resolveInputFile(file InputFile, attachName string) (string, *FilePart, err
 
 // storyPayload is the internal multipart-ready payload for postStory.
 type storyPayload struct {
-	BusinessConnectionID string              `json:"business_connection_id"`
-	Content              string              `json:"content"`
-	ActivePeriod         int                 `json:"active_period,omitempty"`
-	Caption              string              `json:"caption,omitempty"`
-	ParseMode            string              `json:"parse_mode,omitempty"`
-	CaptionEntities      []tg.MessageEntity  `json:"caption_entities,omitempty"`
-	ProtectContent       bool                `json:"protect_content,omitempty"`
-	AttachedFiles        []FilePart          `json:"_file_parts"`
+	BusinessConnectionID string             `json:"business_connection_id"`
+	Content              string             `json:"content"`
+	ActivePeriod         int                `json:"active_period,omitempty"`
+	Caption              string             `json:"caption,omitempty"`
+	ParseMode            string             `json:"parse_mode,omitempty"`
+	CaptionEntities      []tg.MessageEntity `json:"caption_entities,omitempty"`
+	ProtectContent       bool               `json:"protect_content,omitempty"`
+	AttachedFiles        []FilePart         `json:"_file_parts"`
 }
 
 // buildStoryPayload resolves InputStoryContent to a multipart-ready payload.

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -79,7 +80,7 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("request failed: %w", scrub.TokenFromError(err, token))
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)
@@ -117,7 +118,7 @@ func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToke
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("request failed: %w", scrub.TokenFromError(err, token))
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)
@@ -154,7 +155,7 @@ func GetWebhookInfo(ctx context.Context, client *http.Client, token tg.SecretTok
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", scrub.TokenFromError(err, token))
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)

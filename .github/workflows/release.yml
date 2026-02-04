@@ -1,0 +1,128 @@
+# galigo Release Automation
+# Creates releases with changelog, binaries, and SBOM when tags are pushed
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================
+  # JOB 1: Validate - Ensure release is ready
+  # ============================================================
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify module
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+          go mod verify
+
+      - name: Run tests
+        run: go test -race -shuffle=on -count=1 ./...
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1
+          args: --timeout=5m
+
+      - name: Run security scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # ============================================================
+  # JOB 2: Release - Create GitHub release with binaries
+  # ============================================================
+  release:
+    name: Create Release
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --abbrev=0 --tags HEAD^ 2>/dev/null || echo "")
+          CURR_TAG=${GITHUB_REF#refs/tags/}
+          
+          echo "## What's Changed in ${CURR_TAG}" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "### 🚀 Features" >> CHANGELOG.md
+            git log --pretty=format:"* %s (%h)" $PREV_TAG..$CURR_TAG | grep -iE "^.*feat" >> CHANGELOG.md || true
+            echo "" >> CHANGELOG.md
+            
+            echo "### 🐛 Bug Fixes" >> CHANGELOG.md
+            git log --pretty=format:"* %s (%h)" $PREV_TAG..$CURR_TAG | grep -iE "^.*fix" >> CHANGELOG.md || true
+            echo "" >> CHANGELOG.md
+            
+            echo "### 📚 Documentation" >> CHANGELOG.md
+            git log --pretty=format:"* %s (%h)" $PREV_TAG..$CURR_TAG | grep -iE "^.*docs" >> CHANGELOG.md || true
+            echo "" >> CHANGELOG.md
+            
+            echo "### 🔧 Other Changes" >> CHANGELOG.md
+            git log --pretty=format:"* %s (%h)" $PREV_TAG..$CURR_TAG | grep -viE "^.*(feat|fix|docs)" >> CHANGELOG.md || true
+            echo "" >> CHANGELOG.md
+            
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$CURR_TAG" >> CHANGELOG.md
+          else
+            echo "Initial release" >> CHANGELOG.md
+          fi
+
+      - name: Build testbot binaries
+        run: |
+          mkdir -p dist
+          
+          # Build for multiple platforms
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/galigo-testbot-linux-amd64 ./cmd/galigo-testbot
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/galigo-testbot-linux-arm64 ./cmd/galigo-testbot
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/galigo-testbot-darwin-amd64 ./cmd/galigo-testbot
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/galigo-testbot-darwin-arm64 ./cmd/galigo-testbot
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/galigo-testbot-windows-amd64.exe ./cmd/galigo-testbot
+          
+          # Create checksums
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/sbom.spdx.json
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          files: |
+            dist/*
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

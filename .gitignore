@@ -40,3 +40,4 @@ Thumbs.db
 
 # Testbot storage
 /var/
+cmd/galigo-testbot/var/

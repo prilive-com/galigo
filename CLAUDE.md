@@ -28,6 +28,7 @@ galigo/
 │   ├── chat_member.go      # ChatMember with polymorphic unmarshal
 │   ├── chat_permissions.go # ChatPermissions type
 │   ├── chat_admin_rights.go # ChatAdministratorRights type
+│   ├── identity.go         # BotCommand, BotCommandScope, BotName, BotDescription
 │   ├── forum.go            # Sticker, ForumTopic types
 │   ├── config.go       # Configuration helpers
 │   ├── parse_mode.go   # ParseMode constants
@@ -50,6 +51,7 @@ galigo/
 │   ├── chat_admin.go   # Chat admin methods (BanChatMember, etc.)
 │   ├── polls.go        # Poll methods (SendPoll, StopPoll)
 │   ├── forum.go        # Forum topic methods
+│   ├── identity.go     # Bot identity methods (commands, profile, admin rights)
 │   ├── validate.go     # Input validation helpers
 │   ├── options.go      # Functional options for requests
 │   ├── config.go       # Sender configuration
@@ -71,6 +73,7 @@ galigo/
 │       │   ├── gifts.go       # Gift catalog scenarios (S23)
 │       │   ├── checklists.go  # Checklist lifecycle scenarios (S24, requires Premium)
 │       │   ├── extras.go      # Extras scenarios (S25-S32: geo, bulk, reactions, user info, chat settings)
+│       │   ├── bot_config.go  # Bot identity scenarios (S33-S35: commands, profile, admin defaults)
 │       │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │       │   └── webhook.go    # Webhook scenarios (S13-S14, opt-in)
 │       ├── fixtures/   # Embedded test media files (go:embed)
@@ -83,7 +86,7 @@ galigo/
 │       │   └── videonote.mp4  # Minimal H.264 MP4 (240x240, square)
 │       ├── config/     # Environment config + .env loader
 │       ├── evidence/   # JSON report generation
-│       ├── registry/   # Method coverage tracking (64 target methods)
+│       ├── registry/   # Method coverage tracking (75 target methods)
 │       └── cleanup/    # Message cleanup utilities
 └── examples/
     └── echo/           # Echo bot example
@@ -123,6 +126,7 @@ go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21
 go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
 go run ./cmd/galigo-testbot --run extras      # Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
+go run ./cmd/galigo-testbot --run bot-config  # Bot identity (S33-S35: commands, profile, admin defaults)
 go run ./cmd/galigo-testbot --run interactive # Interactive (S12, requires user click)
 go run ./cmd/galigo-testbot --run webhook     # Webhook lifecycle (S13-S14)
 go run ./cmd/galigo-testbot --status          # Show method coverage
@@ -355,8 +359,9 @@ The testbot validates API methods against real Telegram servers. It runs scenari
 | Stickers | S20: Sticker Set Lifecycle | createNewStickerSet, getStickerSet, addStickerToSet, setStickerPositionInSet, setStickerEmojiList, setStickerSetTitle, deleteStickerFromSet, deleteStickerSet |
 | Stars | S21-S22: Star Balance, Invoice | getMyStarBalance, getStarTransactions, sendInvoice |
 | Gifts | S23: Gift Catalog | getAvailableGifts |
-| Checklists | S24: Checklist Lifecycle | sendChecklist, editChecklist |
+| Checklists | S24: Checklist Lifecycle | sendChecklist, editMessageChecklist |
 | Extras | S25-S32: Geo, Bulk, Reactions, User Info, Chat Settings | sendLocation, sendVenue, sendContact, sendDice, forwardMessages, copyMessages, deleteMessages, setMessageReaction, getUserProfilePhotos, getUserChatBoosts, setChatPhoto, deleteChatPhoto, setChatPermissions |
+| Bot Config | S33-S35: Bot Commands, Profile, Admin Defaults | setMyCommands, getMyCommands, deleteMyCommands, setMyName, getMyName, setMyDescription, getMyDescription, setMyShortDescription, getMyShortDescription, setMyDefaultAdministratorRights, getMyDefaultAdministratorRights |
 | Interactive | S12: Callback Query (opt-in) | answerCallbackQuery |
 | Webhook | S13-S14: Webhook Lifecycle, GetUpdates (opt-in) | setWebhook, getWebhookInfo, deleteWebhook, getUpdates |
 
@@ -383,7 +388,7 @@ go run ./cmd/galigo-testbot --status
 
 ### Available Suites
 
-CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `stickers`, `sticker-lifecycle`, `stars`, `star-balance`, `invoice`, `gifts`, `checklists`, `extras`, `geo`, `venue`, `contact-dice`, `bulk`, `reactions`, `user-info`, `chat-photo`, `chat-permissions`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
+CLI `--run` values: `smoke`, `identity`, `messages`, `forward`, `actions`, `core`, `media`, `media-uploads`, `media-groups`, `edit-media`, `get-file`, `edit-message-media`, `keyboards`, `inline-keyboard`, `chat-admin`, `chat-info`, `chat-settings`, `pin-messages`, `polls`, `forum-stickers`, `interactive`, `callback`, `stickers`, `sticker-lifecycle`, `stars`, `star-balance`, `invoice`, `gifts`, `checklists`, `extras`, `geo`, `venue`, `contact-dice`, `bulk`, `reactions`, `user-info`, `chat-photo`, `chat-permissions`, `bot-config`, `bot-commands`, `bot-profile`, `bot-admin-defaults`, `webhook`, `webhook-lifecycle`, `get-updates`, `all`
 
 ### Test Fixtures
 
@@ -515,6 +520,13 @@ The multipart encoder calls `InputFile.OpenReader()` which returns `Source()` if
 - `LogOut` - Log out from cloud Bot API
 - `CloseBot` - Close bot instance
 
+### Bot Commands & Profile
+- `SetMyCommands` / `GetMyCommands` / `DeleteMyCommands` - Manage bot commands
+- `SetMyName` / `GetMyName` - Set/get bot name
+- `SetMyDescription` / `GetMyDescription` - Set/get bot description
+- `SetMyShortDescription` / `GetMyShortDescription` - Set/get bot short description
+- `SetMyDefaultAdministratorRights` / `GetMyDefaultAdministratorRights` - Set/get default admin rights
+
 ### Messages
 - `SendMessage` - Send text messages
 - `SendPhoto` - Send photos (InputFile: file upload, URL, or file_id)
@@ -579,7 +591,7 @@ The multipart encoder calls `InputFile.OpenReader()` which returns `Source()` if
 
 ### Checklists
 - `SendChecklist` - Send checklist (nested `InputChecklist` field, requires Premium)
-- `EditChecklist` - Edit checklist
+- `EditMessageChecklist` - Edit checklist
 
 ### Inline Queries
 - `AnswerInlineQuery` / `AnswerWebAppQuery` / `SavePreparedInlineMessage`

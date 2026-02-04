@@ -11,14 +11,14 @@ func S24_Checklists() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName:        "S24-Checklists",
 		ScenarioDescription: "Send and edit a checklist message",
-		CoveredMethods:      []string{"sendChecklist", "editChecklist"},
+		CoveredMethods:      []string{"sendChecklist", "editMessageChecklist"},
 		ScenarioTimeout:     30 * time.Second,
 		ScenarioSteps: []engine.Step{
 			&engine.SendChecklistStep{
 				Title: "[galigo-test] Test Checklist",
 				Tasks: []string{"Task 1: Buy groceries", "Task 2: Write tests", "Task 3: Deploy"},
 			},
-			&engine.EditChecklistStep{
+			&engine.EditMessageChecklistStep{
 				Title: "[galigo-test] Updated Checklist",
 				Tasks: []engine.ChecklistTaskInput{
 					{ID: 1, Text: "Task 1: Buy groceries (done)"},

@@ -92,6 +92,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 	scenarios = append(scenarios, suites.AllExtrasScenarios()...)
+	scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -101,8 +102,8 @@ func showCoverageStatus(logger *slog.Logger) {
 
 	report := registry.CheckCoverage(coverers)
 
-	fmt.Println("Method Coverage Status (All Phases + Tier 2 + Interactive + Webhook)")
-	fmt.Println("============================================================")
+	fmt.Println("Method Coverage Status (All Phases + Tier 2 + Interactive + Webhook + Bot Config)")
+	fmt.Println("================================================================================")
 	fmt.Printf("Covered: %d methods\n", len(report.Covered))
 	for _, m := range report.Covered {
 		fmt.Printf("  + %s\n", m)
@@ -221,6 +222,15 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S31_ChatPhotoLifecycle()}
 	case "chat-permissions":
 		scenarios = []engine.Scenario{suites.S32_ChatPermissionsLifecycle()}
+	// Bot Identity (S33-S35)
+	case "bot-config":
+		scenarios = suites.AllBotConfigScenarios()
+	case "bot-commands":
+		scenarios = []engine.Scenario{suites.S33_BotCommands()}
+	case "bot-profile":
+		scenarios = []engine.Scenario{suites.S34_BotProfile()}
+	case "bot-admin-defaults":
+		scenarios = []engine.Scenario{suites.S35_BotAdminDefaults()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -229,10 +239,11 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllStarsScenarios()...)
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
 		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
+		scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, all")
 		os.Exit(1)
 	}
 
@@ -570,6 +581,15 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S31_ChatPhotoLifecycle()}
 	case "chat-permissions":
 		scenarios = []engine.Scenario{suites.S32_ChatPermissionsLifecycle()}
+	// Bot Identity (S33-S35)
+	case "bot-config":
+		scenarios = suites.AllBotConfigScenarios()
+	case "bot-commands":
+		scenarios = []engine.Scenario{suites.S33_BotCommands()}
+	case "bot-profile":
+		scenarios = []engine.Scenario{suites.S34_BotProfile()}
+	case "bot-admin-defaults":
+		scenarios = []engine.Scenario{suites.S35_BotAdminDefaults()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -578,6 +598,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(scenarios, suites.AllStarsScenarios()...)
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
 		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
+		scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)

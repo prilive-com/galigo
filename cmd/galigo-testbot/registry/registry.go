@@ -125,7 +125,20 @@ var AllMethods = []Method{
 
 	// === Extended: Checklists ===
 	{Name: "sendChecklist", Category: CategoryExtended},
-	{Name: "editChecklist", Category: CategoryExtended},
+	{Name: "editMessageChecklist", Category: CategoryExtended},
+
+	// === Bot Identity ===
+	{Name: "setMyCommands", Category: CategoryExtended},
+	{Name: "getMyCommands", Category: CategoryExtended},
+	{Name: "deleteMyCommands", Category: CategoryExtended},
+	{Name: "setMyName", Category: CategoryExtended},
+	{Name: "getMyName", Category: CategoryExtended},
+	{Name: "setMyDescription", Category: CategoryExtended},
+	{Name: "getMyDescription", Category: CategoryExtended},
+	{Name: "setMyShortDescription", Category: CategoryExtended},
+	{Name: "getMyShortDescription", Category: CategoryExtended},
+	{Name: "setMyDefaultAdministratorRights", Category: CategoryExtended},
+	{Name: "getMyDefaultAdministratorRights", Category: CategoryExtended},
 
 	// === Legacy Methods ===
 	// Webhook management

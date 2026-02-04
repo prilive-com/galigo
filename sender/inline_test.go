@@ -129,11 +129,11 @@ func TestSendChecklist_Validation(t *testing.T) {
 	}
 }
 
-// ==================== EditChecklist ====================
+// ==================== EditMessageChecklist ====================
 
-func TestEditChecklist(t *testing.T) {
+func TestEditMessageChecklist(t *testing.T) {
 	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/editChecklist", func(w http.ResponseWriter, r *http.Request) {
+	server.On("/bot"+testutil.TestToken+"/editMessageChecklist", func(w http.ResponseWriter, r *http.Request) {
 		testutil.ReplyOK(w, map[string]any{
 			"message_id": 1,
 			"chat":       map[string]any{"id": int64(123), "type": "private"},
@@ -142,7 +142,7 @@ func TestEditChecklist(t *testing.T) {
 	})
 
 	client := testutil.NewTestClient(t, server.BaseURL())
-	msg, err := client.EditChecklist(context.Background(), sender.EditChecklistRequest{
+	msg, err := client.EditMessageChecklist(context.Background(), sender.EditMessageChecklistRequest{
 		ChatID:    int64(123),
 		MessageID: 1,
 		Checklist: tg.InputChecklist{
@@ -154,22 +154,22 @@ func TestEditChecklist(t *testing.T) {
 	assert.Equal(t, 1, msg.MessageID)
 }
 
-func TestEditChecklist_Validation(t *testing.T) {
+func TestEditMessageChecklist_Validation(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	client := testutil.NewTestClient(t, server.BaseURL())
 
 	tests := []struct {
 		name string
-		req  sender.EditChecklistRequest
+		req  sender.EditMessageChecklistRequest
 		want string
 	}{
-		{"missing chat_id", sender.EditChecklistRequest{MessageID: 1}, "chat_id"},
-		{"missing message_id", sender.EditChecklistRequest{ChatID: int64(1)}, "message_id"},
+		{"missing chat_id", sender.EditMessageChecklistRequest{MessageID: 1}, "chat_id"},
+		{"missing message_id", sender.EditMessageChecklistRequest{ChatID: int64(1)}, "message_id"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := client.EditChecklist(context.Background(), tt.req)
+			_, err := client.EditMessageChecklist(context.Background(), tt.req)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.want)
 		})

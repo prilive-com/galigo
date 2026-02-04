@@ -374,20 +374,20 @@ func (s *SendChecklistStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	}, nil
 }
 
-// EditChecklistStep edits the last checklist message.
-type EditChecklistStep struct {
+// EditMessageChecklistStep edits the last checklist message.
+type EditMessageChecklistStep struct {
 	Title string
 	Tasks []ChecklistTaskInput
 }
 
-func (s *EditChecklistStep) Name() string { return "editChecklist" }
+func (s *EditMessageChecklistStep) Name() string { return "editMessageChecklist" }
 
-func (s *EditChecklistStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+func (s *EditMessageChecklistStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	if rt.LastMessage == nil {
 		return nil, fmt.Errorf("no last message to edit")
 	}
 
-	msg, err := rt.Sender.EditChecklist(ctx, rt.ChatID, rt.LastMessage.MessageID, s.Title, s.Tasks)
+	msg, err := rt.Sender.EditMessageChecklist(ctx, rt.ChatID, rt.LastMessage.MessageID, s.Title, s.Tasks)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (s *EditChecklistStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	rt.LastMessage = msg
 
 	return &StepResult{
-		Method:     "editChecklist",
+		Method:     "editMessageChecklist",
 		MessageIDs: []int{msg.MessageID},
 		Evidence: map[string]any{
 			"message_id": msg.MessageID,

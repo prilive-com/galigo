@@ -607,6 +607,7 @@ go run ./cmd/galigo-testbot --run stickers    # Phase E: sticker lifecycle (S20)
 go run ./cmd/galigo-testbot --run stars       # Phase E: star balance + transactions (S21-S22)
 go run ./cmd/galigo-testbot --run gifts       # Phase E: gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Phase E: checklist lifecycle (S24, requires Premium)
+go run ./cmd/galigo-testbot --run bot-config  # Phase G: bot identity (S33-S35)
 
 # Run individual scenarios
 go run ./cmd/galigo-testbot --run smoke            # S0: Quick sanity check
@@ -647,6 +648,10 @@ go run ./cmd/galigo-testbot --run reactions              # S29: Reactions
 go run ./cmd/galigo-testbot --run user-info              # S30: User profile photos + boosts
 go run ./cmd/galigo-testbot --run chat-photo             # S31: Chat photo lifecycle
 go run ./cmd/galigo-testbot --run chat-permissions       # S32: Chat permissions lifecycle
+go run ./cmd/galigo-testbot --run bot-config             # S33-S35: Bot identity
+go run ./cmd/galigo-testbot --run bot-commands           # S33: Bot commands
+go run ./cmd/galigo-testbot --run bot-profile            # S34: Bot profile
+go run ./cmd/galigo-testbot --run bot-admin-defaults     # S35: Bot admin defaults
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -710,7 +715,7 @@ Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "no
 | S21-StarBalance | getMyStarBalance, getStarTransactions | Star balance and transactions |
 | S22-Invoice | sendInvoice | Send a star invoice |
 | S23-Gifts | getAvailableGifts | Gift catalog |
-| S24-Checklists | sendChecklist, editChecklist | Checklist lifecycle (requires Premium) |
+| S24-Checklists | sendChecklist, editMessageChecklist | Checklist lifecycle (requires Premium) |
 
 S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 requires Telegram Premium and is excluded from `--run all`.
 
@@ -728,6 +733,14 @@ S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 req
 | S32-ChatPermissionsLifecycle | setChatPermissions | Permissions save/restore using tg.AllPermissions() |
 
 S31-S32 require admin with `can_change_info` / `can_restrict_members` permissions. Uses `SkipError` framework for graceful prerequisite handling.
+
+#### Phase G: Bot Identity (S33-S35)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S33-BotCommands | setMyCommands, getMyCommands, deleteMyCommands | Bot command menu lifecycle |
+| S34-BotProfile | setMyName, getMyName, setMyDescription, getMyDescription, setMyShortDescription, getMyShortDescription | Bot name and description management |
+| S35-BotAdminDefaults | setMyDefaultAdministratorRights, getMyDefaultAdministratorRights | Default admin rights for groups/channels |
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -748,9 +761,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **64 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **75 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-All 64 methods have acceptance test coverage. Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+All 75 methods have acceptance test coverage. Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -809,6 +822,7 @@ cmd/galigo-testbot/
 │   ├── steps_misc.go       # Misc steps (SendDice, SetMessageReaction, GetUserProfilePhotos, GetUserChatBoosts)
 │   ├── steps_bulk.go       # Bulk steps (SeedMessages, ForwardMessages, CopyMessages, DeleteMessages)
 │   ├── steps_chat_settings.go # Chat settings (SetChatPhoto, SetChatPermissions with save/restore)
+│   ├── steps_bot_config.go    # Bot identity steps (commands, profile, admin rights)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -824,6 +838,7 @@ cmd/galigo-testbot/
 │   ├── gifts.go       # Phase E: Gifts (S23)
 │   ├── checklists.go  # Phase E: Checklists (S24, Premium)
 │   ├── extras.go      # Phase F: Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
+│   ├── bot_config.go  # Phase G: Bot identity (S33-S35: commands, profile, admin defaults)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
@@ -831,7 +846,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (64 methods)
+├── registry/       # Target method list and coverage checking (75 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

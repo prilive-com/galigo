@@ -54,41 +54,43 @@ jobs:
       - name: Run gosec
         run: gosec -no-fail -fmt sarif -out gosec.sarif ./...
 
-      - name: Upload gosec SARIF
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: gosec.sarif
-          category: gosec
+      # SARIF upload requires Code Security enabled (free for public repos)
+      # - name: Upload gosec SARIF
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   if: always()
+      #   with:
+      #     sarif_file: gosec.sarif
+      #     category: gosec
 
   # ============================================================
   # JOB 3: CodeQL - GitHub's semantic code analysis
+  # Requires Code Security enabled (free for public repos, paid for private)
+  # Uncomment when Code Security is enabled
   # ============================================================
-  codeql:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    # Skip on PRs from forks (they can't write security events)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: go
-          queries: security-extended
-
-      - name: Build
-        run: go build ./...
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: "/language:go"
+  # codeql:
+  #   name: CodeQL Analysis
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - uses: actions/setup-go@v5
+  #       with:
+  #         go-version-file: go.mod
+  #
+  #     - name: Initialize CodeQL
+  #       uses: github/codeql-action/init@v4
+  #       with:
+  #         languages: go
+  #         queries: security-extended
+  #
+  #     - name: Build
+  #       run: go build ./...
+  #
+  #     - name: Perform CodeQL Analysis
+  #       uses: github/codeql-action/analyze@v4
+  #       with:
+  #         category: "/language:go"
 
   # ============================================================
   # JOB 4: Dependency Review - Check for vulnerable deps in PRs

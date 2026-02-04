@@ -83,28 +83,10 @@ jobs:
       - name: Build testbot
         run: go build -o galigo-testbot ./cmd/galigo-testbot
 
+      - name: Write .env file
+        run: echo "${{ secrets.TESTBOT_ENV }}" > .env
+
       - name: Run test suite
-        env:
-          # ══════════════════════════════════════════════════════
-          # SECRETS (from GitHub Environment 'telegram-live')
-          # Configure in: Settings → Environments → telegram-live → Add secret
-          # ══════════════════════════════════════════════════════
-          TESTBOT_TOKEN: ${{ secrets.TESTBOT_TOKEN }}
-          TESTBOT_CHAT_ID: ${{ secrets.TESTBOT_CHAT_ID }}
-          TESTBOT_ADMINS: ${{ secrets.TESTBOT_ADMINS }}
-          
-          # ══════════════════════════════════════════════════════
-          # CONFIGURATION (all vars from cmd/galigo-testbot/config/config.go)
-          # ══════════════════════════════════════════════════════
-          TESTBOT_MODE: polling
-          TESTBOT_STORAGE_DIR: ./var
-          TESTBOT_LOG_LEVEL: info
-          TESTBOT_MAX_MESSAGES_PER_RUN: "60"
-          TESTBOT_SEND_INTERVAL: "350ms"
-          TESTBOT_JITTER_INTERVAL: "150ms"
-          TESTBOT_RETRY_429: "true"
-          TESTBOT_MAX_429_RETRIES: "2"
-          TESTBOT_ALLOW_STRESS: "false"  # Never enable in CI
         run: |
           SUITE="${{ github.event.inputs.suite }}"
           if [ -z "$SUITE" ]; then SUITE="smoke"; fi
@@ -174,19 +156,10 @@ jobs:
       - name: Build testbot
         run: go build -o galigo-testbot ./cmd/galigo-testbot
 
+      - name: Write .env file
+        run: echo "${{ secrets.TESTBOT_ENV }}" > .env
+
       - name: Run extended test suite
-        env:
-          TESTBOT_TOKEN: ${{ secrets.TESTBOT_TOKEN }}
-          TESTBOT_CHAT_ID: ${{ secrets.TESTBOT_CHAT_ID }}
-          TESTBOT_ADMINS: ${{ secrets.TESTBOT_ADMINS }}
-          TESTBOT_MODE: polling
-          TESTBOT_LOG_LEVEL: info
-          TESTBOT_MAX_MESSAGES_PER_RUN: "100"
-          TESTBOT_SEND_INTERVAL: "400ms"
-          TESTBOT_JITTER_INTERVAL: "150ms"
-          TESTBOT_RETRY_429: "true"
-          TESTBOT_MAX_429_RETRIES: "3"
-          TESTBOT_ALLOW_STRESS: "false"
         run: ./galigo-testbot --run all
         timeout-minutes: 60
 

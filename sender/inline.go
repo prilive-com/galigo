@@ -34,8 +34,8 @@ type SendChecklistRequest struct {
 	ReplyParameters     *tg.ReplyParameters `json:"reply_parameters,omitempty"`
 }
 
-// EditChecklistRequest represents an editChecklist request.
-type EditChecklistRequest struct {
+// EditMessageChecklistRequest represents an editMessageChecklist request.
+type EditMessageChecklistRequest struct {
 	ChatID    tg.ChatID         `json:"chat_id"`
 	MessageID int               `json:"message_id"`
 	Checklist tg.InputChecklist `json:"checklist"`
@@ -90,8 +90,8 @@ func (c *Client) SendChecklist(ctx context.Context, req SendChecklistRequest) (*
 	return &result, nil
 }
 
-// EditChecklist edits a checklist message.
-func (c *Client) EditChecklist(ctx context.Context, req EditChecklistRequest) (*tg.Message, error) {
+// EditMessageChecklist edits a checklist message.
+func (c *Client) EditMessageChecklist(ctx context.Context, req EditMessageChecklistRequest) (*tg.Message, error) {
 	if err := validateChatID(req.ChatID); err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (c *Client) EditChecklist(ctx context.Context, req EditChecklistRequest) (*
 	}
 
 	var result tg.Message
-	if err := c.callJSON(ctx, "editChecklist", req, &result, extractChatID(req.ChatID)); err != nil {
+	if err := c.callJSON(ctx, "editMessageChecklist", req, &result, extractChatID(req.ChatID)); err != nil {
 		return nil, err
 	}
 	return &result, nil

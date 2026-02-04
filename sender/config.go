@@ -21,10 +21,10 @@ type Config struct {
 	IdleTimeout    time.Duration
 
 	// Rate limiting
-	GlobalRPS    float64
-	GlobalBurst  int
-	PerChatRPS   float64
-	PerChatBurst int
+	GlobalRPS       float64
+	GlobalBurst     int
+	PerChatRPS      float64
+	PerChatBurst    int
 	GroupRPS        float64 // Rate limit for group chats (negative chat IDs). 0 = use PerChatRPS.
 	GroupBurst      int     // Burst for group chats. 0 = use PerChatBurst.
 	MaxChatLimiters int     // Maximum number of per-chat limiters to prevent memory exhaustion. 0 = 10000.

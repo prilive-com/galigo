@@ -461,8 +461,8 @@ func (a *SenderAdapter) SendChecklist(ctx context.Context, chatID int64, title s
 	})
 }
 
-// EditChecklist edits a checklist message.
-func (a *SenderAdapter) EditChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error) {
+// EditMessageChecklist edits a checklist message.
+func (a *SenderAdapter) EditMessageChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error) {
 	inputTasks := make([]tg.InputChecklistTask, len(tasks))
 	for i, t := range tasks {
 		inputTasks[i] = tg.InputChecklistTask{
@@ -470,7 +470,7 @@ func (a *SenderAdapter) EditChecklist(ctx context.Context, chatID int64, message
 			Text: t.Text,
 		}
 	}
-	return a.client.EditChecklist(ctx, sender.EditChecklistRequest{
+	return a.client.EditMessageChecklist(ctx, sender.EditMessageChecklistRequest{
 		ChatID:    chatID,
 		MessageID: messageID,
 		Checklist: tg.InputChecklist{
@@ -588,6 +588,70 @@ func (a *SenderAdapter) DeleteChatPhoto(ctx context.Context, chatID int64) error
 // SetChatPermissions sets the default chat permissions.
 func (a *SenderAdapter) SetChatPermissions(ctx context.Context, chatID int64, perms tg.ChatPermissions) error {
 	return a.client.SetChatPermissions(ctx, chatID, perms)
+}
+
+// ================= Bot Identity =================
+
+// SetMyCommands sets the bot's command list.
+func (a *SenderAdapter) SetMyCommands(ctx context.Context, commands []tg.BotCommand) error {
+	return a.client.SetMyCommands(ctx, commands)
+}
+
+// GetMyCommands returns the bot's command list.
+func (a *SenderAdapter) GetMyCommands(ctx context.Context) ([]tg.BotCommand, error) {
+	return a.client.GetMyCommands(ctx)
+}
+
+// DeleteMyCommands removes the bot's command list.
+func (a *SenderAdapter) DeleteMyCommands(ctx context.Context) error {
+	return a.client.DeleteMyCommands(ctx)
+}
+
+// SetMyName sets the bot's name.
+func (a *SenderAdapter) SetMyName(ctx context.Context, name string) error {
+	return a.client.SetMyName(ctx, name)
+}
+
+// GetMyName returns the bot's name.
+func (a *SenderAdapter) GetMyName(ctx context.Context) (*tg.BotName, error) {
+	return a.client.GetMyName(ctx)
+}
+
+// SetMyDescription sets the bot's description.
+func (a *SenderAdapter) SetMyDescription(ctx context.Context, description string) error {
+	return a.client.SetMyDescription(ctx, description)
+}
+
+// GetMyDescription returns the bot's description.
+func (a *SenderAdapter) GetMyDescription(ctx context.Context) (*tg.BotDescription, error) {
+	return a.client.GetMyDescription(ctx)
+}
+
+// SetMyShortDescription sets the bot's short description.
+func (a *SenderAdapter) SetMyShortDescription(ctx context.Context, shortDescription string) error {
+	return a.client.SetMyShortDescription(ctx, shortDescription)
+}
+
+// GetMyShortDescription returns the bot's short description.
+func (a *SenderAdapter) GetMyShortDescription(ctx context.Context) (*tg.BotShortDescription, error) {
+	return a.client.GetMyShortDescription(ctx)
+}
+
+// SetMyDefaultAdministratorRights sets the bot's default admin rights.
+func (a *SenderAdapter) SetMyDefaultAdministratorRights(ctx context.Context, rights *tg.ChatAdministratorRights, forChannels bool) error {
+	var opts []sender.AdminRightsOption
+	if rights != nil {
+		opts = append(opts, sender.WithAdminRights(*rights))
+	}
+	if forChannels {
+		opts = append(opts, sender.ForChannels())
+	}
+	return a.client.SetMyDefaultAdministratorRights(ctx, opts...)
+}
+
+// GetMyDefaultAdministratorRights returns the bot's default admin rights.
+func (a *SenderAdapter) GetMyDefaultAdministratorRights(ctx context.Context, forChannels bool) (*tg.ChatAdministratorRights, error) {
+	return a.client.GetMyDefaultAdministratorRights(ctx, forChannels)
 }
 
 // SetWebhook sets a webhook URL.

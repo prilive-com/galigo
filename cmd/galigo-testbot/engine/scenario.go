@@ -280,7 +280,7 @@ type SenderClient interface {
 
 	// Extended: Checklists
 	SendChecklist(ctx context.Context, chatID int64, title string, tasks []string) (*tg.Message, error)
-	EditChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error)
+	EditMessageChecklist(ctx context.Context, chatID int64, messageID int, title string, tasks []ChecklistTaskInput) (*tg.Message, error)
 
 	// Geo & Contact
 	SendLocation(ctx context.Context, chatID int64, lat, lon float64) (*tg.Message, error)
@@ -302,6 +302,19 @@ type SenderClient interface {
 	SetChatPhoto(ctx context.Context, chatID int64, photo sender.InputFile) error
 	DeleteChatPhoto(ctx context.Context, chatID int64) error
 	SetChatPermissions(ctx context.Context, chatID int64, perms tg.ChatPermissions) error
+
+	// Bot Identity
+	SetMyCommands(ctx context.Context, commands []tg.BotCommand) error
+	GetMyCommands(ctx context.Context) ([]tg.BotCommand, error)
+	DeleteMyCommands(ctx context.Context) error
+	SetMyName(ctx context.Context, name string) error
+	GetMyName(ctx context.Context) (*tg.BotName, error)
+	SetMyDescription(ctx context.Context, description string) error
+	GetMyDescription(ctx context.Context) (*tg.BotDescription, error)
+	SetMyShortDescription(ctx context.Context, shortDescription string) error
+	GetMyShortDescription(ctx context.Context) (*tg.BotShortDescription, error)
+	SetMyDefaultAdministratorRights(ctx context.Context, rights *tg.ChatAdministratorRights, forChannels bool) error
+	GetMyDefaultAdministratorRights(ctx context.Context, forChannels bool) (*tg.ChatAdministratorRights, error)
 
 	// Webhook management methods
 	SetWebhook(ctx context.Context, url string) error

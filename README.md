@@ -81,6 +81,7 @@ galigo/
 │   ├── chat_member.go      # ChatMember with polymorphic unmarshal
 │   ├── chat_permissions.go # ChatPermissions type
 │   ├── chat_admin_rights.go # ChatAdministratorRights type
+│   ├── identity.go         # BotCommand, BotCommandScope, BotName, BotDescription
 │   ├── forum.go            # Sticker, ForumTopic types
 │   ├── config.go       # Configuration helpers
 │   ├── parse_mode.go   # ParseMode constants
@@ -103,6 +104,7 @@ galigo/
 │   ├── chat_admin.go   # Chat admin methods (BanChatMember, etc.)
 │   ├── polls.go        # Poll methods (SendPoll, StopPoll)
 │   ├── forum.go        # Forum topic methods
+│   ├── identity.go     # Bot identity methods (commands, profile, admin rights)
 │   ├── validate.go     # Input validation helpers
 │   ├── options.go      # Functional options for requests
 │   ├── config.go       # Sender configuration
@@ -152,6 +154,13 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 - `GetMe` - Get bot information
 - `LogOut` - Log out from cloud Bot API
 - `CloseBot` - Close bot instance
+
+### Bot Commands & Profile
+- `SetMyCommands` / `GetMyCommands` / `DeleteMyCommands` - Manage bot command menu
+- `SetMyName` / `GetMyName` - Set/get bot display name
+- `SetMyDescription` / `GetMyDescription` - Set/get bot description (shown in empty chat)
+- `SetMyShortDescription` / `GetMyShortDescription` - Set/get short description (shown in profile)
+- `SetMyDefaultAdministratorRights` / `GetMyDefaultAdministratorRights` - Set/get default admin rights
 
 ### Messages
 - `SendMessage` - Send text messages
@@ -251,7 +260,7 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 
 ### Checklists
 - `SendChecklist` - Send a checklist message
-- `EditChecklist` - Edit a checklist message
+- `EditMessageChecklist` - Edit a checklist message
 
 ### Inline Queries
 - `AnswerInlineQuery` - Answer an inline query
@@ -600,6 +609,7 @@ go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21
 go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
 go run ./cmd/galigo-testbot --run extras      # Extras (S25-S32: geo, bulk, reactions, user info, chat photo, permissions)
+go run ./cmd/galigo-testbot --run bot-config  # Bot identity (S33-S35: commands, profile, admin defaults)
 
 # Check method coverage
 go run ./cmd/galigo-testbot --status

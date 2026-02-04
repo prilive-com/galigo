@@ -1,0 +1,199 @@
+# galigo Live Integration Tests
+# Runs galigo-testbot against real Telegram API
+# SECURITY: Uses GitHub Environments with Required Reviewers
+#
+# Combined best practices from 4 security consultants (Feb 2026)
+name: Live Integration Tests
+
+on:
+  schedule:
+    # Daily smoke test at 5:15 AM UTC (low Telegram traffic)
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - core
+          - media
+          - keyboards
+          - chat-admin
+          - stickers
+          - stars
+          - all
+
+# CRITICAL: Only ONE live test at a time (prevents Telegram 429 chaos)
+concurrency:
+  group: telegram-live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ============================================================
+  # JOB 1: Live Telegram Test with Full Security Hardening
+  # ============================================================
+  live-test:
+    name: Run Testbot (${{ github.event.inputs.suite || 'smoke' }})
+    runs-on: ubuntu-latest
+    
+    # ══════════════════════════════════════════════════════════
+    # SECURITY LAYER 1: GitHub Environment with Required Reviewers
+    # - Secrets only available in this environment
+    # - Manual approval required for workflow_dispatch
+    # - Configure in: Settings → Environments → telegram-live
+    # ══════════════════════════════════════════════════════════
+    environment: telegram-live
+    
+    # ══════════════════════════════════════════════════════════
+    # SECURITY LAYER 2: Repository Owner Check
+    # - Prevents forks from running this workflow
+    # - Change 'prilive-com' to your actual org/username
+    # ══════════════════════════════════════════════════════════
+    if: github.repository_owner == 'prilive-com'
+    
+    steps:
+      # ════════════════════════════════════════════════════════
+      # SECURITY LAYER 3: Runner Hardening
+      # - Monitors network egress (detects token exfiltration)
+      # - Audits file system changes
+      # - Start with 'audit', switch to 'block' once stable
+      # ════════════════════════════════════════════════════════
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          allowed-endpoints: >
+            api.telegram.org:443
+            github.com:443
+            proxy.golang.org:443
+            sum.golang.org:443
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build testbot
+        run: go build -o galigo-testbot ./cmd/galigo-testbot
+
+      - name: Run test suite
+        env:
+          # ══════════════════════════════════════════════════════
+          # SECRETS (from GitHub Environment 'telegram-live')
+          # Configure in: Settings → Environments → telegram-live → Add secret
+          # ══════════════════════════════════════════════════════
+          TESTBOT_TOKEN: ${{ secrets.TESTBOT_TOKEN }}
+          TESTBOT_CHAT_ID: ${{ secrets.TESTBOT_CHAT_ID }}
+          TESTBOT_ADMINS: ${{ secrets.TESTBOT_ADMINS }}
+          
+          # ══════════════════════════════════════════════════════
+          # CONFIGURATION (all vars from cmd/galigo-testbot/config/config.go)
+          # ══════════════════════════════════════════════════════
+          TESTBOT_MODE: polling
+          TESTBOT_STORAGE_DIR: ./var
+          TESTBOT_LOG_LEVEL: info
+          TESTBOT_MAX_MESSAGES_PER_RUN: "60"
+          TESTBOT_SEND_INTERVAL: "350ms"
+          TESTBOT_JITTER_INTERVAL: "150ms"
+          TESTBOT_RETRY_429: "true"
+          TESTBOT_MAX_429_RETRIES: "2"
+          TESTBOT_ALLOW_STRESS: "false"  # Never enable in CI
+        run: |
+          SUITE="${{ github.event.inputs.suite }}"
+          if [ -z "$SUITE" ]; then SUITE="smoke"; fi
+          
+          echo "═══════════════════════════════════════════════════"
+          echo "Running suite: $SUITE"
+          echo "═══════════════════════════════════════════════════"
+          
+          ./galigo-testbot --run "$SUITE"
+        timeout-minutes: 30
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testbot-report-${{ github.event.inputs.suite || 'smoke' }}-${{ github.run_number }}
+          path: var/*.json
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## 🤖 Testbot Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | ${{ github.event.inputs.suite || 'smoke' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f var/*.json ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Reports generated successfully" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ============================================================
+  # JOB 2: Weekly Extended Test (all non-interactive suites)
+  # ============================================================
+  weekly-extended:
+    name: Weekly Extended Tests
+    runs-on: ubuntu-latest
+    environment: telegram-live
+    
+    # Only run on Sunday schedule, not manual dispatch
+    if: |
+      github.event_name == 'schedule' && 
+      github.repository_owner == 'prilive-com'
+    
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+          allowed-endpoints: >
+            api.telegram.org:443
+            github.com:443
+            proxy.golang.org:443
+            sum.golang.org:443
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build testbot
+        run: go build -o galigo-testbot ./cmd/galigo-testbot
+
+      - name: Run extended test suite
+        env:
+          TESTBOT_TOKEN: ${{ secrets.TESTBOT_TOKEN }}
+          TESTBOT_CHAT_ID: ${{ secrets.TESTBOT_CHAT_ID }}
+          TESTBOT_ADMINS: ${{ secrets.TESTBOT_ADMINS }}
+          TESTBOT_MODE: polling
+          TESTBOT_LOG_LEVEL: info
+          TESTBOT_MAX_MESSAGES_PER_RUN: "100"
+          TESTBOT_SEND_INTERVAL: "400ms"
+          TESTBOT_JITTER_INTERVAL: "150ms"
+          TESTBOT_RETRY_429: "true"
+          TESTBOT_MAX_429_RETRIES: "3"
+          TESTBOT_ALLOW_STRESS: "false"
+        run: ./galigo-testbot --run all
+        timeout-minutes: 60
+
+      - name: Upload extended test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testbot-extended-${{ github.run_number }}
+          path: var/*.json
+          retention-days: 90

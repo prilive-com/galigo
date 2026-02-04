@@ -1,0 +1,21 @@
+# galigo Code Owners
+# Require maintainer review on sensitive areas
+
+# Critical pipelines and release logic
+.github/workflows/ci.yml            @prilive-com/galigo-maintainers
+.github/workflows/release.yml       @prilive-com/galigo-maintainers
+.github/workflows/integration.yml   @prilive-com/galigo-maintainers
+.github/workflows/security.yml      @prilive-com/galigo-maintainers
+
+# Security policies
+.github/SECURITY.md                 @prilive-com/galigo-maintainers
+.github/CODE_OF_CONDUCT.md          @prilive-com/galigo-maintainers
+
+# Core library
+sender/                             @prilive-com/galigo-maintainers
+receiver/                           @prilive-com/galigo-maintainers
+tg/                                 @prilive-com/galigo-maintainers
+
+# Test infrastructure
+cmd/galigo-testbot/                 @prilive-com/galigo-maintainers
+internal/                           @prilive-com/galigo-maintainers

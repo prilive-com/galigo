@@ -1,0 +1,122 @@
+# galigo Fuzz Testing
+# Runs Go native fuzz tests to find edge cases and crashes
+name: Fuzz Tests
+
+on:
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Fuzz duration per test'
+        required: true
+        default: '5m'
+        type: choice
+        options:
+          - 1m
+          - 5m
+          - 15m
+          - 30m
+          - 1h
+
+permissions:
+  contents: read
+  issues: write  # To create issues for found crashes
+
+env:
+  FUZZTIME: ${{ github.event.inputs.fuzztime || '5m' }}
+
+jobs:
+  fuzz:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fuzz-target:
+          - FuzzUnmarshalTransactionPartner
+          - FuzzUnmarshalChatBoostSource
+          - FuzzUnmarshalRevenueWithdrawalState
+          - FuzzChatBoostUnmarshalJSON
+          - FuzzStarTransactionUnmarshalJSON
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod  # Single source of truth
+          cache: true
+
+      - name: Restore fuzz corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/go-build/fuzz
+            testdata/fuzz
+          key: fuzz-corpus-${{ matrix.fuzz-target }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.fuzz-target }}-
+
+      - name: Run fuzz test - ${{ matrix.fuzz-target }}
+        id: fuzz
+        run: |
+          echo "Running ${{ matrix.fuzz-target }} for ${{ env.FUZZTIME }}..."
+          go test -fuzz=${{ matrix.fuzz-target }} -fuzztime=${{ env.FUZZTIME }} ./tg/ 2>&1 | tee fuzz-output.txt
+          
+          # Check for failures
+          if grep -q "FAIL" fuzz-output.txt; then
+            echo "fuzz_failed=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Save fuzz corpus
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build/fuzz
+            testdata/fuzz
+          key: fuzz-corpus-${{ matrix.fuzz-target }}-${{ github.sha }}
+
+      - name: Upload crash artifacts
+        uses: actions/upload-artifact@v4
+        if: steps.fuzz.outputs.fuzz_failed == 'true'
+        with:
+          name: fuzz-crash-${{ matrix.fuzz-target }}
+          path: |
+            testdata/fuzz/**
+            fuzz-output.txt
+          retention-days: 90
+
+      - name: Create issue on crash
+        if: steps.fuzz.outputs.fuzz_failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('fuzz-output.txt', 'utf8');
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔍 Fuzz test crash: ${{ matrix.fuzz-target }}`,
+              body: `## Fuzz Test Failure
+              
+            **Target:** \`${{ matrix.fuzz-target }}\`
+            **Duration:** ${{ env.FUZZTIME }}
+            **Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### Output
+            \`\`\`
+            ${output.slice(0, 3000)}
+            \`\`\`
+
+            ### Reproduction
+            Download the crash artifact and run:
+            \`\`\`bash
+            go test -run=${{ matrix.fuzz-target }}/<crash_file> ./tg/
+            \`\`\`
+            `,
+              labels: ['bug', 'fuzz', 'automated']
+            });

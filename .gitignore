@@ -41,3 +41,12 @@ Thumbs.db
 # Testbot storage
 /var/
 cmd/galigo-testbot/var/
+
+# Internal docs (local only)
+/docs/
+CODE_REVIEW.md
+
+# AI context files (local only)
+CLAUDE.md
+.cursorrules
+.aider*

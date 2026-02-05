@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prilive-com/galigo/sender"
 	"github.com/sony/gobreaker/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/sender"
 )
 
 // CircuitBreakerNeverTrip returns settings where breaker never opens.

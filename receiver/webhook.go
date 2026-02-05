@@ -13,9 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prilive-com/galigo/tg"
 	"github.com/sony/gobreaker/v2"
 	"golang.org/x/time/rate"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 var _ http.Handler = (*WebhookHandler)(nil)

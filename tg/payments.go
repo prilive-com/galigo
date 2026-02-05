@@ -124,13 +124,13 @@ type TransactionPartnerTelegramAds struct {
 
 func (TransactionPartnerTelegramAds) transactionPartnerTag() {}
 
-// TransactionPartnerTelegramApi represents payment from Telegram API usage.
-type TransactionPartnerTelegramApi struct {
+// TransactionPartnerTelegramAPI represents payment from Telegram API usage.
+type TransactionPartnerTelegramAPI struct {
 	Type         string `json:"type"` // Always "telegram_api"
 	RequestCount int    `json:"request_count"`
 }
 
-func (TransactionPartnerTelegramApi) transactionPartnerTag() {}
+func (TransactionPartnerTelegramAPI) transactionPartnerTag() {}
 
 // TransactionPartnerOther represents an unknown transaction partner type.
 type TransactionPartnerOther struct {
@@ -177,7 +177,7 @@ func unmarshalTransactionPartner(data json.RawMessage) TransactionPartner {
 		}
 		return p
 	case "telegram_api":
-		var p TransactionPartnerTelegramApi
+		var p TransactionPartnerTelegramAPI
 		if err := json.Unmarshal(data, &p); err != nil {
 			return TransactionPartnerUnknown{Type: probe.Type, Raw: data}
 		}

@@ -23,7 +23,7 @@ func TestCircuitBreaker_OpensOnFailures(t *testing.T) {
 	client := testutil.NewBreakerTestClient(t, server.BaseURL())
 
 	// Make requests to trip breaker (needs 2 consecutive failures)
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -55,7 +55,7 @@ func TestCircuitBreaker_RecoverAfterTimeout(t *testing.T) {
 	client := testutil.NewBreakerTestClient(t, server.BaseURL())
 
 	// Trip the breaker
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -94,7 +94,7 @@ func TestCircuitBreaker_StaysOpenOnContinuedFailure(t *testing.T) {
 	client := testutil.NewBreakerTestClient(t, server.BaseURL())
 
 	// Trip the breaker
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, _ = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -129,7 +129,7 @@ func TestCircuitBreaker_SuccessDoesNotTrip(t *testing.T) {
 	client := testutil.NewBreakerTestClient(t, server.BaseURL())
 
 	// Many successful requests should not trip breaker
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -164,7 +164,7 @@ func TestCircuitBreaker_MixedResultsPartialFailure(t *testing.T) {
 
 	// Mixed results - breaker should eventually trip due to failure ratio
 	var lastErr error
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, lastErr = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -202,7 +202,7 @@ func TestCircuitBreaker_DefaultSettings(t *testing.T) {
 	defer client.Close()
 
 	// Make 3 failing requests - should trip default breaker
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		_, _ = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -238,7 +238,7 @@ func TestCircuitBreaker_CustomSettings(t *testing.T) {
 	defer client.Close()
 
 	// Many failures should not trip (custom settings never trip)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, _ = client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",

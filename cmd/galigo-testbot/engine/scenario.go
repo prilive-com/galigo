@@ -162,7 +162,7 @@ func (rt *Runtime) ProbeChat(ctx context.Context) error {
 	member, err := rt.Sender.GetChatMember(ctx, rt.ChatID, me.ID)
 	if err != nil {
 		// Not a member or can't query — that's OK, just not admin
-		return nil
+		return nil //nolint:nilerr // Intentional: error means bot is not admin, which is a valid state
 	}
 
 	status := member.Status()

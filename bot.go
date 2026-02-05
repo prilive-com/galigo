@@ -36,7 +36,6 @@ type botConfig struct {
 	// Webhook settings
 	webhookPort   int
 	webhookSecret string
-	allowedDomain string
 
 	// Sender settings
 	senderConfig sender.Config
@@ -126,7 +125,7 @@ func WithUpdateBufferSize(size int) Option {
 func New(token string, opts ...Option) (*Bot, error) {
 	// P0.7 FIX: Use proper token validation instead of just empty check
 	if err := validate.Token(token); err != nil {
-		return nil, fmt.Errorf("%w: %v", tg.ErrInvalidToken, err)
+		return nil, fmt.Errorf("%w: %w", tg.ErrInvalidToken, err)
 	}
 
 	cfg := botConfig{

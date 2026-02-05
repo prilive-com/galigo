@@ -101,6 +101,15 @@ func NewAPIErrorWithRetry(method string, code int, description string, retryAfte
 
 // DetectSentinel maps Telegram error codes/descriptions to sentinel errors.
 // Description-based detection is prioritized over HTTP status codes for more specific errors.
+//
+// Design note: This function uses substring matching on error descriptions, which is
+// inherently fragile if Telegram changes their error messages. However, this approach
+// was chosen over code-only mapping because:
+//  1. Telegram uses the same HTTP codes (400, 403) for many different errors
+//  2. Description matching provides more specific error identification
+//  3. The acceptance test suite validates these mappings against real Telegram responses
+//
+// If Telegram changes an error message, the acceptance tests will catch the drift.
 func DetectSentinel(code int, desc string) error {
 	// Check description first for specific error messages
 	descLower := strings.ToLower(desc)

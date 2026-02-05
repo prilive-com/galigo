@@ -1,24 +1,31 @@
 # galigo
 
-A unified Go library for Telegram Bot API with built-in resilience features.
+[![Go Reference](https://pkg.go.dev/badge/github.com/prilive-com/galigo.svg)](https://pkg.go.dev/github.com/prilive-com/galigo)
+[![CI](https://github.com/prilive-com/galigo/actions/workflows/ci.yml/badge.svg)](https://github.com/prilive-com/galigo/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/prilive-com/galigo)](https://goreportcard.com/report/github.com/prilive-com/galigo)
+[![codecov](https://codecov.io/gh/prilive-com/galigo/graph/badge.svg)](https://codecov.io/gh/prilive-com/galigo)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A production-grade Go library for the Telegram Bot API with built-in resilience.
+
+galigo is designed for high-load environments where reliability matters. Unlike libraries that treat errors as exceptional, galigo treats rate limits, network failures, and API instability as expected conditions — handling them automatically so you can focus on your bot's logic.
 
 ## Features
 
-- **Dual mode**: Webhook or long polling for receiving updates
-- **Circuit breaker**: Fault tolerance with sony/gobreaker/v2
-- **Rate limiting**: Per-chat and global rate limiting with golang.org/x/time/rate
-- **Retry with backoff**: Exponential backoff with cryptographic jitter (crypto/rand)
-- **File uploads**: InputFile abstraction with streaming multipart support (no memory buffering)
-- **TLS 1.2+**: Secure connections by default
-- **Secret token protection**: Auto-redacts tokens in logs (slog.LogValuer)
-- **Modern Go**: Built for Go 1.25+ with generics and iter.Seq iterators
-- **Acceptance testing**: Built-in testbot for real Telegram API validation
+- **Resilient** — Circuit breaker prevents cascading failures; only trips on 5xx/network errors, not user errors
+- **Respectful** — Smart rate limiting with per-chat and global limits; auto-handles 429 Retry-After
+- **Secure** — Tokens auto-redacted from logs and error messages; TLS 1.2+ enforced
+- **Complete** — Full Telegram Bot API coverage including Stars, Gifts, Business, and Forum Topics
+- **Flexible** — Use the unified Bot type or import only `sender/` or `receiver/` packages
+- **Modern** — Built for Go 1.25+ with generics, iterators, and structured logging
 
 ## Installation
 
 ```bash
 go get github.com/prilive-com/galigo
 ```
+
+**Requirements:** Go 1.25 or later
 
 ## Quick Start
 
@@ -33,13 +40,10 @@ import (
     "syscall"
 
     "github.com/prilive-com/galigo"
-    "github.com/prilive-com/galigo/tg"
 )
 
 func main() {
-    token := os.Getenv("TELEGRAM_BOT_TOKEN")
-
-    bot, err := galigo.New(token,
+    bot, err := galigo.New(os.Getenv("TELEGRAM_BOT_TOKEN"),
         galigo.WithPolling(30, 100),
         galigo.WithRetries(3),
         galigo.WithRateLimit(30.0, 5),
@@ -59,85 +63,137 @@ func main() {
     for update := range bot.Updates() {
         if update.Message != nil {
             bot.SendMessage(ctx, update.Message.Chat.ID,
-                "Echo: "+update.Message.Text,
-                galigo.WithReplyTo(update.Message.MessageID))
+                "Echo: "+update.Message.Text)
         }
     }
 }
 ```
 
-## Package Structure
+## Documentation
 
+| Resource | Description |
+|----------|-------------|
+| [API Reference](https://pkg.go.dev/github.com/prilive-com/galigo) | Full type and method documentation |
+| [Examples](./examples/) | Working code for common patterns |
+| [Testing Guide](./docs/testing.md) | Integration testing with galigo-testbot |
+| [Telegram Bot API](https://core.telegram.org/bots/api) | Official Telegram documentation |
+
+### Examples
+
+- [Echo Bot](./examples/echo/) — Basic message handling
+- [Keyboards](./examples/keyboard/) — Inline keyboard interactions
+- [Webhooks](./examples/webhook/) — Production webhook setup
+
+## Compatibility
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| **Go** | 1.25+ | Uses generics, iter.Seq, log/slog |
+| **Telegram Bot API** | 8.0+ | Stars, Gifts, Business, Checklists |
+| **Platforms** | Linux, macOS, Windows | Pure Go, no CGO |
+
+### Supported API Methods
+
+galigo implements **150+ methods** covering:
+
+- Messages, media, files, and albums
+- Inline keyboards and callback queries
+- Chat administration and moderation
+- Forum topics and permissions
+- Stickers and custom emoji
+- Payments, Stars, and Gifts
+- Polls, quizzes, and giveaways
+- Webhooks and long polling
+
+For the complete method list, see the [API Reference](https://pkg.go.dev/github.com/prilive-com/galigo/sender).
+
+## Thread Safety
+
+| Component | Safe | Notes |
+|-----------|------|-------|
+| `galigo.Bot` | ✅ | All methods safe for concurrent use |
+| `sender.Client` | ✅ | Designed for high-concurrency |
+| `receiver.PollingClient` | ✅ | Single goroutine fetches, multiple can consume |
+| `tg.Update` | ✅ | Immutable after creation |
+
+## Error Handling
+
+galigo provides typed errors for precise handling:
+
+```go
+import (
+    "errors"
+    "github.com/prilive-com/galigo/tg"
+)
+
+_, err := bot.SendMessage(ctx, chatID, text)
+if err != nil {
+    switch {
+    case errors.Is(err, tg.ErrBotBlocked):
+        // User blocked the bot — remove from database
+    case errors.Is(err, tg.ErrTooManyRequests):
+        // Rate limited — already retried, consider backing off
+    case errors.Is(err, tg.ErrMessageNotFound):
+        // Message was deleted — update local state
+    case errors.Is(err, tg.ErrCircuitOpen):
+        // Circuit breaker open — Telegram API may be down
+    default:
+        var apiErr *tg.APIError
+        if errors.As(err, &apiErr) {
+            log.Printf("API error %d: %s", apiErr.Code, apiErr.Description)
+        }
+    }
+}
 ```
-galigo/
-├── bot.go              # Unified Bot type with functional options
-├── doc.go              # Package documentation
-├── tg/                 # Shared Telegram types
-│   ├── types.go        # Message, User, Chat, File, Editable interface
-│   ├── update.go       # Update, CallbackQuery, Poll, PollAnswer
-│   ├── keyboard.go     # Fluent inline keyboard builder with generics
-│   ├── errors.go       # Canonical error types and sentinels
-│   ├── chat_full_info.go   # ChatFullInfo for getChat response
-│   ├── chat_member.go      # ChatMember with polymorphic unmarshal
-│   ├── chat_permissions.go # ChatPermissions type
-│   ├── chat_admin_rights.go # ChatAdministratorRights type
-│   ├── identity.go         # BotCommand, BotCommandScope, BotName, BotDescription
-│   ├── forum.go            # Sticker, ForumTopic types
-│   ├── config.go       # Configuration helpers
-│   ├── parse_mode.go   # ParseMode constants
-│   └── secret.go       # SecretToken (auto-redacts in logs)
-├── receiver/           # Update receiving (webhook/polling)
-│   ├── polling.go      # Long polling with circuit breaker + delivery policies
-│   ├── webhook.go      # Webhook HTTP handler
-│   ├── api.go          # Webhook management API (set/delete/get)
-│   ├── config.go       # Receiver configuration + delivery policy
-│   └── errors.go       # Receiver error types
-├── sender/             # Message sending
-│   ├── client.go       # Sender client with retry, rate limiting, multipart detection
-│   ├── requests.go     # Request types (SendMessage, SendDocument, etc.)
-│   ├── inputfile.go    # InputFile for file uploads (FileID, URL, Reader, FromBytes)
-│   ├── multipart.go    # Multipart encoder for file uploads
-│   ├── call.go         # Generic callJSON helper for non-retry methods
-│   ├── chat_info.go    # Chat info methods (GetChat, GetChatMember, etc.)
-│   ├── chat_settings.go # Chat settings (SetChatTitle, SetChatDescription)
-│   ├── chat_pin.go     # Pin/unpin message methods
-│   ├── chat_admin.go   # Chat admin methods (BanChatMember, etc.)
-│   ├── polls.go        # Poll methods (SendPoll, StopPoll)
-│   ├── forum.go        # Forum topic methods
-│   ├── identity.go     # Bot identity methods (commands, profile, admin rights)
-│   ├── validate.go     # Input validation helpers
-│   ├── options.go      # Functional options for requests
-│   ├── config.go       # Sender configuration
-│   └── errors.go       # Error aliases (backward compatible with tg.Err*)
-├── internal/           # Internal packages
-│   ├── testutil/       # Test utilities, mock server, fixtures
-│   └── validate/       # Token and input validation
-├── cmd/
-│   └── galigo-testbot/ # Acceptance test bot (see docs/testing.md)
-│       ├── main.go     # CLI entry point
-│       ├── engine/     # Scenario runner, steps, adapter
-│       ├── suites/     # Test scenario definitions (core, media, keyboards, chat-admin)
-│       ├── fixtures/   # Embedded test media files (JPEG, GIF, PNG, MP3, OGG)
-│       ├── config/     # Environment config + .env loader
-│       ├── evidence/   # JSON report generation
-│       ├── registry/   # Method coverage tracking
-│       └── cleanup/    # Message cleanup utilities
-└── examples/
-    └── echo/           # Echo bot example
+
+### Error Reference
+
+| Error | When |
+|-------|------|
+| `ErrBotBlocked` | User blocked the bot |
+| `ErrBotKicked` | Bot removed from group |
+| `ErrChatNotFound` | Chat doesn't exist |
+| `ErrMessageNotFound` | Message was deleted |
+| `ErrMessageNotModified` | Edit had no changes |
+| `ErrTooManyRequests` | Rate limited (429) |
+| `ErrUnauthorized` | Invalid bot token |
+| `ErrForbidden` | Missing permissions |
+| `ErrCircuitOpen` | Circuit breaker tripped |
+| `ErrMaxRetries` | All retry attempts failed |
+
+## Configuration
+
+### Bot Options
+
+```go
+bot, err := galigo.New(token,
+    // Receiving mode (choose one)
+    galigo.WithPolling(30, 100),          // Long polling
+    galigo.WithWebhook(8443, "secret"),   // Webhook
+
+    // Resilience
+    galigo.WithRetries(3),                // Max retry attempts
+    galigo.WithRateLimit(30.0, 5),        // Global: 30 req/s, burst 5
+
+    // Behavior
+    galigo.WithLogger(slog.Default()),    // Custom logger
+    galigo.WithAllowedUpdates("message", "callback_query"),
+)
 ```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | — | Bot token from @BotFather |
+
+For advanced configuration, see the [sender](https://pkg.go.dev/github.com/prilive-com/galigo/sender#Config) and [receiver](https://pkg.go.dev/github.com/prilive-com/galigo/receiver#Config) package documentation.
 
 ## Modular Usage
 
-Use only what you need:
+Use only the packages you need:
 
 ```go
-// Only receiving updates (long polling)
-import "github.com/prilive-com/galigo/receiver"
-
-updates := make(chan tg.Update, 100)
-client := receiver.NewPollingClient(token, updates, logger, cfg)
-client.Start(ctx)
-
 // Only sending messages
 import "github.com/prilive-com/galigo/sender"
 
@@ -146,494 +202,96 @@ client.SendMessage(ctx, sender.SendMessageRequest{
     ChatID: chatID,
     Text:   "Hello!",
 })
-```
 
-## Supported API Methods
-
-### Bot Identity
-- `GetMe` - Get bot information
-- `LogOut` - Log out from cloud Bot API
-- `CloseBot` - Close bot instance
-
-### Bot Commands & Profile
-- `SetMyCommands` / `GetMyCommands` / `DeleteMyCommands` - Manage bot command menu
-- `SetMyName` / `GetMyName` - Set/get bot display name
-- `SetMyDescription` / `GetMyDescription` - Set/get bot description (shown in empty chat)
-- `SetMyShortDescription` / `GetMyShortDescription` - Set/get short description (shown in profile)
-- `SetMyDefaultAdministratorRights` / `GetMyDefaultAdministratorRights` - Set/get default admin rights
-
-### Messages
-- `SendMessage` - Send text messages
-- `SendPhoto` - Send photos (file upload, URL, or file_id)
-- `SendDocument` - Send documents
-- `SendVideo` - Send videos
-- `SendAudio` - Send audio files
-- `SendVoice` - Send voice messages (OGG Opus)
-- `SendAnimation` - Send GIFs/animations
-- `SendVideoNote` - Send video notes
-- `SendSticker` - Send stickers
-- `SendMediaGroup` - Send albums
-
-### Chat Information
-- `GetChat` - Get full chat info
-- `GetChatAdministrators` - List chat admins
-- `GetChatMemberCount` - Get member count
-- `GetChatMember` - Get specific member info
-
-### Chat Settings
-- `SetChatTitle` - Set chat title
-- `SetChatDescription` - Set chat description
-
-### Pin Messages
-- `PinChatMessage` - Pin a message
-- `UnpinChatMessage` - Unpin a specific message
-- `UnpinAllChatMessages` - Unpin all messages
-
-### Polls
-- `SendPoll` - Send native polls (regular and quiz)
-- `StopPoll` - Stop a running poll
-
-### Chat Photo
-- `SetChatPhoto` - Set chat photo (multipart upload)
-- `DeleteChatPhoto` - Delete chat photo
-
-### Chat Moderation
-- `BanChatMember` - Ban a user
-- `UnbanChatMember` - Unban a user
-- `RestrictChatMember` - Restrict user permissions
-- `PromoteChatMember` - Promote a user to admin
-- `DemoteChatMember` - Demote an admin
-- `SetChatAdministratorCustomTitle` - Set admin custom title
-- `BanChatSenderChat` - Ban a sender chat
-- `UnbanChatSenderChat` - Unban a sender chat
-- `SetChatPermissions` - Set default chat permissions
-- `LeaveChat` - Leave a chat
-
-### Forum Topics
-- `CreateForumTopic` - Create a forum topic
-- `EditForumTopic` - Edit a forum topic
-- `CloseForumTopic` - Close a forum topic
-- `ReopenForumTopic` - Reopen a forum topic
-- `DeleteForumTopic` - Delete a forum topic
-- `UnpinAllForumTopicMessages` - Unpin all messages in a topic
-- `EditGeneralForumTopic` - Edit the general forum topic
-- `CloseGeneralForumTopic` - Close the general topic
-- `ReopenGeneralForumTopic` - Reopen the general topic
-- `HideGeneralForumTopic` - Hide the general topic
-- `UnhideGeneralForumTopic` - Unhide the general topic
-- `UnpinAllGeneralForumTopicMessages` - Unpin all messages in general topic
-- `GetForumTopicIconStickers` - Get available topic icon stickers
-
-### Stickers
-- `CreateNewStickerSet` - Create a new sticker set
-- `GetStickerSet` - Get sticker set info
-- `AddStickerToSet` - Add a sticker to a set
-- `SetStickerPositionInSet` - Reorder a sticker in a set
-- `SetStickerEmojiList` - Set sticker emoji list
-- `SetStickerSetTitle` - Set sticker set title
-- `DeleteStickerFromSet` - Remove a sticker from a set
-- `DeleteStickerSet` - Delete a sticker set
-- `UploadStickerFile` - Upload a sticker file
-- `SetStickerSetThumbnail` - Set sticker set thumbnail
-- `SetStickerKeywords` - Set sticker keywords
-- `SetStickerMaskPosition` - Set sticker mask position
-- `ReplaceStickerInSet` - Replace a sticker in a set
-- `GetCustomEmojiStickers` - Get custom emoji stickers
-- `SetCustomEmojiStickerSetThumbnail` - Set custom emoji set thumbnail
-
-### Payments & Stars
-- `SendInvoice` - Send an invoice
-- `CreateInvoiceLink` - Create an invoice link
-- `AnswerShippingQuery` - Answer a shipping query
-- `AnswerPreCheckoutQuery` - Answer a pre-checkout query
-- `RefundStarPayment` - Refund a star payment
-- `GetStarTransactions` - Get star transactions
-- `GetMyStarBalance` - Get bot's star balance
-
-### Gifts
-- `GetAvailableGifts` - Get available gifts
-- `SendGift` - Send a gift
-- `TransferGift` - Transfer a gift
-- `UpgradeGift` - Upgrade a gift
-- `ConvertGiftToStars` - Convert a gift to stars
-- `GetOwnedGifts` - Get owned gifts
-
-### Checklists
-- `SendChecklist` - Send a checklist message
-- `EditMessageChecklist` - Edit a checklist message
-
-### Inline Queries
-- `AnswerInlineQuery` - Answer an inline query
-- `AnswerWebAppQuery` - Answer a web app query
-- `SavePreparedInlineMessage` - Save a prepared inline message
-
-### Games
-- `SendGame` - Send a game
-- `SetGameScore` - Set a game score
-- `GetGameHighScores` - Get game high scores
-
-### Business
-- `GetBusinessConnection` - Get business connection info
-- `SetBusinessAccountName` - Set business account name
-- `SetBusinessAccountBio` - Set business account bio
-- `SetBusinessAccountUsername` - Set business account username
-- `SetBusinessAccountGiftSettings` - Set gift settings
-- `SetBusinessAccountProfilePhoto` - Set business profile photo
-- `RemoveBusinessAccountProfilePhoto` - Remove business profile photo
-- `GetBusinessAccountStarBalance` - Get business star balance
-- `TransferBusinessAccountStars` - Transfer business stars
-- `PostStory` - Post a story
-- `EditStory` - Edit a story
-- `DeleteStory` - Delete a story
-
-### Chat Boosts & Subscriptions
-- `GetUserChatBoosts` - Get user's chat boosts (acceptance tested)
-- `CreateChatSubscriptionInviteLink` - Create subscription invite link
-- `EditChatSubscriptionInviteLink` - Edit subscription invite link
-
-### Verification
-- `VerifyUser` - Verify a user
-- `VerifyChat` - Verify a chat
-- `RemoveUserVerification` - Remove user verification
-- `RemoveChatVerification` - Remove chat verification
-- `SetPassportDataErrors` - Set passport data errors
-
-### Utilities
-- `GetFile` - Get file info for download
-- `SendChatAction` - Send typing indicator, etc.
-- `GetUserProfilePhotos` - Get user's profile photos
-
-### Location & Contact
-- `SendLocation` - Send location
-- `SendVenue` - Send venue
-- `SendContact` - Send phone contact
-- `SendDice` - Send animated dice
-
-### Message Operations
-- `EditMessageText` - Edit message text
-- `EditMessageCaption` - Edit caption
-- `EditMessageReplyMarkup` - Edit reply markup
-- `DeleteMessage` - Delete a message
-- `ForwardMessage` - Forward a message
-- `CopyMessage` - Copy a message
-
-### Callback Queries
-- `AnswerCallbackQuery` - Answer callback queries
-- `Answer` - Answer with options (convenience)
-- `Acknowledge` - Silently acknowledge
-
-### Bulk Operations
-- `ForwardMessages` - Forward multiple messages
-- `CopyMessages` - Copy multiple messages
-- `DeleteMessages` - Delete multiple messages
-- `SetMessageReaction` - Set message reaction
-
-## File Uploads
-
-All media methods support four input modes via `InputFile`:
-
-```go
-import "github.com/prilive-com/galigo/sender"
-
-// From file ID (already on Telegram servers)
-doc := sender.FromFileID("AgACAgIAAxkBAAI...")
-
-// From URL (Telegram will download)
-doc := sender.FromURL("https://example.com/file.pdf")
-
-// From bytes (retry-safe — recommended for in-memory data)
-doc := sender.FromBytes(data, "document.pdf")
-
-// From io.Reader (streamed, no memory buffering — single-use, not retry-safe)
-file, _ := os.Open("document.pdf")
-defer file.Close()
-doc := sender.FromReader(file, "document.pdf")
-
-// Send document
-client.SendDocument(ctx, sender.SendDocumentRequest{
-    ChatID:   chatID,
-    Document: doc,
-    Caption:  "Here's your document",
-})
-```
-
-When using `FromReader` or `FromBytes`, the library automatically switches from JSON to `multipart/form-data` encoding. For `FromFileID` and `FromURL`, standard JSON encoding is used.
-
-**Retry safety:** `FromBytes` creates a factory that provides a fresh reader on each retry attempt. `FromReader` passes the reader directly — if the request is retried (e.g., on 429/5xx), the reader is already at EOF and the retry sends an empty file. Use `FromBytes` when data is in memory and retries are enabled.
-
-## Inline Keyboards
-
-```go
-import "github.com/prilive-com/galigo/tg"
-
-// Fluent builder
-kb := tg.NewKeyboard().
-    Row(tg.Btn("Yes", "yes"), tg.Btn("No", "no")).
-    Row(tg.BtnURL("Help", "https://example.com")).
-    Build()
-
-// Quick helpers
-confirm := tg.Confirm("yes:123", "no:123")
-pagination := tg.Pagination(page, total, "page")
-
-// Grid from slice (uses generics)
-grid := tg.Grid(items, 2, func(item Item) tg.InlineKeyboardButton {
-    return tg.Btn(item.Name, "select:"+item.ID)
-})
-
-// Iterate over keyboard rows (uses iter.Seq)
-for row := range kb.Rows() {
-    fmt.Println(row)
-}
-```
-
-## Editable Interface
-
-Edit and delete messages using the `Editable` interface:
-
-```go
-// Message implements Editable
-msg, _ := bot.SendMessage(ctx, chatID, "Original text")
-
-// Edit using Editable
-bot.Edit(ctx, msg, "Updated text", sender.WithEditParseMode(tg.ParseModeHTML))
-
-// Delete using Editable
-bot.Delete(ctx, msg)
-
-// Store message reference for later
-stored := tg.StoredMessage{MsgID: msg.MessageID, ChatID: msg.Chat.ID}
-bot.Edit(ctx, stored, "Edited later")
-```
-
-## Error Handling
-
-Errors are defined canonically in `tg` package with backward-compatible aliases in `sender`:
-
-```go
-import (
-    "errors"
-    "github.com/prilive-com/galigo/tg"
-    "github.com/prilive-com/galigo/sender"
-)
-
-result, err := bot.SendMessage(ctx, chatID, text)
-if err != nil {
-    var apiErr *tg.APIError
-    if errors.As(err, &apiErr) {
-        log.Printf("API error: %s (code=%d)", apiErr.Description, apiErr.Code)
-
-        // Check if retryable
-        if apiErr.IsRetryable() {
-            // Will be retried automatically
-        }
-    }
-
-    // Check specific error types (both tg.Err* and sender.Err* work)
-    if errors.Is(err, tg.ErrBotBlocked) {
-        // User blocked the bot
-    }
-    if errors.Is(err, tg.ErrMessageNotFound) {
-        // Message was deleted
-    }
-    if errors.Is(err, tg.ErrTooManyRequests) {
-        // Rate limited, retry later
-    }
-    if errors.Is(err, tg.ErrCircuitOpen) {
-        // Circuit breaker is open
-    }
-}
-```
-
-### Available Sentinel Errors
-
-| Error | Description |
-|-------|-------------|
-| `ErrUnauthorized` | Invalid bot token |
-| `ErrForbidden` | Bot lacks permissions |
-| `ErrNotFound` | Resource not found |
-| `ErrTooManyRequests` | Rate limited (429) |
-| `ErrBotBlocked` | Bot blocked by user |
-| `ErrBotKicked` | Bot kicked from chat |
-| `ErrChatNotFound` | Chat doesn't exist |
-| `ErrMessageNotFound` | Message to edit/delete not found |
-| `ErrMessageNotModified` | Message content unchanged |
-| `ErrCircuitOpen` | Circuit breaker is open |
-| `ErrMaxRetries` | Max retries exceeded |
-| `ErrRateLimited` | Local rate limit exceeded |
-
-## Update Delivery Policy
-
-Configure how updates are handled when the channel is full:
-
-```go
+// Only receiving updates
 import "github.com/prilive-com/galigo/receiver"
 
-cfg := receiver.DefaultConfig()
-
-// Block with timeout (default) - safest, no updates lost unless timeout
-cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyBlock
-cfg.UpdateDeliveryTimeout = 5 * time.Second
-
-// Drop newest - high throughput, may lose updates
-cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyDropNewest
-
-// Drop oldest - keeps newest updates
-cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyDropOldest
-
-// Monitor dropped updates
-cfg.OnUpdateDropped = func(updateID int, reason string) {
-    metrics.IncrCounter("updates_dropped", 1, "reason", reason)
-}
+updates := make(chan tg.Update, 100)
+poller := receiver.NewPollingClient(token, updates, logger, cfg)
+poller.Start(ctx)
 ```
 
-## Bot Options
-
-```go
-bot, err := galigo.New(token,
-    // Mode selection
-    galigo.WithPolling(30, 100),           // Long polling (timeout, limit)
-    galigo.WithWebhook(8443, "secret"),    // Or webhook mode
-
-    // Resilience
-    galigo.WithRetries(3),                 // Max retry attempts
-    galigo.WithRateLimit(30.0, 5),         // Global RPS and burst
-    galigo.WithPollingMaxErrors(10),       // Max consecutive errors
-
-    // Behavior
-    galigo.WithDeleteWebhook(true),        // Delete webhook before polling
-    galigo.WithAllowedUpdates("message", "callback_query"),
-    galigo.WithUpdateBufferSize(100),      // Updates channel buffer
-
-    // Logging
-    galigo.WithLogger(customLogger),       // Custom slog.Logger
-)
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | - | Bot token (required) |
-| `RECEIVER_MODE` | `longpolling` | `webhook` or `longpolling` |
-| `POLLING_TIMEOUT` | `30` | Long polling timeout (0-60s) |
-| `POLLING_LIMIT` | `100` | Updates per request (1-100) |
-| `WEBHOOK_PORT` | `8443` | Webhook HTTPS port |
-| `RATE_LIMIT_REQUESTS` | `30` | Global rate limit (req/s) |
-| `MAX_RETRIES` | `3` | Max retry attempts |
-| `UPDATE_DELIVERY_POLICY` | `block` | `block`, `drop_newest`, `drop_oldest` |
-| `UPDATE_DELIVERY_TIMEOUT` | `5s` | Timeout for block policy |
-
-### Sender Configuration
-
-```go
-cfg := sender.Config{
-    Token:           tg.SecretToken(token),
-    BaseURL:         "https://api.telegram.org",
-    RequestTimeout:  30 * time.Second,
-    MaxRetries:      3,
-    RetryBaseWait:   500 * time.Millisecond,
-    RetryMaxWait:    30 * time.Second,
-    RetryFactor:     2.0,
-    GlobalRPS:       30.0,
-    GlobalBurst:     5,
-    PerChatRPS:      1.0,
-    PerChatBurst:    3,
-}
-client, _ := sender.NewFromConfig(cfg)
-```
-
-## Resilience Features
+## Resilience
 
 ### Circuit Breaker
 
-Prevents cascading failures when Telegram API is unavailable:
+Prevents cascading failures when Telegram is unavailable:
 
-```go
-// Default settings (configurable)
-// - Opens after 50% failure rate (min 3 requests)
-// - Half-open after 30s timeout
-// - Only server errors (5xx) and network errors trip the breaker
-// - Client errors (4xx) do NOT trip the breaker (prevents self-DOS)
-// - Logs state changes
-```
+- Opens after 50% failure rate (minimum 3 requests in 10s window)
+- Half-open state after 30s timeout
+- Only server errors (5xx) and network errors trip the breaker
+- Client errors (4xx) never trip — prevents self-inflicted outages
 
 ### Rate Limiting
 
-Respects Telegram's rate limits:
+Respects Telegram's limits automatically:
 
-- **Global**: 30 requests/second (configurable)
-- **Per-chat**: 1 request/second for same chat (configurable)
-- Automatically waits when limits exceeded
-- Stale per-chat limiters cleaned up after 10 minutes
+- **Global:** 30 requests/second (configurable)
+- **Per-chat:** 1 request/second per chat (configurable)
+- **429 handling:** Reads `retry_after` from response, waits automatically
 
-### Retry with Backoff
+### Retry Strategy
 
-Automatically retries transient failures:
+Transient failures are retried with exponential backoff:
 
-- Exponential backoff: 500ms, 1s, 2s, 4s...
+- Base wait: 500ms → 1s → 2s → 4s (capped at 30s)
 - Cryptographic jitter prevents thundering herd
-- Respects `retry_after` from JSON response (primary) or HTTP header (fallback)
 - Only retries network errors and 5xx responses
 
 ## Testing
 
-### Unit Tests
-
 ```bash
+# Unit tests
 go test ./...
+
+# With race detector
 go test -race ./...
+
+# With coverage
 go test -coverprofile=coverage.out ./...
 ```
 
-### Acceptance Tests (galigo-testbot)
+### Integration Tests
 
-The library includes a built-in acceptance test bot that validates all API methods against the real Telegram API. See [docs/testing.md](docs/testing.md) for details.
+galigo includes a testbot for validating against the real Telegram API:
 
 ```bash
-# Quick run
 export TESTBOT_TOKEN="your-token"
 export TESTBOT_CHAT_ID="your-chat-id"
 export TESTBOT_ADMINS="your-user-id"
+
 go run ./cmd/galigo-testbot --run all
-
-# Run specific suites
-go run ./cmd/galigo-testbot --run core        # Core messaging (S0-S5)
-go run ./cmd/galigo-testbot --run media       # Media uploads (S6-S11)
-go run ./cmd/galigo-testbot --run keyboards   # Inline keyboards (S10)
-go run ./cmd/galigo-testbot --run chat-admin  # Chat administration (S15-S19)
-go run ./cmd/galigo-testbot --run stickers    # Sticker set lifecycle (S20)
-go run ./cmd/galigo-testbot --run stars       # Star balance + transactions (S21-S22)
-go run ./cmd/galigo-testbot --run gifts       # Gift catalog (S23)
-go run ./cmd/galigo-testbot --run checklists  # Checklist lifecycle (S24, requires Premium)
-go run ./cmd/galigo-testbot --run extras      # Extras (S25-S32: geo, bulk, reactions, user info, chat photo, permissions)
-go run ./cmd/galigo-testbot --run bot-config  # Bot identity (S33-S35: commands, profile, admin defaults)
-
-# Check method coverage
-go run ./cmd/galigo-testbot --status
 ```
 
-## Security
-
-- **TLS 1.2+**: All HTTP clients enforce minimum TLS 1.2
-- **Token scrubbing**: Bot tokens are scrubbed from HTTP error messages to prevent leakage
-- **Secret token protection**: `tg.SecretToken` type prevents accidental logging
-- **Webhook validation**: Constant-time comparison of webhook secrets
-- **Input validation**: Token format and request parameters validated before sending
-- **Response size limits**: Prevents memory exhaustion from large responses
+See [docs/testing.md](./docs/testing.md) for complete testing documentation.
 
 ## Dependencies
 
-```go
-require (
-    github.com/sony/gobreaker/v2 v2.4.0   // Circuit breaker
-    golang.org/x/time v0.14.0              // Rate limiting
-    github.com/stretchr/testify v1.8.4     // Testing
-)
-```
+| Package | Purpose |
+|---------|---------|
+| [`sony/gobreaker/v2`](https://github.com/sony/gobreaker) | Circuit breaker |
+| [`golang.org/x/time`](https://pkg.go.dev/golang.org/x/time/rate) | Rate limiting |
+
+Testing only: `stretchr/testify`
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Read the [Contributing Guide](CONTRIBUTING.md)
+2. Ensure tests pass: `go test ./...`
+3. Run linter: `golangci-lint run`
+4. Follow existing code style
+
+## Security
+
+Found a vulnerability? Please report it privately:
+
+- Use [GitHub's private vulnerability reporting](https://github.com/prilive-com/galigo/security)
+- See [SECURITY.md](.github/SECURITY.md) for our security policy
+
+**Do not** open public issues for security vulnerabilities.
 
 ## License
 
-MIT License
+[MIT License](LICENSE) — use freely in personal and commercial projects.

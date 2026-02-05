@@ -371,7 +371,7 @@ func (s *SendPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, 
 
 	// Capture file_id for reuse
 	var fileID string
-	if msg.Photo != nil && len(msg.Photo) > 0 {
+	if len(msg.Photo) > 0 {
 		fileID = msg.Photo[len(msg.Photo)-1].FileID
 		rt.CapturedFileIDs["photo"] = fileID
 	}

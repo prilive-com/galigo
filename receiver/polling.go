@@ -20,8 +20,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prilive-com/galigo/tg"
 	"github.com/sony/gobreaker/v2"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 const (
@@ -364,7 +365,7 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 
 		// Deliver updates using configured policy
 		if err := c.deliverUpdates(ctx, updates); err != nil {
-			if err == context.Canceled || errors.Is(err, context.Canceled) {
+			if errors.Is(err, context.Canceled) {
 				c.logger.Info("stopping update delivery: context cancelled")
 			} else {
 				c.logger.Info("stopping update delivery: stop signal")
@@ -538,9 +539,9 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 	}
 
 	respBody, err := c.breaker.Execute(func() ([]byte, error) {
-		resp, err := c.client.Do(req)
-		if err != nil {
-			return nil, scrubTokenFromError(err, c.token)
+		resp, doErr := c.client.Do(req)
+		if doErr != nil {
+			return nil, scrubTokenFromError(doErr, c.token)
 		}
 		defer func() {
 			io.Copy(io.Discard, resp.Body)

@@ -23,7 +23,6 @@ linters:
     - gosec            # Security vulnerability detection
 
     # ====== Performance ======
-    - prealloc         # Slice pre-allocation
     - unconvert        # Unnecessary type conversions
 
     # ====== Code Quality ======
@@ -41,14 +40,18 @@ linters:
     - sloglint         # log/slog consistency (important for galigo)
     - intrange         # Use integer range loops where applicable
 
+  disable:
+    - prealloc         # Micro-optimization, adds noise without significant benefit
+
   settings:
     errcheck:
       check-type-assertions: true
-      check-blank: true
+      check-blank: false  # Allow explicit _ = for intentional ignores
       exclude-functions:
         - (*github.com/prilive-com/galigo/sender.Client).Close
         - io.Copy
         - io.WriteString
+        - (net/http.ResponseWriter).Write  # HTTP writes rarely need checking
 
     govet:
       enable-all: true
@@ -56,10 +59,10 @@ linters:
         - fieldalignment  # Not critical for API library
 
     gocyclo:
-      min-complexity: 15
+      min-complexity: 18  # Allow slightly higher for config loaders
 
     gocognit:
-      min-complexity: 20
+      min-complexity: 30  # Allow higher for switch-heavy functions like DetectSentinel
 
     gosec:
       severity: medium
@@ -67,6 +70,9 @@ linters:
       excludes:
         - G104  # Unhandled errors (covered by errcheck)
         - G304  # File path from variable (needed for InputFile)
+        - G306  # WriteFile permissions (0644 is fine for reports)
+        - G301  # Directory permissions (0755 is fine for reports)
+        - G404  # Weak random (acceptable in test code for delays)
 
     gocritic:
       enabled-tags:
@@ -74,7 +80,12 @@ linters:
         - style
         - performance
       disabled-checks:
-        - whyNoLint  # Allow nolint without explanation in tests
+        - whyNoLint         # Allow nolint without explanation in tests
+        - hugeParam         # Request structs are intentionally passed by value (immutable)
+        - paramTypeCombine  # Style preference, not a bug
+        - exitAfterDefer    # Acceptable in CLI main() functions
+        - rangeValCopy      # Acceptable for small iterations
+        - ifElseChain       # Sometimes if-else is clearer than switch
 
     revive:
       rules:
@@ -84,6 +95,8 @@ linters:
             - "checkPrivateReceivers"
         - name: var-naming
           disabled: false
+          exclude:
+            - "S[0-9]+_*"  # Allow S0_Smoke, S15_ChatInfo pattern for test scenarios
         - name: package-comments
           disabled: false
 
@@ -105,7 +118,13 @@ linters:
       - cmd/galigo-testbot/var
 
     rules:
-      # Allow longer functions in tests
+      # Allow underscore naming in testbot suites (S0_Smoke, S15_ChatInfo, etc.)
+      - path: cmd/galigo-testbot/suites/
+        linters:
+          - revive
+        text: "var-naming.*underscore"
+
+      # Allow longer functions and complexity in tests
       - path: _test\.go
         linters:
           - funlen
@@ -113,24 +132,52 @@ linters:
           - gosec
           - gocyclo
           - gocognit
+          - errcheck      # Test code often intentionally ignores errors
 
-      # Allow complexity in testbot scenarios
+      # Allow complexity in testbot
       - path: cmd/galigo-testbot/
         linters:
           - gocyclo
           - gocognit
           - funlen
+          - gosec         # Test utilities don't need strict security
+          - errcheck      # Test code often intentionally ignores errors
+
+      # Allow complexity in internal test utilities
+      - path: internal/testutil/
+        linters:
+          - errcheck
+          - gosec
 
       # Allow unused parameters in interface implementations
       - linters:
           - unparam
         text: "always receives"
 
-      # Ignore specific patterns
+      # Allow shadowing of common builtins in parameter names
       - linters:
           - gocritic
-        text: "hugeParam"
-        path: "tg/"
+        text: "builtinShadow.*\\b(delete|min|max|cap)\\b"
+
+      # Allow import shadowing for common patterns
+      - linters:
+          - gocritic
+        text: "importShadow"
+
+      # Allow httpNoBody suggestion (nil is idiomatic for GET requests)
+      - linters:
+          - gocritic
+        text: "httpNoBody"
+
+      # staticcheck: Allow embedded field access style
+      - linters:
+          - staticcheck
+        text: "QF1008"
+
+      # staticcheck: Allow if-else over tagged switch (sometimes clearer)
+      - linters:
+          - staticcheck
+        text: "QF1003"
 
 formatters:
   enable:

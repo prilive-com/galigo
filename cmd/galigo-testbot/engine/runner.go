@@ -130,7 +130,7 @@ func (r *Runner) runStepWithRetry(ctx context.Context, step Step) (*StepResult, 
 	var stepResult *StepResult
 	var err error
 
-	for attempt := 0; attempt < maxAttempts; attempt++ {
+	for attempt := range maxAttempts {
 		stepResult, err = r.runStep(ctx, step)
 		if err == nil {
 			return stepResult, nil

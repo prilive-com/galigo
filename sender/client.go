@@ -329,7 +329,10 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
-// Close releases resources.
+// Close releases resources used by the client.
+// It is safe to call Close concurrently with other methods;
+// in-flight requests will complete normally or with context errors.
+// Close should be called only once; subsequent calls are no-ops.
 func (c *Client) Close() error {
 	// P1.6 FIX: Actually close resources
 
@@ -567,7 +570,7 @@ func (c *Client) sendMessageOnce(ctx context.Context, req SendMessageRequest) (*
 	resp, err := c.executeRequest(ctx, "sendMessage", req, extractChatID(req.ChatID))
 	if err != nil {
 		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
-			return nil, fmt.Errorf("%w: %v", ErrCircuitOpen, err)
+			return nil, fmt.Errorf("%w: %w", ErrCircuitOpen, err)
 		}
 		return nil, err
 	}
@@ -578,7 +581,7 @@ func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.M
 	resp, err := c.executeRequest(ctx, "sendPhoto", req, extractChatID(req.ChatID))
 	if err != nil {
 		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
-			return nil, fmt.Errorf("%w: %v", ErrCircuitOpen, err)
+			return nil, fmt.Errorf("%w: %w", ErrCircuitOpen, err)
 		}
 		return nil, err
 	}
@@ -636,9 +639,9 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 		req.Header.Set("Content-Type", contentType)
 	} else {
 		// Use JSON for simple requests (no file uploads)
-		jsonData, err := json.Marshal(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request: %w", err)
+		jsonData, marshalErr := json.Marshal(payload)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("failed to marshal request: %w", marshalErr)
 		}
 
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
@@ -730,7 +733,7 @@ func (c *Client) getChatLimiter(chatID string) *rate.Limiter {
 	}
 	if len(c.chatLimiters) >= maxLimiters {
 		var oldestKey string
-		var oldestTime int64 = now
+		oldestTime := now
 		for k, e := range c.chatLimiters {
 			if t := e.lastUsed.Load(); t < oldestTime {
 				oldestTime = t

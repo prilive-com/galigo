@@ -45,7 +45,7 @@ func TestUnmarshalTransactionPartner_TelegramApi(t *testing.T) {
 	data := `{"type":"telegram_api","request_count":42}`
 	result := unmarshalTransactionPartner(json.RawMessage(data))
 
-	p, ok := result.(TransactionPartnerTelegramApi)
+	p, ok := result.(TransactionPartnerTelegramAPI)
 	require.True(t, ok)
 	assert.Equal(t, 42, p.RequestCount)
 }

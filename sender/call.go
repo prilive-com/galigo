@@ -29,18 +29,3 @@ func (c *Client) callJSON(ctx context.Context, method string, payload any, out a
 	}
 	return nil
 }
-
-// callJSONResult is a generic version for cleaner call sites.
-// Requires Go 1.18+ generics.
-//
-// Usage:
-//
-//	info, err := callJSONResult[tg.ChatFullInfo](c, ctx, "getChat", req)
-func callJSONResult[T any](c *Client, ctx context.Context, method string, payload any, chatIDs ...string) (T, error) {
-	var result T
-	if err := c.callJSON(ctx, method, payload, &result, chatIDs...); err != nil {
-		var zero T
-		return zero, err
-	}
-	return result, nil
-}

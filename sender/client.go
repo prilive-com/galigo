@@ -19,10 +19,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prilive-com/galigo/internal/scrub"
-	"github.com/prilive-com/galigo/tg"
 	"github.com/sony/gobreaker/v2"
 	"golang.org/x/time/rate"
+
+	"github.com/prilive-com/galigo/internal/scrub"
+	"github.com/prilive-com/galigo/tg"
 )
 
 const (
@@ -784,7 +785,7 @@ func withRetry[T any](c *Client, ctx context.Context, chatID tg.ChatID, fn func(
 		}
 	}
 
-	return zero, fmt.Errorf("%w: %v", ErrMaxRetries, lastErr)
+	return zero, fmt.Errorf("%w: %w", ErrMaxRetries, lastErr)
 }
 
 func isRetryable(err error) bool {

@@ -2,16 +2,16 @@ package sender_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
-	"errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCallJSON_ViaGetMe(t *testing.T) {

@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ==================== SetChatPermissions ====================

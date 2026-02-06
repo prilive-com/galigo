@@ -550,9 +550,9 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 
 		// P0.9 FIX: Add response size limit to prevent memory exhaustion
 		limitedReader := io.LimitReader(resp.Body, maxPollResponseSize+1)
-		body, err := io.ReadAll(limitedReader)
-		if err != nil {
-			return nil, err
+		body, readErr := io.ReadAll(limitedReader)
+		if readErr != nil {
+			return nil, readErr
 		}
 
 		if int64(len(body)) > maxPollResponseSize {

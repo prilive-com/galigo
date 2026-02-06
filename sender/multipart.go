@@ -91,7 +91,7 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 	rt := rv.Type()
 	attachIdx := 0
 
-	for i := 0; i < rt.NumField(); i++ {
+	for i := range rt.NumField() {
 		field := rt.Field(i)
 		value := rv.Field(i)
 

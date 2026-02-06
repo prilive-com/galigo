@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/internal/testutil"
 )
 
 func TestMockServer_CapturesRequests(t *testing.T) {
@@ -70,8 +71,14 @@ func TestMockServer_Reset(t *testing.T) {
 	server := testutil.NewMockServer(t)
 
 	// Make some requests
-	http.Get(server.BaseURL() + "/test1")
-	http.Get(server.BaseURL() + "/test2")
+	resp1, _ := http.Get(server.BaseURL() + "/test1")
+	if resp1 != nil {
+		resp1.Body.Close()
+	}
+	resp2, _ := http.Get(server.BaseURL() + "/test2")
+	if resp2 != nil {
+		resp2.Body.Close()
+	}
 
 	assert.Equal(t, 2, server.CaptureCount())
 
@@ -83,9 +90,15 @@ func TestMockServer_Reset(t *testing.T) {
 func TestMockServer_TimeBetweenCaptures(t *testing.T) {
 	server := testutil.NewMockServer(t)
 
-	http.Get(server.BaseURL() + "/test1")
+	resp1, _ := http.Get(server.BaseURL() + "/test1")
+	if resp1 != nil {
+		resp1.Body.Close()
+	}
 	time.Sleep(50 * time.Millisecond)
-	http.Get(server.BaseURL() + "/test2")
+	resp2, _ := http.Get(server.BaseURL() + "/test2")
+	if resp2 != nil {
+		resp2.Body.Close()
+	}
 
 	duration := server.TimeBetweenCaptures(0, 1)
 	assert.GreaterOrEqual(t, duration, 50*time.Millisecond)
@@ -223,7 +236,10 @@ func TestCapture_Assertions(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", server.BaseURL()+"/bot"+testutil.TestToken+"/sendMessage", nil)
 	req.Header.Set("Content-Type", "application/json")
-	http.DefaultClient.Do(req)
+	resp, _ = http.DefaultClient.Do(req)
+	if resp != nil {
+		resp.Body.Close()
+	}
 
 	cap := server.LastCapture()
 	require.NotNil(t, cap)

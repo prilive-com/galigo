@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prilive-com/galigo/internal/testutil"
-	"github.com/prilive-com/galigo/sender"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/internal/testutil"
+	"github.com/prilive-com/galigo/sender"
 )
 
 func TestRateLimit_GlobalLimiter(t *testing.T) {
@@ -34,7 +35,7 @@ func TestRateLimit_GlobalLimiter(t *testing.T) {
 
 	// Send 3 requests - should take at least 500ms due to rate limiting
 	start := time.Now()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -66,7 +67,7 @@ func TestRateLimit_PerChatLimiter(t *testing.T) {
 
 	// Send 3 requests to same chat - should be throttled
 	start := time.Now()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Hello",
@@ -97,7 +98,7 @@ func TestRateLimit_DifferentChatsNotThrottled(t *testing.T) {
 
 	// Send to different chats - should not be throttled by per-chat limiter
 	start := time.Now()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: int64(1000 + i), // Different chat each time
 			Text:   "Hello",
@@ -128,7 +129,7 @@ func TestRateLimit_ChatLimiterCount(t *testing.T) {
 	assert.Equal(t, 0, client.ChatLimiterCount())
 
 	// Send to different chats
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: int64(1000 + i),
 			Text:   "Hello",
@@ -203,7 +204,7 @@ func TestRateLimit_ConcurrentRequests(t *testing.T) {
 
 	// Send concurrent requests
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(chatID int64) {
 			defer wg.Done()

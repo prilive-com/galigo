@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prilive-com/galigo/internal/testutil"
-	"github.com/prilive-com/galigo/sender"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/internal/testutil"
+	"github.com/prilive-com/galigo/sender"
 )
 
 func TestCircuitBreaker_OpensOnFailures(t *testing.T) {

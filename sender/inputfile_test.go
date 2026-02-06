@@ -4,8 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prilive-com/galigo/sender"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/prilive-com/galigo/sender"
 )
 
 func TestInputFile_FromReader(t *testing.T) {

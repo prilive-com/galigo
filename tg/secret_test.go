@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prilive-com/galigo/tg"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 func TestSecretToken_Value(t *testing.T) {
@@ -62,7 +63,7 @@ func TestSecretToken_NotLeakedInFmt(t *testing.T) {
 
 	// Test various fmt formats don't leak the token
 	formats := []string{
-		fmt.Sprintf("%s", token),
+		token.String(),
 		fmt.Sprintf("%v", token),
 		fmt.Sprintf("%#v", token),
 		fmt.Sprintf("%+v", token),

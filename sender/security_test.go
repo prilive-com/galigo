@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNoTokenInErrors(t *testing.T) {

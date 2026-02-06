@@ -94,7 +94,7 @@ func (r *Report) ToJSON() ([]byte, error) {
 
 // Save saves the report to a file.
 func (r *Report) Save(storageDir string) (string, error) {
-	if err := os.MkdirAll(filepath.Join(storageDir, "reports"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(storageDir, "reports"), 0o755); err != nil {
 		return "", fmt.Errorf("failed to create reports directory: %w", err)
 	}
 
@@ -105,7 +105,7 @@ func (r *Report) Save(storageDir string) (string, error) {
 		return "", fmt.Errorf("failed to marshal report: %w", err)
 	}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(filename, data, 0o644); err != nil {
 		return "", fmt.Errorf("failed to write report: %w", err)
 	}
 

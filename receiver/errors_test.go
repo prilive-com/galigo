@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/prilive-com/galigo/receiver"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/prilive-com/galigo/receiver"
 )
 
 // ==================== WebhookError ====================

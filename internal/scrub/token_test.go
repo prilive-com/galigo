@@ -6,10 +6,11 @@ import (
 	"net"
 	"testing"
 
-	"github.com/prilive-com/galigo/internal/scrub"
-	"github.com/prilive-com/galigo/tg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/internal/scrub"
+	"github.com/prilive-com/galigo/tg"
 )
 
 func TestTokenFromError_NilError(t *testing.T) {

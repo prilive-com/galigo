@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prilive-com/galigo/internal/testutil"
-	"github.com/prilive-com/galigo/sender"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/internal/testutil"
+	"github.com/prilive-com/galigo/sender"
 )
 
 func TestEditMessageMedia_FileID(t *testing.T) {

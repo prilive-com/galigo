@@ -176,7 +176,10 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // processUpdate handles the actual update processing (inside circuit breaker)
 func (h *WebhookHandler) processUpdate(w http.ResponseWriter, r *http.Request) error {
 	// Get pooled buffer
-	bufPtr := h.bufferPool.Get().(*[]byte)
+	bufPtr, ok := h.bufferPool.Get().(*[]byte)
+	if !ok {
+		return errors.New("invalid buffer from pool")
+	}
 	buffer := *bufPtr
 	defer h.bufferPool.Put(bufPtr)
 

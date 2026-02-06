@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prilive-com/galigo/sender"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/sender"
 )
 
 func TestMultipartEncoder_BasicFields(t *testing.T) {

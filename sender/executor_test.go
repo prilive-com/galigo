@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExecutor_SendMessage_Success(t *testing.T) {
@@ -374,7 +375,7 @@ func TestExecutor_RequestCapture(t *testing.T) {
 	client := testutil.NewTestClient(t, server.BaseURL())
 
 	// Make multiple requests
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		client.SendMessage(context.Background(), sender.SendMessageRequest{
 			ChatID: testutil.TestChatID,
 			Text:   "Message " + string(rune('A'+i)),

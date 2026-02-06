@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prilive-com/galigo/receiver"
-	"github.com/prilive-com/galigo/tg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/prilive-com/galigo/receiver"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // ==================== SetWebhook ====================

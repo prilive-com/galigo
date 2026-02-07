@@ -1,69 +1,74 @@
 # galigo Live Integration Tests
-# Runs galigo-testbot against real Telegram API
-# SECURITY: Uses GitHub Environments with Required Reviewers
 #
-# Combined best practices from 4 security consultants (Feb 2026)
+# TRIGGER MATRIX:
+#   ┌─────────────────────┬─────────┬─────────┬─────────────────────┐
+#   │ Trigger             │ Suite   │ Timeout │ Environment         │
+#   ├─────────────────────┼─────────┼─────────┼─────────────────────┤
+#   │ Daily schedule      │ smoke   │ 15 min  │ telegram-smoke      │
+#   │ Manual (default)    │ all     │ 60 min  │ telegram-live       │
+#   │ Manual → smoke      │ smoke   │ 15 min  │ telegram-live       │
+#   │ Manual → other      │ choice  │ 60 min  │ telegram-live       │
+#   │ Release published   │ all     │ 60 min  │ telegram-live       │
+#   └─────────────────────┴─────────┴─────────┴─────────────────────┘
+#
+# ENVIRONMENT SETUP REQUIRED:
+#   1. telegram-smoke: No required reviewers (for unattended schedule)
+#   2. telegram-live:  Required reviewers = you (for manual/release)
+#   Both need: TESTBOT_ENV secret
+#
 name: Live Integration Tests
 
 on:
   schedule:
-    # Daily smoke test at 5:15 AM UTC (low Telegram traffic)
     - cron: '15 5 * * *'
+
+  release:
+    types: [published]
+
   workflow_dispatch:
     inputs:
       suite:
         description: 'Test suite to run'
-        required: false
-        default: 'smoke'
+        required: true
+        default: 'all'
         type: choice
         options:
-          - smoke
           - all
+          - smoke
           - core
           - media
           - keyboards
+          - interactive
           - chat-admin
           - stickers
           - stars
 
-# CRITICAL: Only ONE live test at a time (prevents Telegram 429 chaos)
 concurrency:
   group: telegram-live
   cancel-in-progress: false
 
 permissions:
   contents: read
+  issues: write  # For failure notification
 
 jobs:
-  # ============================================================
-  # JOB 1: Live Telegram Test with Full Security Hardening
-  # ============================================================
-  live-test:
-    name: Smoke Test (${{ github.event.inputs.suite || 'smoke' }})
+  integration-test:
+    name: >-
+      ${{
+        github.event_name == 'schedule' && '⏰ Smoke Test' ||
+        github.event_name == 'release' && format('🚀 Release {0}', github.event.release.tag_name) ||
+        format('🧪 {0}', inputs.suite)
+      }}
     runs-on: ubuntu-latest
-    
-    # ══════════════════════════════════════════════════════════
-    # SECURITY LAYER 1: GitHub Environment with Required Reviewers
-    # - Secrets only available in this environment
-    # - Manual approval required for workflow_dispatch
-    # - Configure in: Settings → Environments → telegram-live
-    # ══════════════════════════════════════════════════════════
-    environment: telegram-live
-    
-    # ══════════════════════════════════════════════════════════
-    # SECURITY LAYER 2: Repository Owner Check
-    # - Prevents forks from running this workflow
-    # - Change 'prilive-com' to your actual org/username
-    # ══════════════════════════════════════════════════════════
+
+    # CRITICAL: Dynamic environment selection
+    # - Schedule uses 'telegram-smoke' (NO approval required - runs unattended)
+    # - Manual/Release uses 'telegram-live' (approval required - human triggered)
+    environment: ${{ github.event_name == 'schedule' && 'telegram-smoke' || 'telegram-live' }}
+
     if: github.repository_owner == 'prilive-com'
-    
+
     steps:
-      # ════════════════════════════════════════════════════════
-      # SECURITY LAYER 3: Runner Hardening
-      # - Monitors network egress (detects token exfiltration)
-      # - Audits file system changes
-      # - Start with 'audit', switch to 'block' once stable
-      # ════════════════════════════════════════════════════════
       - name: Harden Runner
         uses: step-security/harden-runner@v2
         with:
@@ -71,40 +76,78 @@ jobs:
           allowed-endpoints: >
             api.telegram.org:443
             github.com:443
+            api.github.com:443
             proxy.golang.org:443
             sum.golang.org:443
+            storage.googleapis.com:443
 
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
 
       - name: Build testbot
         run: go build -o galigo-testbot ./cmd/galigo-testbot
 
-      - name: Write .env file
+      - name: Configure environment
         env:
           TESTBOT_ENV: ${{ secrets.TESTBOT_ENV }}
-        run: printf '%s\n' "$TESTBOT_ENV" > .env
-
-      - name: Run test suite
         run: |
-          SUITE="${{ github.event.inputs.suite }}"
-          if [ -z "$SUITE" ]; then SUITE="smoke"; fi
+          set -euo pipefail
+          printf '%s\n' "$TESTBOT_ENV" > .env
 
-          echo "═══════════════════════════════════════════════════"
-          echo "Running suite: $SUITE"
-          echo "═══════════════════════════════════════════════════"
+      - name: Determine test suite
+        id: config
+        run: |
+          set -euo pipefail
 
-          ./galigo-testbot --run "$SUITE"
-        timeout-minutes: 10
+          EVENT="${{ github.event_name }}"
 
-      - name: Upload test reports
+          case "$EVENT" in
+            schedule)
+              SUITE="smoke"
+              TIMEOUT=15
+              ;;
+            release)
+              SUITE="all"
+              TIMEOUT=60
+              ;;
+            workflow_dispatch)
+              SUITE="${{ inputs.suite }}"
+              if [[ "$SUITE" == "smoke" ]]; then
+                TIMEOUT=15
+              else
+                TIMEOUT=60
+              fi
+              ;;
+            *)
+              SUITE="smoke"
+              TIMEOUT=15
+              ;;
+          esac
+
+          echo "suite=$SUITE" >> $GITHUB_OUTPUT
+          echo "timeout=$TIMEOUT" >> $GITHUB_OUTPUT
+
+          echo "════════════════════════════════════════"
+          echo "  Suite:   $SUITE"
+          echo "  Timeout: ${TIMEOUT}m"
+          echo "  Trigger: $EVENT"
+          echo "════════════════════════════════════════"
+
+      - name: Run ${{ steps.config.outputs.suite }} tests
+        run: ./galigo-testbot --run "${{ steps.config.outputs.suite }}"
+        timeout-minutes: ${{ fromJSON(steps.config.outputs.timeout) }}
+
+      - name: Upload reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: testbot-report-${{ github.event.inputs.suite || 'smoke' }}-${{ github.run_number }}
+          name: testbot-${{ steps.config.outputs.suite }}-${{ github.run_number }}
           path: var/*.json
           retention-days: 90
           if-no-files-found: warn
@@ -112,65 +155,78 @@ jobs:
       - name: Generate summary
         if: always()
         run: |
-          echo "## 🤖 Testbot Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Suite | ${{ github.event.inputs.suite || 'smoke' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Run | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f var/*.json ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ Reports generated successfully" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🤖 Testbot Results
+
+          | Property | Value |
+          |----------|-------|
+          | **Suite** | \`${{ steps.config.outputs.suite }}\` |
+          | **Trigger** | \`${{ github.event_name }}\` |
+          | **Timeout** | ${{ steps.config.outputs.timeout }} min |
+          | **Environment** | \`${{ github.event_name == 'schedule' && 'telegram-smoke' || 'telegram-live' }}\` |
+          | **Run** | #${{ github.run_number }} |
+          EOF
+
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "| **Release** | \`${{ github.event.release.tag_name }}\` |" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # ============================================================
-  # JOB 2: Full Test (all methods) - manual trigger only
-  # ============================================================
-  full-test:
-    name: Full Test (all methods)
+  # Separate job for failure notification
+  # Why separate? If main job times out, inline steps won't run
+  notify-failure:
+    name: 🚨 Notify Failure
     runs-on: ubuntu-latest
-    environment: telegram-live
+    needs: integration-test
+    if: failure() && github.repository_owner == 'prilive-com'
 
-    # Only run when 'all' is selected manually
-    if: |
-      github.repository_owner == 'prilive-com' &&
-      github.event.inputs.suite == 'all'
-    
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@v2
+      - name: Create failure issue
+        uses: actions/github-script@v7
         with:
-          egress-policy: audit
-          allowed-endpoints: >
-            api.telegram.org:443
-            github.com:443
-            proxy.golang.org:443
-            sum.golang.org:443
+          script: |
+            const title = `🚨 Integration test failed (${context.eventName})`;
+            const body = `
+            ## Test Failure Report
 
-      - uses: actions/checkout@v4
+            | Property | Value |
+            |----------|-------|
+            | **Trigger** | \`${context.eventName}\` |
+            | **Run** | [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) |
+            | **Ref** | \`${context.ref}\` |
+            | **SHA** | \`${context.sha.substring(0, 7)}\` |
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+            Please investigate the failure.
+            `;
 
-      - name: Build testbot
-        run: go build -o galigo-testbot ./cmd/galigo-testbot
+            // Check for existing open issue to avoid duplicates
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-failure',
+              per_page: 10
+            });
 
-      - name: Write .env file
-        env:
-          TESTBOT_ENV: ${{ secrets.TESTBOT_ENV }}
-        run: printf '%s\n' "$TESTBOT_ENV" > .env
+            const existingIssue = issues.data.find(i =>
+              i.title.startsWith('🚨 Integration test failed')
+            );
 
-      - name: Run extended test suite
-        run: ./galigo-testbot --run all
-        timeout-minutes: 60
-
-      - name: Upload full test reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: testbot-full-${{ github.run_number }}
-          path: var/*.json
-          retention-days: 90
+            if (existingIssue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: body
+              });
+              console.log(`Added comment to issue #${existingIssue.number}`);
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-failure', 'bot']
+              });
+              console.log('Created new failure issue');
+            }

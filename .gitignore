@@ -43,7 +43,10 @@ Thumbs.db
 cmd/galigo-testbot/var/
 
 # Internal docs (local only)
-/docs/
+/docs/reviews/
+/docs/ci-cd/
+/docs/tests/
+/docs/tiers/
 CODE_REVIEW.md
 
 # AI context files (local only)

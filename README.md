@@ -74,6 +74,9 @@ func main() {
 | Resource | Description |
 |----------|-------------|
 | [API Reference](https://pkg.go.dev/github.com/prilive-com/galigo) | Full type and method documentation |
+| [Configuration Guide](./docs/configuration.md) | Circuit breaker, rate limiting, retry, and options |
+| [Error Handling](./docs/errors.md) | Sentinel errors and recommended actions |
+| [Architecture](./docs/architecture.md) | Goroutines, channels, and operational model |
 | [Examples](./examples/) | Working code for common patterns |
 | [Testing Guide](./docs/testing.md) | Integration testing with galigo-testbot |
 | [Telegram Bot API](https://core.telegram.org/bots/api) | Official Telegram documentation |
@@ -217,7 +220,7 @@ poller.Start(ctx)
 
 Prevents cascading failures when Telegram is unavailable:
 
-- Opens after 50% failure rate (minimum 3 requests in 10s window)
+- Opens after 50% failure rate (minimum 3 requests in 60s window)
 - Half-open state after 30s timeout
 - Only server errors (5xx) and network errors trip the breaker
 - Client errors (4xx) never trip — prevents self-inflicted outages

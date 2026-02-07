@@ -16,21 +16,51 @@ if errors.Is(err, tg.ErrBotBlocked) {
 
 ## Error Reference
 
+### API Errors
+
+| Error | Meaning | Recommended Action |
+|-------|---------|-------------------|
+| `ErrUnauthorized` | Invalid or revoked bot token (401) | **Critical alert** — rotate token immediately |
+| `ErrForbidden` | Bot lacks required permissions (403) | Log, skip action, verify bot permissions in chat settings |
+| `ErrNotFound` | Generic resource not found (404) | Log, investigate what resource is missing |
+| `ErrTooManyRequests` | Telegram rate limit hit (429) | galigo handles retry automatically; track frequency for alerting |
+
+### Chat/User Errors
+
 | Error | Meaning | Recommended Action |
 |-------|---------|-------------------|
 | `ErrBotBlocked` | User blocked the bot | Mark user as inactive, stop messaging them |
 | `ErrBotKicked` | Bot was kicked from group | Mark group as inactive, stop messaging |
 | `ErrChatNotFound` | Chat doesn't exist or bot was never a member | Remove from active roster, log for investigation |
 | `ErrUserNotFound` | User doesn't exist | Remove from active roster |
+| `ErrUserDeactivated` | User account was deleted | Remove from active roster |
+| `ErrNoRights` | Bot lacks specific permission for action | Check bot admin rights in chat |
+
+### Message Errors
+
+| Error | Meaning | Recommended Action |
+|-------|---------|-------------------|
 | `ErrMessageNotFound` | Message to edit/delete doesn't exist | Update local state, continue (message was already deleted) |
 | `ErrMessageNotModified` | Edit would result in identical content | Swallow silently (no-op), debug log only |
-| `ErrTooManyRequests` | Telegram rate limit hit (429) | galigo handles retry automatically; track frequency for alerting |
-| `ErrUnauthorized` | Invalid or revoked bot token (401) | **Critical alert** — rotate token immediately |
-| `ErrForbidden` | Bot lacks required permissions (403) | Log, skip action, verify bot permissions in chat settings |
-| `ErrNotFound` | Generic resource not found (404) | Log, investigate what resource is missing |
+| `ErrMessageCantBeEdited` | Message is too old or wrong type | Log, don't retry |
+| `ErrMessageCantBeDeleted` | Message cannot be deleted | Log, don't retry |
+| `ErrMessageTooOld` | Message is older than 48 hours | Cannot edit/delete — log and continue |
+
+### Client Errors
+
+| Error | Meaning | Recommended Action |
+|-------|---------|-------------------|
 | `ErrCircuitOpen` | Circuit breaker is open | Service degraded — galigo will recover automatically after 30s |
 | `ErrMaxRetries` | All retry attempts exhausted | Log failure, increment error counter, alert if sustained |
 | `ErrRateLimited` | Local rate limiter blocked request | Request queued — wait for next available slot |
+| `ErrResponseTooLarge` | Response exceeded size limit | Log, investigate large response |
+
+### Validation Errors
+
+| Error | Meaning | Recommended Action |
+|-------|---------|-------------------|
+| `ErrInvalidToken` | Token format is invalid | Fix token configuration |
+| `ErrPathTraversal` | File path contains path traversal | Security issue — reject request |
 
 ## Error Handling Patterns
 

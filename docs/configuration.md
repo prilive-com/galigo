@@ -4,15 +4,34 @@ This document covers the configuration options, built-in resilience features, an
 
 ## Bot Options
 
+### Core Options
+
 | Option | Example | Notes |
 |--------|---------|-------|
 | `WithPolling(timeout, limit)` | `WithPolling(30, 100)` | 30s long-poll timeout, 100 updates per batch |
 | `WithWebhook(port, secret)` | `WithWebhook(8443, "secret")` | Requires TLS termination + ingress |
 | `WithRetries(n)` | `WithRetries(3)` | Exponential backoff with jitter |
-| `WithRateLimit(rps, burst)` | `WithRateLimit(30.0, 5)` | Global rate limiter |
-| `WithPerChatRateLimit(rps, burst)` | `WithPerChatRateLimit(1.0, 3)` | Per-chat rate limiter |
 | `WithLogger(logger)` | `WithLogger(slog.Default())` | Structured logging with token redaction |
 | `WithAllowedUpdates(types...)` | `WithAllowedUpdates("message", "callback_query")` | Only receive specified update types |
+
+### Rate Limiting Options
+
+| Option | Example | Notes |
+|--------|---------|-------|
+| `WithRateLimit(rps, burst)` | `WithRateLimit(30.0, 5)` | Global rate limiter. **RPS = requests per second** |
+| `WithPerChatRateLimit(rps, burst)` | `WithPerChatRateLimit(1.0, 3)` | Per-chat rate limiter (private chats) |
+| `WithGroupRateLimit(rps, burst)` | `WithGroupRateLimit(0.33, 2)` | Group-specific rate limiter (~20/min) |
+
+**Important:** Rate limit options take **requests per second (RPS)**, not per minute. To convert: `rps = perMinute / 60.0`
+
+### Advanced Options
+
+| Option | Example | Notes |
+|--------|---------|-------|
+| `WithBaseURL(url)` | `WithBaseURL(ts.URL)` | Custom API base URL (for httptest mocking) |
+| `WithHTTPClient(client)` | `WithHTTPClient(customClient)` | Custom HTTP client with custom timeouts |
+| `WithCircuitBreakerSettings(s)` | See below | Override default circuit breaker configuration |
+| `WithSleeper(s)` | `WithSleeper(mockSleeper)` | Custom sleeper for testing retry timing |
 
 ## Circuit Breaker
 
@@ -80,7 +99,10 @@ galigo can be used as a unified bot or as separate sender/receiver components.
 ### Sender-Only Example
 
 ```go
-import "github.com/prilive-com/galigo/sender"
+import (
+    "github.com/prilive-com/galigo/sender"
+    "github.com/prilive-com/galigo/tg"
+)
 
 client, err := sender.New(token,
     sender.WithRetries(3),
@@ -92,40 +114,54 @@ if err != nil {
 defer client.Close()
 
 msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
-    ChatID: chatID,
-    Text:   "Hello!",
+    ChatID:    tg.ChatID(chatID),
+    Text:      "Hello!",
+    ParseMode: tg.ParseModeMarkdown,
 })
 ```
 
 ### File Upload Example
 
 ```go
-import "github.com/prilive-com/galigo/sender"
+import (
+    "github.com/prilive-com/galigo/sender"
+    "github.com/prilive-com/galigo/tg"
+)
 
-// From file ID (already on Telegram servers)
+// From file ID (already on Telegram servers) — retry-safe
 photo := sender.FromFileID("AgACAgIAAxkBAAI...")
 
-// From URL (Telegram downloads it)
+// From URL (Telegram downloads it) — retry-safe
 photo := sender.FromURL("https://example.com/image.jpg")
 
-// From bytes (retry-safe)
+// From bytes (in-memory data) — retry-safe
 data, _ := os.ReadFile("photo.jpg")
 photo := sender.FromBytes(data, "photo.jpg")
 
-// From io.Reader (single-use, NOT retry-safe)
+// From io.Reader — NOT retry-safe, use only with WithRetries(0)
 file, _ := os.Open("photo.jpg")
 defer file.Close()
 photo := sender.FromReader(file, "photo.jpg")
 
 // Send
 msg, err := client.SendPhoto(ctx, sender.SendPhotoRequest{
-    ChatID:  chatID,
-    Photo:   photo,
-    Caption: "Hello!",
+    ChatID:    tg.ChatID(chatID),
+    Photo:     photo,
+    Caption:   "Hello!",
+    ParseMode: tg.ParseModeMarkdown,
 })
 ```
 
-**Note:** Use `FromBytes` for retry-safe uploads. `FromReader` is single-use — if a retry occurs, the reader is at EOF.
+### InputFile Retry Safety
+
+| Method | Retry-Safe | Use Case |
+|--------|------------|----------|
+| `FromFileID(id)` | Yes | Re-sending files already on Telegram |
+| `FromURL(url)` | Yes | Remote images (Telegram downloads) |
+| `FromBytes(data, name)` | Yes | Local files, in-memory data |
+| `FromReader(r, name)` | **No** | Streaming only (use with `WithRetries(0)`) |
+
+**Warning:** `FromReader` is consumed on first send attempt. If a retry occurs, the reader is at EOF and sends an empty file. Always use `FromBytes` for local files when retries are enabled (the default).
 
 ### Receiver-Only Example
 
@@ -148,6 +184,46 @@ if err := poller.Start(ctx); err != nil {
 for update := range poller.Updates() {
     // Process update
 }
+```
+
+## Type Helpers
+
+### ChatID
+
+Use `tg.ChatID()` to wrap chat IDs in requests:
+
+```go
+// From int64
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID: tg.ChatID(123456789),
+    Text:   "Hello!",
+})
+
+// Negative IDs for groups/channels
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID: tg.ChatID(-100123456789),
+    Text:   "Hello group!",
+})
+```
+
+### ParseMode Constants
+
+Use constants instead of raw strings:
+
+```go
+import "github.com/prilive-com/galigo/tg"
+
+// Available parse modes
+tg.ParseModeMarkdown    // "Markdown"
+tg.ParseModeMarkdownV2  // "MarkdownV2"
+tg.ParseModeHTML        // "HTML"
+
+// Usage
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID:    tg.ChatID(chatID),
+    Text:      "*bold* _italic_",
+    ParseMode: tg.ParseModeMarkdown,
+})
 ```
 
 ## Security

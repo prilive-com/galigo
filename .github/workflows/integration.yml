@@ -18,13 +18,13 @@ on:
         type: choice
         options:
           - smoke
+          - all
           - core
           - media
           - keyboards
           - chat-admin
           - stickers
           - stars
-          - all
 
 # CRITICAL: Only ONE live test at a time (prevents Telegram 429 chaos)
 concurrency:
@@ -39,7 +39,7 @@ jobs:
   # JOB 1: Live Telegram Test with Full Security Hardening
   # ============================================================
   live-test:
-    name: Run Testbot (${{ github.event.inputs.suite || 'smoke' }})
+    name: Smoke Test (${{ github.event.inputs.suite || 'smoke' }})
     runs-on: ubuntu-latest
     
     # ══════════════════════════════════════════════════════════
@@ -92,13 +92,13 @@ jobs:
         run: |
           SUITE="${{ github.event.inputs.suite }}"
           if [ -z "$SUITE" ]; then SUITE="smoke"; fi
-          
+
           echo "═══════════════════════════════════════════════════"
           echo "Running suite: $SUITE"
           echo "═══════════════════════════════════════════════════"
-          
+
           ./galigo-testbot --run "$SUITE"
-        timeout-minutes: 30
+        timeout-minutes: 10
 
       - name: Upload test reports
         uses: actions/upload-artifact@v4
@@ -126,17 +126,17 @@ jobs:
           fi
 
   # ============================================================
-  # JOB 2: Weekly Extended Test (all non-interactive suites)
+  # JOB 2: Full Test (all methods) - manual trigger only
   # ============================================================
-  weekly-extended:
-    name: Weekly Extended Tests
+  full-test:
+    name: Full Test (all methods)
     runs-on: ubuntu-latest
     environment: telegram-live
-    
-    # Only run on Sunday schedule, not manual dispatch
+
+    # Only run when 'all' is selected manually
     if: |
-      github.event_name == 'schedule' && 
-      github.repository_owner == 'prilive-com'
+      github.repository_owner == 'prilive-com' &&
+      github.event.inputs.suite == 'all'
     
     steps:
       - name: Harden Runner
@@ -167,10 +167,10 @@ jobs:
         run: ./galigo-testbot --run all
         timeout-minutes: 60
 
-      - name: Upload extended test reports
+      - name: Upload full test reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: testbot-extended-${{ github.run_number }}
+          name: testbot-full-${{ github.run_number }}
           path: var/*.json
           retention-days: 90

@@ -84,7 +84,10 @@ jobs:
         run: go build -o galigo-testbot ./cmd/galigo-testbot
 
       - name: Write .env file
-        run: echo "${{ secrets.TESTBOT_ENV }}" > .env
+        run: |
+          cat > .env << 'ENVEOF'
+          ${{ secrets.TESTBOT_ENV }}
+          ENVEOF
 
       - name: Run test suite
         run: |
@@ -157,7 +160,10 @@ jobs:
         run: go build -o galigo-testbot ./cmd/galigo-testbot
 
       - name: Write .env file
-        run: echo "${{ secrets.TESTBOT_ENV }}" > .env
+        run: |
+          cat > .env << 'ENVEOF'
+          ${{ secrets.TESTBOT_ENV }}
+          ENVEOF
 
       - name: Run extended test suite
         run: ./galigo-testbot --run all

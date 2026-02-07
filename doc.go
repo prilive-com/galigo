@@ -42,11 +42,11 @@
 //
 //   - Dual mode: webhook or long polling
 //   - Circuit breaker with sony/gobreaker
-//   - Per-chat rate limiting
+//   - Per-chat and global rate limiting
 //   - Retry with exponential backoff and crypto jitter
 //   - TLS 1.2+ enforcement
-//   - Path traversal protection with os.Root
+//   - Token auto-redaction in logs and errors
 //   - Structured logging with slog
 //   - OpenTelemetry-ready
-//   - Go 1.25+ features: WaitGroup.Go(), synctest, container-aware GOMAXPROCS
+//   - Go 1.22+ features: integer range loops, improved generics
 package galigo

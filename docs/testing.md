@@ -615,6 +615,7 @@ go run ./cmd/galigo-testbot --run identity         # S1: Bot identity
 go run ./cmd/galigo-testbot --run messages         # S2: Send, edit, delete
 go run ./cmd/galigo-testbot --run forward          # S4: Forward and copy
 go run ./cmd/galigo-testbot --run actions          # S5: Chat actions
+go run ./cmd/galigo-testbot --run link-preview     # S37: Link preview options
 go run ./cmd/galigo-testbot --run media-uploads    # S6: Photo, document, animation, audio, voice
 go run ./cmd/galigo-testbot --run media-groups     # S7: Albums
 go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
@@ -678,6 +679,7 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 | S2-MessageLifecycle | sendMessage, editMessageText, deleteMessage | Full message lifecycle |
 | S4-ForwardCopy | sendMessage, forwardMessage, copyMessage | Forward and copy operations |
 | S5-ChatAction | sendChatAction | Typing indicators |
+| S37-LinkPreview | sendMessage | Link preview options (rendering hints) |
 
 #### Phase B: Media (S6-S9)
 

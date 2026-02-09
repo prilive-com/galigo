@@ -226,6 +226,57 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 })
 ```
 
+### LinkPreviewOptions
+
+Control how link previews are displayed in messages:
+
+```go
+import "github.com/prilive-com/galigo/tg"
+
+// News channel style: large preview above text
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID: tg.ChatID(chatID),
+    Text:   "Check out https://example.com",
+    LinkPreviewOptions: &tg.LinkPreviewOptions{
+        PreferLargeMedia: true,
+        ShowAboveText:    true,
+    },
+})
+
+// Disable link preview entirely
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID: tg.ChatID(chatID),
+    Text:   "https://example.com (no preview)",
+    LinkPreviewOptions: &tg.LinkPreviewOptions{
+        IsDisabled: true,
+    },
+})
+
+// Force preview for a specific URL (even if multiple URLs in text)
+msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+    ChatID: tg.ChatID(chatID),
+    Text:   "Visit https://a.com or https://b.com",
+    LinkPreviewOptions: &tg.LinkPreviewOptions{
+        URL:              "https://b.com",
+        PreferSmallMedia: true,
+    },
+})
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `IsDisabled` | `bool` | Disable link preview entirely |
+| `URL` | `string` | Force preview for this URL (when multiple URLs in text) |
+| `PreferSmallMedia` | `bool` | Prefer smaller media in preview |
+| `PreferLargeMedia` | `bool` | Prefer larger media in preview |
+| `ShowAboveText` | `bool` | Show preview above message text (news channel style) |
+
+**Validation:** `PreferSmallMedia` and `PreferLargeMedia` are mutually exclusive. Setting both returns an error before the API call is made.
+
+**Important:** Link preview options are *rendering hints*. Telegram may ignore them based on URL availability, metadata, or user settings. Do not rely on exact preview appearance.
+
+Also works with `EditMessageTextRequest` to update preview settings when editing messages.
+
 ## Security
 
 | Feature | Details |

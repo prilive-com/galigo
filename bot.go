@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/prilive-com/galigo/internal/validate"
 	"github.com/prilive-com/galigo/receiver"
@@ -20,6 +21,9 @@ type Bot struct {
 	sender   *sender.Client
 	updates  chan tg.Update
 	config   botConfig
+
+	// P1 FIX: Ensure Close() is idempotent
+	closeOnce sync.Once
 }
 
 type botConfig struct {
@@ -212,10 +216,28 @@ func (b *Bot) Stop() {
 }
 
 // Close releases all resources.
+// Close is idempotent; subsequent calls are no-ops.
+//
+// In polling mode, Close() waits for the poll loop to exit (via Stop()),
+// then closes the updates channel. It is safe to range over Updates()
+// until it closes.
+//
+// In webhook mode, the updates channel is NOT closed because the HTTP
+// server may still be accepting connections. Stop your HTTP server first,
+// then call Close(). If you need to drain the channel after stopping the
+// server, use a timeout select loop.
 func (b *Bot) Close() error {
-	b.Stop()
-	close(b.updates)
-	return b.sender.Close()
+	var err error
+	b.closeOnce.Do(func() {
+		b.Stop()
+		// Only close updates channel in polling mode.
+		// In webhook mode, concurrent HTTP handlers may still send updates.
+		if b.receiver != nil {
+			close(b.updates)
+		}
+		err = b.sender.Close()
+	})
+	return err
 }
 
 // Updates returns the updates channel.

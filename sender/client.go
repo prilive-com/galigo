@@ -95,6 +95,9 @@ type Client struct {
 	// P1.2: Cleanup
 	cleanupTicker *time.Ticker
 	cleanupDone   chan struct{}
+
+	// P1 FIX: Ensure Close() is idempotent
+	closeOnce sync.Once
 }
 
 // chatLimiterEntry wraps a rate limiter with last used timestamp.
@@ -333,21 +336,20 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 // Close releases resources used by the client.
 // It is safe to call Close concurrently with other methods;
 // in-flight requests will complete normally or with context errors.
-// Close should be called only once; subsequent calls are no-ops.
+// Close is idempotent; subsequent calls are no-ops.
 func (c *Client) Close() error {
-	// P1.6 FIX: Actually close resources
+	c.closeOnce.Do(func() {
+		// Stop limiter cleanup goroutine
+		if c.cleanupTicker != nil {
+			c.cleanupTicker.Stop()
+			close(c.cleanupDone)
+		}
 
-	// Stop limiter cleanup goroutine
-	if c.cleanupTicker != nil {
-		c.cleanupTicker.Stop()
-		close(c.cleanupDone)
-	}
-
-	// Close idle HTTP connections
-	if t, ok := c.httpClient.Transport.(*http.Transport); ok {
-		t.CloseIdleConnections()
-	}
-
+		// Close idle HTTP connections
+		if t, ok := c.httpClient.Transport.(*http.Transport); ok {
+			t.CloseIdleConnections()
+		}
+	})
 	return nil
 }
 

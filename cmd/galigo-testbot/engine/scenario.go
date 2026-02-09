@@ -349,7 +349,7 @@ type SendOption func(*SendOptions)
 type SendOptions struct {
 	ReplyMarkup        *tg.InlineKeyboardMarkup
 	ParseMode          string
-	Caption            string              // For media methods (sendPhoto, sendDocument, etc.)
+	Caption            string                 // For media methods (sendPhoto, sendDocument, etc.)
 	LinkPreviewOptions *tg.LinkPreviewOptions // For sendMessage
 }
 

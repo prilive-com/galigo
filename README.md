@@ -119,6 +119,24 @@ For the complete method list, see the [API Reference](https://pkg.go.dev/github.
 | `receiver.PollingClient` | ✅ | Single goroutine fetches, multiple can consume |
 | `tg.Update` | ✅ | Immutable after creation |
 
+### Close() Idempotency
+
+Both `Bot.Close()` and `sender.Client.Close()` are idempotent — safe to call multiple times or concurrently without panicking. This is important for:
+
+- `defer bot.Close()` combined with explicit shutdown paths
+- Graceful shutdown handlers that may race with other cleanup code
+- Error recovery scenarios
+
+```go
+bot, _ := galigo.New(token)
+defer bot.Close()  // Safe even if Close() called elsewhere
+
+// ... later in shutdown handler ...
+bot.Close()  // No panic, just a no-op
+```
+
+**Webhook mode note:** In webhook mode, `Bot.Close()` does *not* close the updates channel because HTTP handlers may still be sending updates. Stop your HTTP server first, then call `Close()`.
+
 ## Error Handling
 
 galigo provides typed errors for precise handling:

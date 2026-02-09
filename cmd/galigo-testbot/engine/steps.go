@@ -127,7 +127,7 @@ func (s *SendMessageWithLinkPreviewStep) Execute(ctx context.Context, rt *Runtim
 // Uses tg.ParseMode for compile-time safety.
 // See: https://github.com/prilive-com/galigo/issues/5
 type SendPhotoWithParseModeStep struct {
-	Photo     MediaInput   // Required: pass via MediaFromBytes(fixtures.PhotoBytes(), ...)
+	Photo     MediaInput // Required: pass via MediaFromBytes(fixtures.PhotoBytes(), ...)
 	Caption   string
 	ParseMode tg.ParseMode // Use actual type for compile-time safety
 }

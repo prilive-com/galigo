@@ -347,9 +347,10 @@ type SendOption func(*SendOptions)
 
 // SendOptions holds optional parameters for sending.
 type SendOptions struct {
-	ReplyMarkup *tg.InlineKeyboardMarkup
-	ParseMode   string
-	Caption     string // For media methods (sendPhoto, sendDocument, etc.)
+	ReplyMarkup        *tg.InlineKeyboardMarkup
+	ParseMode          string
+	Caption            string              // For media methods (sendPhoto, sendDocument, etc.)
+	LinkPreviewOptions *tg.LinkPreviewOptions // For sendMessage
 }
 
 // WithReplyMarkup sets the reply markup.
@@ -370,6 +371,13 @@ func WithParseMode(mode string) SendOption {
 func WithCaption(caption string) SendOption {
 	return func(o *SendOptions) {
 		o.Caption = caption
+	}
+}
+
+// WithLinkPreviewOptions sets link preview options for sendMessage.
+func WithLinkPreviewOptions(opts *tg.LinkPreviewOptions) SendOption {
+	return func(o *SendOptions) {
+		o.LinkPreviewOptions = opts
 	}
 }
 

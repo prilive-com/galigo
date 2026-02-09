@@ -51,9 +51,10 @@ func (a *SenderAdapter) SendMessage(ctx context.Context, chatID int64, text stri
 	}
 
 	req := sender.SendMessageRequest{
-		ChatID:    chatID,
-		Text:      text,
-		ParseMode: tg.ParseMode(options.ParseMode),
+		ChatID:             chatID,
+		Text:               text,
+		ParseMode:          tg.ParseMode(options.ParseMode),
+		LinkPreviewOptions: options.LinkPreviewOptions,
 	}
 
 	if options.ReplyMarkup != nil {

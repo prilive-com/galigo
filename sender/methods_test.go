@@ -1079,3 +1079,87 @@ func TestSetMessageReaction_Success(t *testing.T) {
 	cap := server.LastCapture()
 	cap.AssertJSONField(t, "message_id", float64(123))
 }
+
+// ================== LinkPreviewOptions Tests ==================
+
+func TestSendMessage_WithLinkPreviewOptions(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 1)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Check this link https://example.com",
+		LinkPreviewOptions: &tg.LinkPreviewOptions{
+			URL:              "https://example.com",
+			PreferLargeMedia: true,
+			ShowAboveText:    true,
+		},
+	})
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONFieldExists(t, "link_preview_options")
+}
+
+func TestSendMessage_LinkPreviewOptions_MutuallyExclusiveError(t *testing.T) {
+	// No server needed - validation fails before request
+	client := testutil.NewTestClient(t, "http://localhost:9999")
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: testutil.TestChatID,
+		Text:   "Test",
+		LinkPreviewOptions: &tg.LinkPreviewOptions{
+			PreferSmallMedia: true,
+			PreferLargeMedia: true, // Invalid: mutually exclusive
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestEditMessageText_WithLinkPreviewOptions(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/editMessageText", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 1)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.EditMessageText(context.Background(), sender.EditMessageTextRequest{
+		ChatID:    testutil.TestChatID,
+		MessageID: 1,
+		Text:      "Updated with link https://example.com",
+		LinkPreviewOptions: &tg.LinkPreviewOptions{
+			IsDisabled: true,
+		},
+	})
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONFieldExists(t, "link_preview_options")
+}
+
+func TestEditMessageText_LinkPreviewOptions_MutuallyExclusiveError(t *testing.T) {
+	// No server needed - validation fails before request
+	client := testutil.NewTestClient(t, "http://localhost:9999")
+
+	_, err := client.EditMessageText(context.Background(), sender.EditMessageTextRequest{
+		ChatID:    testutil.TestChatID,
+		MessageID: 1,
+		Text:      "Test",
+		LinkPreviewOptions: &tg.LinkPreviewOptions{
+			PreferSmallMedia: true,
+			PreferLargeMedia: true, // Invalid: mutually exclusive
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}

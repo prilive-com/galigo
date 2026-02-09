@@ -90,6 +90,38 @@ func (s *SendFormattedMessageStep) Execute(ctx context.Context, rt *Runtime) (*S
 	}, nil
 }
 
+// SendMessageWithLinkPreviewStep sends a message with LinkPreviewOptions.
+// This validates that link_preview_options serializes correctly and is accepted by Telegram.
+// NOTE: We do NOT assert on preview rendering (whether it shows up, size, position) since
+// link_preview_options are rendering hints that Telegram may ignore.
+// See: https://github.com/prilive-com/galigo/issues/6
+type SendMessageWithLinkPreviewStep struct {
+	Text               string
+	LinkPreviewOptions *tg.LinkPreviewOptions
+}
+
+func (s *SendMessageWithLinkPreviewStep) Name() string { return "sendMessage (link_preview_options)" }
+
+func (s *SendMessageWithLinkPreviewStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithLinkPreviewOptions(s.LinkPreviewOptions))
+	if err != nil {
+		return nil, fmt.Errorf("sendMessage with LinkPreviewOptions: %w", err)
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	return &StepResult{
+		Method:     "sendMessage",
+		MessageIDs: []int{msg.MessageID},
+		Evidence: map[string]any{
+			"message_id":           msg.MessageID,
+			"text":                 s.Text,
+			"link_preview_options": s.LinkPreviewOptions,
+		},
+	}, nil
+}
+
 // SendPhotoWithParseModeStep tests ParseMode in multipart requests.
 // This catches the named-string-type serialization bug in BuildMultipartRequest.
 // Uses tg.ParseMode for compile-time safety.

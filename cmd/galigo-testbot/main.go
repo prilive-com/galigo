@@ -140,6 +140,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
 	case "formatted", "formatting", "parse-mode":
 		scenarios = []engine.Scenario{suites.S3_FormattedMessages()}
+	case "link-preview":
+		scenarios = []engine.Scenario{suites.S37_LinkPreview()}
 	case "core":
 		scenarios = suites.AllPhaseAScenarios()
 	// Phase B: Media
@@ -497,6 +499,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
 	case "formatted", "formatting", "parse-mode":
 		scenarios = []engine.Scenario{suites.S3_FormattedMessages()}
+	case "link-preview":
+		scenarios = []engine.Scenario{suites.S37_LinkPreview()}
 	case "core":
 		scenarios = suites.AllPhaseAScenarios()
 	// Phase B: Media

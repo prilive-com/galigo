@@ -1,6 +1,9 @@
 package tg
 
-import "strconv"
+import (
+	"errors"
+	"strconv"
+)
 
 // ChatID represents a Telegram chat identifier.
 // Valid types: int64 (numeric ID) or string (channel username like "@channelusername")
@@ -328,12 +331,27 @@ type ReplyParameters struct {
 }
 
 // LinkPreviewOptions describes options for link preview generation.
+// These are rendering hints - Telegram may ignore them based on URL
+// availability, metadata, or user settings.
+//
+// https://core.telegram.org/bots/api#linkpreviewoptions
 type LinkPreviewOptions struct {
 	IsDisabled       bool   `json:"is_disabled,omitempty"`
 	URL              string `json:"url,omitempty"`
 	PreferSmallMedia bool   `json:"prefer_small_media,omitempty"`
 	PreferLargeMedia bool   `json:"prefer_large_media,omitempty"`
 	ShowAboveText    bool   `json:"show_above_text,omitempty"`
+}
+
+// Validate checks for invalid option combinations.
+func (o *LinkPreviewOptions) Validate() error {
+	if o == nil {
+		return nil
+	}
+	if o.PreferSmallMedia && o.PreferLargeMedia {
+		return errors.New("link_preview_options: PreferSmallMedia and PreferLargeMedia are mutually exclusive")
+	}
+	return nil
 }
 
 // MaskPosition describes the position of a mask on a face.

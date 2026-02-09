@@ -6,14 +6,17 @@ import (
 
 // SendMessageRequest represents a request to send a text message.
 type SendMessageRequest struct {
-	ChatID                tg.ChatID    `json:"chat_id"`
-	Text                  string       `json:"text"`
-	ParseMode             tg.ParseMode `json:"parse_mode,omitempty"`
-	DisableWebPagePreview bool         `json:"disable_web_page_preview,omitempty"`
-	DisableNotification   bool         `json:"disable_notification,omitempty"`
-	ProtectContent        bool         `json:"protect_content,omitempty"`
-	ReplyToMessageID      int          `json:"reply_to_message_id,omitempty"`
-	ReplyMarkup           any          `json:"reply_markup,omitempty"`
+	ChatID              tg.ChatID              `json:"chat_id"`
+	Text                string                 `json:"text"`
+	ParseMode           tg.ParseMode           `json:"parse_mode,omitempty"`
+	LinkPreviewOptions  *tg.LinkPreviewOptions `json:"link_preview_options,omitempty"`
+	DisableNotification bool                   `json:"disable_notification,omitempty"`
+	ProtectContent      bool                   `json:"protect_content,omitempty"`
+	ReplyToMessageID    int                    `json:"reply_to_message_id,omitempty"`
+	ReplyMarkup         any                    `json:"reply_markup,omitempty"`
+
+	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.
+	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`
 }
 
 // SendPhotoRequest represents a request to send a photo.
@@ -30,13 +33,16 @@ type SendPhotoRequest struct {
 
 // EditMessageTextRequest represents a request to edit message text.
 type EditMessageTextRequest struct {
-	ChatID                tg.ChatID    `json:"chat_id,omitempty"`
-	MessageID             int          `json:"message_id,omitempty"`
-	InlineMessageID       string       `json:"inline_message_id,omitempty"`
-	Text                  string       `json:"text"`
-	ParseMode             tg.ParseMode `json:"parse_mode,omitempty"`
-	DisableWebPagePreview bool         `json:"disable_web_page_preview,omitempty"`
-	ReplyMarkup           any          `json:"reply_markup,omitempty"`
+	ChatID             tg.ChatID              `json:"chat_id,omitempty"`
+	MessageID          int                    `json:"message_id,omitempty"`
+	InlineMessageID    string                 `json:"inline_message_id,omitempty"`
+	Text               string                 `json:"text"`
+	ParseMode          tg.ParseMode           `json:"parse_mode,omitempty"`
+	LinkPreviewOptions *tg.LinkPreviewOptions `json:"link_preview_options,omitempty"`
+	ReplyMarkup        any                    `json:"reply_markup,omitempty"`
+
+	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.
+	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`
 }
 
 // EditMessageCaptionRequest represents a request to edit message caption.

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // S0_Smoke is a quick sanity check.
@@ -104,6 +105,38 @@ func S5_ChatAction() engine.Scenario {
 	}
 }
 
+// S37_LinkPreview tests link_preview_options serialization.
+// NOTE: We do NOT assert on preview rendering — Telegram may ignore these hints.
+// We only verify the request is accepted.
+// See: https://github.com/prilive-com/galigo/issues/6
+func S37_LinkPreview() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S37-LinkPreview",
+		ScenarioDescription: "Send message with link_preview_options (rendering hint)",
+		CoveredMethods:      []string{"sendMessage"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			// Test with show_above_text (news channel style)
+			&engine.SendMessageWithLinkPreviewStep{
+				Text: "galigo-testbot: link preview test https://telegram.org",
+				LinkPreviewOptions: &tg.LinkPreviewOptions{
+					PreferLargeMedia: true,
+					ShowAboveText:    true,
+				},
+			},
+			&engine.DeleteLastMessageStep{},
+			// Test with disabled preview
+			&engine.SendMessageWithLinkPreviewStep{
+				Text: "galigo-testbot: no preview test https://telegram.org",
+				LinkPreviewOptions: &tg.LinkPreviewOptions{
+					IsDisabled: true,
+				},
+			},
+			&engine.DeleteLastMessageStep{},
+		},
+	}
+}
+
 // AllPhaseAScenarios returns all Phase A scenarios.
 func AllPhaseAScenarios() []engine.Scenario {
 	return []engine.Scenario{
@@ -113,6 +146,7 @@ func AllPhaseAScenarios() []engine.Scenario {
 		S3_FormattedMessages(),
 		S4_ForwardCopy(),
 		S5_ChatAction(),
+		S37_LinkPreview(),
 	}
 }
 

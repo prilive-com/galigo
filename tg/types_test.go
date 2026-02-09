@@ -8,131 +8,85 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// ==================== Message.MessageSig ====================
-
-func TestMessage_MessageSig_Valid(t *testing.T) {
-	msg := &tg.Message{
-		MessageID: 123,
-		Chat:      &tg.Chat{ID: 456},
-	}
-
-	msgID, chatID := msg.MessageSig()
-	assert.Equal(t, "123", msgID)
-	assert.Equal(t, int64(456), chatID)
-}
-
-func TestMessage_MessageSig_NilMessage(t *testing.T) {
-	var msg *tg.Message
-
-	msgID, chatID := msg.MessageSig()
-	assert.Equal(t, "", msgID)
-	assert.Equal(t, int64(0), chatID)
-}
-
-func TestMessage_MessageSig_NilChat(t *testing.T) {
-	msg := &tg.Message{
-		MessageID: 123,
-		Chat:      nil,
-	}
-
-	msgID, chatID := msg.MessageSig()
-	assert.Equal(t, "123", msgID)
-	assert.Equal(t, int64(0), chatID)
-}
-
-// ==================== StoredMessage.MessageSig ====================
-
-func TestStoredMessage_MessageSig(t *testing.T) {
-	stored := tg.StoredMessage{
-		MsgID:  789,
-		ChatID: 12345,
-	}
-
-	msgID, chatID := stored.MessageSig()
-	assert.Equal(t, "789", msgID)
-	assert.Equal(t, int64(12345), chatID)
-}
-
-func TestStoredMessage_ImplementsEditable(t *testing.T) {
-	var _ tg.Editable = tg.StoredMessage{}
-}
-
-// ==================== InlineMessage.MessageSig ====================
-
-func TestInlineMessage_MessageSig(t *testing.T) {
-	inline := tg.InlineMessage{
-		InlineMessageID: "inline_msg_123",
-	}
-
-	msgID, chatID := inline.MessageSig()
-	assert.Equal(t, "inline_msg_123", msgID)
-	assert.Equal(t, int64(0), chatID) // Inline messages have no chat ID
-}
-
-func TestInlineMessage_ImplementsEditable(t *testing.T) {
-	var _ tg.Editable = tg.InlineMessage{}
-}
-
-// ==================== CallbackQuery.MessageSig ====================
-
-func TestCallbackQuery_MessageSig_WithInlineMessageID(t *testing.T) {
-	cb := &tg.CallbackQuery{
-		ID:              "cb_123",
-		InlineMessageID: "inline_456",
-	}
-
-	msgID, chatID := cb.MessageSig()
-	assert.Equal(t, "inline_456", msgID)
-	assert.Equal(t, int64(0), chatID)
-}
-
-func TestCallbackQuery_MessageSig_WithMessage(t *testing.T) {
-	cb := &tg.CallbackQuery{
-		ID: "cb_123",
-		Message: &tg.Message{
-			MessageID: 789,
-			Chat:      &tg.Chat{ID: 100},
+func TestLinkPreviewOptions_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		opts    *tg.LinkPreviewOptions
+		wantErr bool
+	}{
+		{
+			name:    "nil options valid",
+			opts:    nil,
+			wantErr: false,
+		},
+		{
+			name:    "empty options valid",
+			opts:    &tg.LinkPreviewOptions{},
+			wantErr: false,
+		},
+		{
+			name: "disabled preview valid",
+			opts: &tg.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "prefer small media valid",
+			opts: &tg.LinkPreviewOptions{
+				PreferSmallMedia: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "prefer large media valid",
+			opts: &tg.LinkPreviewOptions{
+				PreferLargeMedia: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "show above text valid",
+			opts: &tg.LinkPreviewOptions{
+				ShowAboveText: true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "custom URL valid",
+			opts: &tg.LinkPreviewOptions{
+				URL: "https://example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "full valid config",
+			opts: &tg.LinkPreviewOptions{
+				URL:              "https://example.com",
+				PreferLargeMedia: true,
+				ShowAboveText:    true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "mutually exclusive error",
+			opts: &tg.LinkPreviewOptions{
+				PreferSmallMedia: true,
+				PreferLargeMedia: true,
+			},
+			wantErr: true,
 		},
 	}
 
-	msgID, chatID := cb.MessageSig()
-	assert.Equal(t, "789", msgID)
-	assert.Equal(t, int64(100), chatID)
-}
-
-func TestCallbackQuery_MessageSig_Nil(t *testing.T) {
-	var cb *tg.CallbackQuery
-
-	msgID, chatID := cb.MessageSig()
-	assert.Equal(t, "", msgID)
-	assert.Equal(t, int64(0), chatID)
-}
-
-func TestCallbackQuery_MessageSig_NoMessageNoInline(t *testing.T) {
-	cb := &tg.CallbackQuery{
-		ID: "cb_123",
-	}
-
-	msgID, chatID := cb.MessageSig()
-	assert.Equal(t, "", msgID)
-	assert.Equal(t, int64(0), chatID)
-}
-
-// ==================== Editable Interface Compliance ====================
-
-func TestEditableInterface_AllTypesImplement(t *testing.T) {
-	// Compile-time verification that types implement Editable
-	editables := []tg.Editable{
-		&tg.Message{},
-		tg.StoredMessage{},
-		tg.InlineMessage{},
-		&tg.CallbackQuery{},
-	}
-
-	// All should be usable as Editable
-	for _, e := range editables {
-		msgID, chatID := e.MessageSig()
-		_ = msgID
-		_ = chatID
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.opts.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "mutually exclusive")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }

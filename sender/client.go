@@ -394,6 +394,9 @@ func (c *Client) SendMessage(ctx context.Context, req SendMessageRequest) (*tg.M
 	if err := validateChatID(req.ChatID); err != nil {
 		return nil, err
 	}
+	if err := req.LinkPreviewOptions.Validate(); err != nil {
+		return nil, err
+	}
 	return withRetry(c, ctx, req.ChatID, func() (*tg.Message, error) {
 		return c.sendMessageOnce(ctx, req)
 	})
@@ -411,6 +414,9 @@ func (c *Client) SendPhoto(ctx context.Context, req SendPhotoRequest) (*tg.Messa
 
 // EditMessageText edits message text.
 func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest) (*tg.Message, error) {
+	if err := req.LinkPreviewOptions.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "editMessageText", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err

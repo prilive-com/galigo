@@ -41,15 +41,15 @@ jobs:
           - FuzzChatBoostUnmarshalJSON
           - FuzzStarTransactionUnmarshalJSON
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod  # Single source of truth
           cache: true
 
       - name: Restore fuzz corpus
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cache/go-build/fuzz
@@ -71,7 +71,7 @@ jobs:
         continue-on-error: true
 
       - name: Save fuzz corpus
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: always()
         with:
           path: |
@@ -80,7 +80,7 @@ jobs:
           key: fuzz-corpus-${{ matrix.fuzz-target }}-${{ github.sha }}
 
       - name: Upload crash artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: steps.fuzz.outputs.fuzz_failed == 'true'
         with:
           name: fuzz-crash-${{ matrix.fuzz-target }}
@@ -91,7 +91,7 @@ jobs:
 
       - name: Create issue on crash
         if: steps.fuzz.outputs.fuzz_failed == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');

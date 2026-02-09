@@ -829,8 +829,8 @@ cmd/galigo-testbot/
 │   ├── runner.go        # Scenario executor with timing, error handling, skip support
 │   └── adapter.go       # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
-│   ├── tier1.go       # Phase A scenarios (S0-S5)
-│   ├── media.go       # Phase B scenarios (S6-S11)
+│   ├── core.go        # Core scenarios (S0-S5, incl. S3 ParseMode)
+│   ├── media.go       # Media scenarios (S6-S11, S36 multipart ParseMode)
 │   ├── keyboards.go   # Phase C scenarios (S10+)
 │   ├── chat_admin.go  # Phase D scenarios (S15-S19)
 │   ├── stickers.go    # Phase E: Sticker lifecycle (S20)

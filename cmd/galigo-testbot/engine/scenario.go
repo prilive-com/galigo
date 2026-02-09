@@ -218,7 +218,7 @@ type SenderClient interface {
 	SendChatAction(ctx context.Context, chatID int64, action string) error
 
 	// Media methods (Phase B)
-	SendPhoto(ctx context.Context, chatID int64, photo MediaInput, caption string) (*tg.Message, error)
+	SendPhoto(ctx context.Context, chatID int64, photo MediaInput, opts ...SendOption) (*tg.Message, error)
 	SendDocument(ctx context.Context, chatID int64, document MediaInput, caption string) (*tg.Message, error)
 	SendAnimation(ctx context.Context, chatID int64, animation MediaInput, caption string) (*tg.Message, error)
 	SendVideo(ctx context.Context, chatID int64, video MediaInput, caption string) (*tg.Message, error)
@@ -349,6 +349,7 @@ type SendOption func(*SendOptions)
 type SendOptions struct {
 	ReplyMarkup *tg.InlineKeyboardMarkup
 	ParseMode   string
+	Caption     string // For media methods (sendPhoto, sendDocument, etc.)
 }
 
 // WithReplyMarkup sets the reply markup.
@@ -362,6 +363,13 @@ func WithReplyMarkup(markup *tg.InlineKeyboardMarkup) SendOption {
 func WithParseMode(mode string) SendOption {
 	return func(o *SendOptions) {
 		o.ParseMode = mode
+	}
+}
+
+// WithCaption sets the caption for media messages.
+func WithCaption(caption string) SendOption {
+	return func(o *SendOptions) {
+		o.Caption = caption
 	}
 }
 

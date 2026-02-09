@@ -60,6 +60,86 @@ func (s *SendMessageStep) Execute(ctx context.Context, rt *Runtime) (*StepResult
 	}, nil
 }
 
+// SendFormattedMessageStep sends a text message with ParseMode.
+// This validates that named string types (tg.ParseMode) serialize correctly.
+// See: https://github.com/prilive-com/galigo/issues/5
+type SendFormattedMessageStep struct {
+	Text      string
+	ParseMode string // "Markdown", "MarkdownV2", "HTML"
+}
+
+func (s *SendFormattedMessageStep) Name() string { return "sendMessage" }
+
+func (s *SendFormattedMessageStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithParseMode(s.ParseMode))
+	if err != nil {
+		return nil, fmt.Errorf("sendMessage with ParseMode %q: %w", s.ParseMode, err)
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	return &StepResult{
+		Method:     "sendMessage",
+		MessageIDs: []int{msg.MessageID},
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
+			"text":       s.Text,
+			"parse_mode": s.ParseMode,
+		},
+	}, nil
+}
+
+// SendPhotoWithParseModeStep tests ParseMode in multipart requests.
+// This catches the named-string-type serialization bug in BuildMultipartRequest.
+// Uses tg.ParseMode for compile-time safety.
+// See: https://github.com/prilive-com/galigo/issues/5
+type SendPhotoWithParseModeStep struct {
+	Photo     MediaInput   // Required: pass via MediaFromBytes(fixtures.PhotoBytes(), ...)
+	Caption   string
+	ParseMode tg.ParseMode // Use actual type for compile-time safety
+}
+
+func (s *SendPhotoWithParseModeStep) Name() string { return "sendPhoto" }
+
+func (s *SendPhotoWithParseModeStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	msg, err := rt.Sender.SendPhoto(ctx, rt.ChatID, s.Photo,
+		WithCaption(s.Caption),
+		WithParseMode(string(s.ParseMode)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sendPhoto with ParseMode %q: %w", s.ParseMode, err)
+	}
+
+	// Verify formatting was applied (caption entities exist)
+	if len(msg.CaptionEntities) == 0 {
+		return nil, fmt.Errorf("sendPhoto: ParseMode %q accepted but no caption entities returned", s.ParseMode)
+	}
+
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	// Capture file_id for reuse
+	var fileID string
+	if len(msg.Photo) > 0 {
+		fileID = msg.Photo[len(msg.Photo)-1].FileID
+		rt.CapturedFileIDs["photo"] = fileID
+	}
+
+	return &StepResult{
+		Method:     "sendPhoto",
+		MessageIDs: []int{msg.MessageID},
+		FileIDs:    []string{fileID},
+		Evidence: map[string]any{
+			"message_id":           msg.MessageID,
+			"caption":              s.Caption,
+			"parse_mode":           s.ParseMode,
+			"caption_entity_count": len(msg.CaptionEntities),
+			"file_id":              fileID,
+		},
+	}, nil
+}
+
 // EditMessageTextStep edits the last message's text.
 type EditMessageTextStep struct {
 	Text string
@@ -361,7 +441,7 @@ type SendPhotoStep struct {
 func (s *SendPhotoStep) Name() string { return "sendPhoto" }
 
 func (s *SendPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
-	msg, err := rt.Sender.SendPhoto(ctx, rt.ChatID, s.Photo, s.Caption)
+	msg, err := rt.Sender.SendPhoto(ctx, rt.ChatID, s.Photo, WithCaption(s.Caption))
 	if err != nil {
 		return nil, err
 	}

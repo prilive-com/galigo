@@ -6,6 +6,7 @@ import (
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // S6_MediaUploads tests basic media upload methods.
@@ -153,6 +154,27 @@ func S11_EditMessageMedia() engine.Scenario {
 	}
 }
 
+// S36_MultipartParseMode tests ParseMode serialization in multipart requests.
+// This is a regression test for the BuildMultipartRequest named-string-type bug.
+// See: https://github.com/prilive-com/galigo/issues/5
+func S36_MultipartParseMode() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S36_MultipartParseMode",
+		ScenarioDescription: "Verify ParseMode serialization in multipart uploads (regression test)",
+		CoveredMethods:      []string{"sendPhoto"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			// HTML is most reliable for tests (simpler escaping than Markdown)
+			&engine.SendPhotoWithParseModeStep{
+				Photo:     engine.MediaFromBytes(fixtures.PhotoBytes(), "parsemode-test.jpg", "photo"),
+				Caption:   "<b>bold</b> <code>code</code>",
+				ParseMode: tg.ParseModeHTML,
+			},
+			&engine.DeleteLastMessageStep{},
+		},
+	}
+}
+
 // AllPhaseBScenarios returns all Phase B (media) scenarios.
 func AllPhaseBScenarios() []engine.Scenario {
 	return []engine.Scenario{
@@ -161,5 +183,6 @@ func AllPhaseBScenarios() []engine.Scenario {
 		S8_EditMedia(),
 		S9_GetFile(),
 		S11_EditMessageMedia(),
+		S36_MultipartParseMode(),
 	}
 }

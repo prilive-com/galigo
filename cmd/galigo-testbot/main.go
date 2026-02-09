@@ -138,6 +138,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
 	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
+	case "formatted", "formatting", "parse-mode":
+		scenarios = []engine.Scenario{suites.S3_FormattedMessages()}
 	case "core":
 		scenarios = suites.AllPhaseAScenarios()
 	// Phase B: Media
@@ -153,6 +155,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
 	case "edit-message-media":
 		scenarios = []engine.Scenario{suites.S11_EditMessageMedia()}
+	case "multipart-parsemode":
+		scenarios = []engine.Scenario{suites.S36_MultipartParseMode()}
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()
@@ -491,6 +495,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
 	case "actions":
 		scenarios = []engine.Scenario{suites.S5_ChatAction()}
+	case "formatted", "formatting", "parse-mode":
+		scenarios = []engine.Scenario{suites.S3_FormattedMessages()}
 	case "core":
 		scenarios = suites.AllPhaseAScenarios()
 	// Phase B: Media
@@ -506,6 +512,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S9_GetFile()}
 	case "edit-message-media":
 		scenarios = []engine.Scenario{suites.S11_EditMessageMedia()}
+	case "multipart-parsemode":
+		scenarios = []engine.Scenario{suites.S36_MultipartParseMode()}
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()

@@ -117,12 +117,18 @@ func mediaInputToInputFile(m MediaInput) sender.InputFile {
 	return sender.InputFile{}
 }
 
-// SendPhoto sends a photo.
-func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo MediaInput, caption string) (*tg.Message, error) {
+// SendPhoto sends a photo with optional caption and parse mode.
+func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo MediaInput, opts ...SendOption) (*tg.Message, error) {
+	options := &SendOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	return a.client.SendPhoto(ctx, sender.SendPhotoRequest{
-		ChatID:  chatID,
-		Photo:   mediaInputToInputFile(photo),
-		Caption: caption,
+		ChatID:    chatID,
+		Photo:     mediaInputToInputFile(photo),
+		Caption:   options.Caption,
+		ParseMode: tg.ParseMode(options.ParseMode),
 	})
 }
 

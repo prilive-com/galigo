@@ -65,6 +65,32 @@ func S4_ForwardCopy() engine.Scenario {
 	}
 }
 
+// S3_FormattedMessages tests ParseMode serialization in JSON requests (sendMessage).
+// NOTE: This tests the JSON path only. For multipart (file uploads), see S36_MultipartParseMode.
+// See: https://github.com/prilive-com/galigo/issues/5
+func S3_FormattedMessages() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S3-FormattedMessages",
+		ScenarioDescription: "Send messages with ParseMode (Markdown, HTML)",
+		CoveredMethods:      []string{"sendMessage"},
+		ScenarioTimeout:     1 * time.Minute,
+		ScenarioSteps: []engine.Step{
+			// Test Markdown formatting
+			&engine.SendFormattedMessageStep{
+				Text:      "galigo-testbot: *bold* _italic_ `code`",
+				ParseMode: "Markdown",
+			},
+			&engine.DeleteLastMessageStep{},
+			// Test HTML formatting
+			&engine.SendFormattedMessageStep{
+				Text:      "galigo-testbot: <b>bold</b> <i>italic</i> <code>code</code>",
+				ParseMode: "HTML",
+			},
+			&engine.DeleteLastMessageStep{},
+		},
+	}
+}
+
 // S5_ChatAction tests chat action sending.
 func S5_ChatAction() engine.Scenario {
 	return &engine.BaseScenario{
@@ -84,6 +110,7 @@ func AllPhaseAScenarios() []engine.Scenario {
 		S0_Smoke(),
 		S1_Identity(),
 		S2_MessageLifecycle(),
+		S3_FormattedMessages(),
 		S4_ForwardCopy(),
 		S5_ChatAction(),
 	}

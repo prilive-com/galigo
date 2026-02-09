@@ -155,6 +155,15 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 			result.Files = append(result.Files, v...)
 
 		default:
+			// Handle named string types (tg.ParseMode, tg.ChatType, etc.)
+			// These don't match "case string:" because they're distinct types,
+			// but we need to serialize them as plain strings, not JSON-encoded.
+			// See: https://github.com/prilive-com/galigo/issues/5
+			if value.Kind() == reflect.String {
+				result.Params[fieldName] = value.String()
+				continue
+			}
+
 			// Complex types (structs, slices, maps) -> JSON encode
 			data, err := json.Marshal(v)
 			if err != nil {

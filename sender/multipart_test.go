@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 )
 
 func TestMultipartEncoder_BasicFields(t *testing.T) {
@@ -315,4 +316,52 @@ func TestMultipartRequest_HasUploads(t *testing.T) {
 		Params: map[string]string{"chat_id": "123"},
 	}
 	assert.False(t, withoutUploads.HasUploads())
+}
+
+// TestBuildMultipartRequest_NamedStringTypes verifies that named string types
+// (like tg.ParseMode, tg.ChatType) are serialized as plain strings,
+// not JSON-encoded with quotes. See: https://github.com/prilive-com/galigo/issues/5
+func TestBuildMultipartRequest_NamedStringTypes(t *testing.T) {
+	type TestRequest struct {
+		ChatID    int64        `json:"chat_id"`
+		Text      string       `json:"text"`
+		ParseMode tg.ParseMode `json:"parse_mode"`
+	}
+
+	req := TestRequest{
+		ChatID:    123456,
+		Text:      "*bold* _italic_",
+		ParseMode: tg.ParseModeMarkdown,
+	}
+
+	result, err := sender.BuildMultipartRequest(req)
+	require.NoError(t, err)
+
+	// CRITICAL: ParseMode must be "Markdown", not "\"Markdown\""
+	// The bug caused JSON encoding of named string types, wrapping them in quotes
+	assert.Equal(t, "Markdown", result.Params["parse_mode"],
+		"ParseMode should be plain string, not JSON-encoded")
+
+	// Verify it doesn't contain escaped quotes (the bug symptom)
+	assert.NotContains(t, result.Params["parse_mode"], "\"",
+		"ParseMode should not contain escaped quotes")
+}
+
+func TestBuildMultipartRequest_ChatType(t *testing.T) {
+	type TestRequest struct {
+		ChatID   int64       `json:"chat_id"`
+		ChatType tg.ChatType `json:"chat_type"`
+	}
+
+	req := TestRequest{
+		ChatID:   123456,
+		ChatType: tg.ChatTypeSupergroup,
+	}
+
+	result, err := sender.BuildMultipartRequest(req)
+	require.NoError(t, err)
+
+	// ChatType is also a named string type - should serialize as plain string
+	assert.Equal(t, "supergroup", result.Params["chat_type"])
+	assert.NotContains(t, result.Params["chat_type"], "\"")
 }

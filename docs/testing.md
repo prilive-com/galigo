@@ -654,6 +654,13 @@ go run ./cmd/galigo-testbot --run bot-commands           # S33: Bot commands
 go run ./cmd/galigo-testbot --run bot-profile            # S34: Bot profile
 go run ./cmd/galigo-testbot --run bot-admin-defaults     # S35: Bot admin defaults
 
+# Bot API 9.4 scenarios (S38-S42)
+go run ./cmd/galigo-testbot --run api94                  # All 9.4 tests
+go run ./cmd/galigo-testbot --run styled-buttons         # S38: Button styling
+go run ./cmd/galigo-testbot --run profile-audios         # S39: Profile audios
+go run ./cmd/galigo-testbot --run chat-info-94           # S40: ChatFullInfo 9.4 fields
+go run ./cmd/galigo-testbot --run video-qualities        # S42: Video qualities
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -744,6 +751,17 @@ S31-S32 require admin with `can_change_info` / `can_restrict_members` permission
 | S34-BotProfile | setMyName, getMyName, setMyDescription, getMyDescription, setMyShortDescription, getMyShortDescription | Bot name and description management |
 | S35-BotAdminDefaults | setMyDefaultAdministratorRights, getMyDefaultAdministratorRights | Default admin rights for groups/channels |
 
+#### Phase H: Bot API 9.4 (S38-S42)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S38-StyledButtons | sendMessage | Button styling with `style` (danger/success/primary) and `icon_custom_emoji_id` fields |
+| S39-ProfileAudios | getUserProfileAudios | Get user profile audio intro (9.4 method) |
+| S40-ChatInfo94 | getChat | Verify 9.4 ChatFullInfo fields (first_profile_audio, unique_gift_colors, paid_message_star_count) |
+| S42-VideoQualities | sendVideo | Verify Video.Qualities field deserialization |
+
+Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated tests as it's destructive.
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -825,6 +843,7 @@ cmd/galigo-testbot/
 │   ├── steps_bulk.go       # Bulk steps (SeedMessages, ForwardMessages, CopyMessages, DeleteMessages)
 │   ├── steps_chat_settings.go # Chat settings (SetChatPhoto, SetChatPermissions with save/restore)
 │   ├── steps_bot_config.go    # Bot identity steps (commands, profile, admin rights)
+│   ├── steps_api94.go         # Bot API 9.4 steps (styled buttons, profile audios, video qualities)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -841,6 +860,7 @@ cmd/galigo-testbot/
 │   ├── checklists.go  # Phase E: Checklists (S24, Premium)
 │   ├── extras.go      # Phase F: Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
 │   ├── bot_config.go  # Phase G: Bot identity (S33-S35: commands, profile, admin defaults)
+│   ├── api94.go       # Phase H: Bot API 9.4 (S38-S42: styled buttons, profile audios, video qualities)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

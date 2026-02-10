@@ -332,3 +332,47 @@ func TestGrid_EmptyItems(t *testing.T) {
 
 	assert.Empty(t, markup.InlineKeyboard)
 }
+
+// ==================== Button Styling (Bot API 9.4) ====================
+
+func TestInlineKeyboardButton_WithStyle(t *testing.T) {
+	btn := tg.Btn("Delete", "action:delete").WithStyle(tg.ButtonStyleDanger)
+	assert.Equal(t, "Delete", btn.Text)
+	assert.Equal(t, "action:delete", btn.CallbackData)
+	assert.Equal(t, "danger", btn.Style)
+}
+
+func TestInlineKeyboardButton_WithIcon(t *testing.T) {
+	btn := tg.BtnURL("Read", "https://example.com").WithIcon("5368324170671202286")
+	assert.Equal(t, "5368324170671202286", btn.IconCustomEmojiID)
+	assert.Equal(t, "https://example.com", btn.URL)
+}
+
+func TestInlineKeyboardButton_WithStyle_DoesNotMutateOriginal(t *testing.T) {
+	original := tg.Btn("Click", "data")
+	styled := original.WithStyle(tg.ButtonStyleSuccess)
+	assert.Empty(t, original.Style)          // Original unchanged
+	assert.Equal(t, "success", styled.Style) // Copy has style
+}
+
+func TestInlineKeyboardButton_StyleJSON(t *testing.T) {
+	btn := tg.Btn("OK", "ok").WithStyle(tg.ButtonStylePrimary).WithIcon("12345")
+	data, err := json.Marshal(btn)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"style":"primary"`)
+	assert.Contains(t, string(data), `"icon_custom_emoji_id":"12345"`)
+}
+
+func TestInlineKeyboardButton_StyleOmittedWhenEmpty(t *testing.T) {
+	btn := tg.Btn("Click", "data")
+	data, err := json.Marshal(btn)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "style")
+	assert.NotContains(t, string(data), "icon_custom_emoji_id")
+}
+
+func TestButtonStyleConstants(t *testing.T) {
+	assert.Equal(t, "danger", tg.ButtonStyleDanger)
+	assert.Equal(t, "success", tg.ButtonStyleSuccess)
+	assert.Equal(t, "primary", tg.ButtonStylePrimary)
+}

@@ -61,6 +61,19 @@ type GetMyShortDescriptionRequest struct {
 	LanguageCode string `json:"language_code,omitempty"`
 }
 
+// SetMyProfilePhotoRequest represents a setMyProfilePhoto request.
+// Added in Bot API 9.4.
+type SetMyProfilePhotoRequest struct {
+	Photo      InputFile `json:"photo"`
+	IsPersonal bool      `json:"is_personal,omitempty"`
+}
+
+// RemoveMyProfilePhotoRequest represents a removeMyProfilePhoto request.
+// Added in Bot API 9.4.
+type RemoveMyProfilePhotoRequest struct {
+	IsPersonal bool `json:"is_personal,omitempty"`
+}
+
 // SetMyDefaultAdministratorRightsRequest represents a setMyDefaultAdministratorRights request.
 type SetMyDefaultAdministratorRightsRequest struct {
 	Rights      *tg.ChatAdministratorRights `json:"rights,omitempty"`
@@ -211,6 +224,23 @@ func (c *Client) GetMyShortDescription(ctx context.Context, opts ...LanguageOpti
 		return nil, err
 	}
 	return &result, nil
+}
+
+// SetMyProfilePhoto sets the bot's profile photo.
+// Added in Bot API 9.4.
+func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputFile, isPersonal bool) error {
+	req := SetMyProfilePhotoRequest{
+		Photo:      photo,
+		IsPersonal: isPersonal,
+	}
+	return c.callJSON(ctx, "setMyProfilePhoto", req, nil)
+}
+
+// RemoveMyProfilePhoto removes the bot's profile photo.
+// Added in Bot API 9.4.
+func (c *Client) RemoveMyProfilePhoto(ctx context.Context, isPersonal bool) error {
+	req := RemoveMyProfilePhotoRequest{IsPersonal: isPersonal}
+	return c.callJSON(ctx, "removeMyProfilePhoto", req, nil)
 }
 
 // ================== Default Admin Rights ==================

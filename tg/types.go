@@ -61,6 +61,8 @@ type Message struct {
 	GroupChatCreated      bool                  `json:"group_chat_created,omitempty"`
 	SupergroupChatCreated bool                  `json:"supergroup_chat_created,omitempty"`
 	ChannelChatCreated    bool                  `json:"channel_chat_created,omitempty"`
+	ChatOwnerLeft         *ChatOwnerLeft        `json:"chat_owner_left,omitempty"`    // 9.4
+	ChatOwnerChanged      *ChatOwnerChanged     `json:"chat_owner_changed,omitempty"` // 9.4
 	ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
@@ -80,17 +82,18 @@ var _ Editable = (*Message)(nil)
 
 // User represents a Telegram user or bot.
 type User struct {
-	ID                      int64  `json:"id"`
-	IsBot                   bool   `json:"is_bot"`
-	FirstName               string `json:"first_name"`
-	LastName                string `json:"last_name,omitempty"`
-	Username                string `json:"username,omitempty"`
-	LanguageCode            string `json:"language_code,omitempty"`
-	IsPremium               bool   `json:"is_premium,omitempty"`
-	AddedToAttachmentMenu   bool   `json:"added_to_attachment_menu,omitempty"`
-	CanJoinGroups           bool   `json:"can_join_groups,omitempty"`
-	CanReadAllGroupMessages bool   `json:"can_read_all_group_messages,omitempty"`
-	SupportsInlineQueries   bool   `json:"supports_inline_queries,omitempty"`
+	ID                        int64  `json:"id"`
+	IsBot                     bool   `json:"is_bot"`
+	FirstName                 string `json:"first_name"`
+	LastName                  string `json:"last_name,omitempty"`
+	Username                  string `json:"username,omitempty"`
+	LanguageCode              string `json:"language_code,omitempty"`
+	IsPremium                 bool   `json:"is_premium,omitempty"`
+	AddedToAttachmentMenu     bool   `json:"added_to_attachment_menu,omitempty"`
+	CanJoinGroups             bool   `json:"can_join_groups,omitempty"`
+	CanReadAllGroupMessages   bool   `json:"can_read_all_group_messages,omitempty"`
+	SupportsInlineQueries     bool   `json:"supports_inline_queries,omitempty"`
+	AllowsUsersToCreateTopics bool   `json:"allows_users_to_create_topics,omitempty"` // 9.4
 }
 
 // Chat represents a Telegram chat.
@@ -160,15 +163,16 @@ type Document struct {
 
 // Video represents a video file.
 type Video struct {
-	FileID       string     `json:"file_id"`
-	FileUniqueID string     `json:"file_unique_id"`
-	Width        int        `json:"width"`
-	Height       int        `json:"height"`
-	Duration     int        `json:"duration"`
-	Thumbnail    *PhotoSize `json:"thumbnail,omitempty"`
-	FileName     string     `json:"file_name,omitempty"`
-	MimeType     string     `json:"mime_type,omitempty"`
-	FileSize     int64      `json:"file_size,omitempty"`
+	FileID       string         `json:"file_id"`
+	FileUniqueID string         `json:"file_unique_id"`
+	Width        int            `json:"width"`
+	Height       int            `json:"height"`
+	Duration     int            `json:"duration"`
+	Thumbnail    *PhotoSize     `json:"thumbnail,omitempty"`
+	FileName     string         `json:"file_name,omitempty"`
+	MimeType     string         `json:"mime_type,omitempty"`
+	FileSize     int64          `json:"file_size,omitempty"`
+	Qualities    []VideoQuality `json:"qualities,omitempty"` // 9.4
 }
 
 // Audio represents an audio file.
@@ -298,6 +302,36 @@ type File struct {
 type UserProfilePhotos struct {
 	TotalCount int           `json:"total_count"`
 	Photos     [][]PhotoSize `json:"photos"`
+}
+
+// UserProfileAudios contains a list of profile audios for a user.
+// Added in Bot API 9.4.
+type UserProfileAudios struct {
+	TotalCount int     `json:"total_count"`
+	Audios     []Audio `json:"audios"`
+}
+
+// VideoQuality represents an available quality version of a video.
+// Added in Bot API 9.4.
+type VideoQuality struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	Codec        string `json:"codec"` // "h264", "h265", "av01"
+	FileSize     int64  `json:"file_size,omitempty"`
+}
+
+// ChatOwnerLeft is a service message: the chat owner left the chat.
+// Added in Bot API 9.4.
+type ChatOwnerLeft struct {
+	NewOwner *User `json:"new_owner,omitempty"`
+}
+
+// ChatOwnerChanged is a service message: chat ownership has transferred.
+// Added in Bot API 9.4.
+type ChatOwnerChanged struct {
+	NewOwner *User `json:"new_owner"`
 }
 
 // Sticker represents a sticker.

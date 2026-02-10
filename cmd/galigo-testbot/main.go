@@ -93,6 +93,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 	scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 	scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
+	scenarios = append(scenarios, suites.AllAPI94Scenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -237,6 +238,17 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S34_BotProfile()}
 	case "bot-admin-defaults":
 		scenarios = []engine.Scenario{suites.S35_BotAdminDefaults()}
+	// Bot API 9.4 (S38-S42)
+	case "api94", "api-94", "9.4":
+		scenarios = suites.AllAPI94Scenarios()
+	case "styled-buttons":
+		scenarios = []engine.Scenario{suites.S38_StyledButtons()}
+	case "profile-audios":
+		scenarios = []engine.Scenario{suites.S39_ProfileAudios()}
+	case "chat-info-94":
+		scenarios = []engine.Scenario{suites.S40_ChatInfo94()}
+	case "video-qualities":
+		scenarios = []engine.Scenario{suites.S42_VideoQualities()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -246,10 +258,11 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
 		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 		scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
+		scenarios = append(scenarios, suites.AllAPI94Scenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, all")
 		os.Exit(1)
 	}
 
@@ -602,6 +615,17 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S34_BotProfile()}
 	case "bot-admin-defaults":
 		scenarios = []engine.Scenario{suites.S35_BotAdminDefaults()}
+	// Bot API 9.4 (S38-S42)
+	case "api94", "api-94", "9.4":
+		scenarios = suites.AllAPI94Scenarios()
+	case "styled-buttons":
+		scenarios = []engine.Scenario{suites.S38_StyledButtons()}
+	case "profile-audios":
+		scenarios = []engine.Scenario{suites.S39_ProfileAudios()}
+	case "chat-info-94":
+		scenarios = []engine.Scenario{suites.S40_ChatInfo94()}
+	case "video-qualities":
+		scenarios = []engine.Scenario{suites.S42_VideoQualities()}
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -611,6 +635,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(scenarios, suites.AllGiftScenarios()...)
 		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
 		scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
+		scenarios = append(scenarios, suites.AllAPI94Scenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
@@ -653,6 +678,8 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllInteractiveScenarios()...)
 	scenarios = append(scenarios, suites.AllWebhookScenarios()...)
 	scenarios = append(scenarios, suites.AllExtrasScenarios()...)
+	scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
+	scenarios = append(scenarios, suites.AllAPI94Scenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -708,6 +735,13 @@ Extended:
   invoice           - Send invoice (S22)
   gifts             - Gift catalog (S23)
   checklists        - Checklist lifecycle (S24)
+
+Bot API 9.4 (S38-S42):
+  api94           - All 9.4 tests
+  styled-buttons  - Button styling (S38)
+  profile-audios  - getUserProfileAudios (S39)
+  chat-info-94    - ChatFullInfo 9.4 fields (S40)
+  video-qualities - Video qualities field (S42)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

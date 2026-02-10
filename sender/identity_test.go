@@ -322,3 +322,54 @@ func TestBotCommandScopeConstructors(t *testing.T) {
 		})
 	}
 }
+
+// ==================== Profile Photo (Bot API 9.4) ====================
+
+func TestSetMyProfilePhoto(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+	photoData := []byte{0x89, 0x50, 0x4E, 0x47} // PNG header
+	err := client.SetMyProfilePhoto(context.Background(), sender.FromBytes(photoData, "photo.png"), false)
+	require.NoError(t, err)
+}
+
+func TestSetMyProfilePhoto_Personal(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+	photoData := []byte{0x89, 0x50, 0x4E, 0x47}
+	err := client.SetMyProfilePhoto(context.Background(), sender.FromBytes(photoData, "photo.png"), true)
+	require.NoError(t, err)
+}
+
+func TestRemoveMyProfilePhoto(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/removeMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+	err := client.RemoveMyProfilePhoto(context.Background(), false)
+	require.NoError(t, err)
+}
+
+func TestRemoveMyProfilePhoto_Personal(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/removeMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+	err := client.RemoveMyProfilePhoto(context.Background(), true)
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "is_personal", true)
+}

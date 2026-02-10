@@ -32,7 +32,7 @@ type ForumTopicRequest struct {
 
 // ================== Forum Methods ==================
 
-// CreateForumTopic creates a topic in a forum supergroup chat.
+// CreateForumTopic creates a topic in a forum supergroup or private chat.
 // The bot must be an administrator with can_manage_topics rights.
 func (c *Client) CreateForumTopic(ctx context.Context, chatID tg.ChatID, name string, opts ...CreateTopicOption) (*tg.ForumTopic, error) {
 	if err := validateChatID(chatID); err != nil {

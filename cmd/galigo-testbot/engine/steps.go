@@ -384,8 +384,10 @@ type SendMessageWithKeyboardStep struct {
 
 // ButtonDef defines a button for inline keyboards.
 type ButtonDef struct {
-	Text         string
-	CallbackData string
+	Text              string
+	CallbackData      string
+	Style             string // 9.4: "danger", "success", "primary"
+	IconCustomEmojiID string // 9.4: custom emoji ID for button icon
 }
 
 func (s *SendMessageWithKeyboardStep) Name() string { return "sendMessage (keyboard)" }
@@ -452,10 +454,13 @@ func (s *EditMessageReplyMarkupStep) Execute(ctx context.Context, rt *Runtime) (
 func buildKeyboard(buttons []ButtonDef) *tg.InlineKeyboardMarkup {
 	var row []tg.InlineKeyboardButton
 	for _, b := range buttons {
-		row = append(row, tg.InlineKeyboardButton{
-			Text:         b.Text,
-			CallbackData: b.CallbackData,
-		})
+		btn := tg.InlineKeyboardButton{
+			Text:              b.Text,
+			CallbackData:      b.CallbackData,
+			Style:             b.Style,             // 9.4
+			IconCustomEmojiID: b.IconCustomEmojiID, // 9.4
+		}
+		row = append(row, btn)
 	}
 	return &tg.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tg.InlineKeyboardButton{row},

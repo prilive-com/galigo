@@ -1,7 +1,14 @@
 package engine
 
+import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+)
+
 // MinimalPNG is a valid 1x1 red pixel PNG (67 bytes).
-// Used for chat photo tests — no external file dependency.
+// Too small for chat photos — use ChatPhotoPNG instead.
 var MinimalPNG = []byte{
 	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 	0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
@@ -13,3 +20,18 @@ var MinimalPNG = []byte{
 	0xb0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
 	0x44, 0xae, 0x42, 0x60, 0x82,
 }
+
+// ChatPhotoPNG is a 160x160 red PNG suitable for setChatPhoto.
+// Telegram requires chat photos to be at least 160x160 pixels.
+var ChatPhotoPNG = func() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 160, 160))
+	red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	for y := 0; y < 160; y++ {
+		for x := 0; x < 160; x++ {
+			img.Set(x, y, red)
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
+}()

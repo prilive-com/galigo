@@ -14,6 +14,8 @@ type InlineKeyboardMarkup struct {
 // InlineKeyboardButton represents a button in an inline keyboard.
 type InlineKeyboardButton struct {
 	Text                         string                       `json:"text"`
+	IconCustomEmojiID            string                       `json:"icon_custom_emoji_id,omitempty"` // 9.4
+	Style                        string                       `json:"style,omitempty"`                // 9.4: "danger"|"success"|"primary"
 	URL                          string                       `json:"url,omitempty"`
 	CallbackData                 string                       `json:"callback_data,omitempty"`
 	WebApp                       *WebAppInfo                  `json:"web_app,omitempty"`
@@ -22,6 +24,28 @@ type InlineKeyboardButton struct {
 	SwitchInlineQueryCurrentChat string                       `json:"switch_inline_query_current_chat,omitempty"`
 	SwitchInlineQueryChosenChat  *SwitchInlineQueryChosenChat `json:"switch_inline_query_chosen_chat,omitempty"`
 	Pay                          bool                         `json:"pay,omitempty"`
+}
+
+// Button style constants for InlineKeyboardButton and KeyboardButton.
+const (
+	ButtonStyleDanger  = "danger"  // Red
+	ButtonStyleSuccess = "success" // Green
+	ButtonStylePrimary = "primary" // Blue
+)
+
+// WithStyle returns a copy of the button with the given style.
+// Valid values: ButtonStyleDanger ("danger"), ButtonStyleSuccess ("success"),
+// ButtonStylePrimary ("primary").
+func (b InlineKeyboardButton) WithStyle(style string) InlineKeyboardButton {
+	b.Style = style
+	return b
+}
+
+// WithIcon returns a copy of the button with a custom emoji icon.
+// The bot must be eligible to use custom emoji in the message.
+func (b InlineKeyboardButton) WithIcon(customEmojiID string) InlineKeyboardButton {
+	b.IconCustomEmojiID = customEmojiID
+	return b
 }
 
 // WebAppInfo contains information about a Web App.
@@ -223,4 +247,60 @@ func Grid[T any](items []T, columns int, btnFunc func(T) InlineKeyboardButton) *
 	}
 
 	return k.Build()
+}
+
+// Reply keyboard types (for custom keyboards shown below the message input)
+
+// KeyboardButton represents one button of a reply keyboard.
+type KeyboardButton struct {
+	Text              string                      `json:"text"`
+	IconCustomEmojiID string                      `json:"icon_custom_emoji_id,omitempty"` // 9.4
+	Style             string                      `json:"style,omitempty"`                // 9.4
+	RequestUsers      *KeyboardButtonRequestUsers `json:"request_users,omitempty"`
+	RequestChat       *KeyboardButtonRequestChat  `json:"request_chat,omitempty"`
+	RequestContact    bool                        `json:"request_contact,omitempty"`
+	RequestLocation   bool                        `json:"request_location,omitempty"`
+	RequestPoll       *KeyboardButtonPollType     `json:"request_poll,omitempty"`
+	WebApp            *WebAppInfo                 `json:"web_app,omitempty"`
+}
+
+// KeyboardButtonRequestUsers defines criteria for requesting users.
+type KeyboardButtonRequestUsers struct {
+	RequestID     int   `json:"request_id"`
+	UserIsBot     *bool `json:"user_is_bot,omitempty"`
+	UserIsPremium *bool `json:"user_is_premium,omitempty"`
+	MaxQuantity   int   `json:"max_quantity,omitempty"`
+}
+
+// KeyboardButtonRequestChat defines criteria for requesting a chat.
+type KeyboardButtonRequestChat struct {
+	RequestID               int                      `json:"request_id"`
+	ChatIsChannel           bool                     `json:"chat_is_channel"`
+	ChatIsForum             *bool                    `json:"chat_is_forum,omitempty"`
+	ChatHasUsername         *bool                    `json:"chat_has_username,omitempty"`
+	ChatIsCreated           bool                     `json:"chat_is_created,omitempty"`
+	UserAdministratorRights *ChatAdministratorRights `json:"user_administrator_rights,omitempty"`
+	BotAdministratorRights  *ChatAdministratorRights `json:"bot_administrator_rights,omitempty"`
+	BotIsMember             bool                     `json:"bot_is_member,omitempty"`
+}
+
+// KeyboardButtonPollType limits polls to a specific type.
+type KeyboardButtonPollType struct {
+	Type string `json:"type,omitempty"` // "quiz" or "regular"
+}
+
+// ReplyKeyboardMarkup represents a custom keyboard with reply options.
+type ReplyKeyboardMarkup struct {
+	Keyboard              [][]KeyboardButton `json:"keyboard"`
+	IsPersistent          bool               `json:"is_persistent,omitempty"`
+	ResizeKeyboard        bool               `json:"resize_keyboard,omitempty"`
+	OneTimeKeyboard       bool               `json:"one_time_keyboard,omitempty"`
+	InputFieldPlaceholder string             `json:"input_field_placeholder,omitempty"`
+	Selective             bool               `json:"selective,omitempty"`
+}
+
+// ReplyKeyboardRemove requests removal of the custom keyboard.
+type ReplyKeyboardRemove struct {
+	RemoveKeyboard bool `json:"remove_keyboard"` // Always true
+	Selective      bool `json:"selective,omitempty"`
 }

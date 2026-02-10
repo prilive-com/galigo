@@ -16,6 +16,7 @@ type ChatFullInfo struct {
 	AccentColorID                      int               `json:"accent_color_id,omitempty"`
 	MaxReactionCount                   int               `json:"max_reaction_count,omitempty"`
 	Photo                              *ChatPhoto        `json:"photo,omitempty"`
+	FirstProfileAudio                  *Audio            `json:"first_profile_audio,omitempty"` // 9.4
 	ActiveUsernames                    []string          `json:"active_usernames,omitempty"`
 	Birthdate                          *Birthdate        `json:"birthdate,omitempty"`
 	BusinessIntro                      *BusinessIntro    `json:"business_intro,omitempty"`
@@ -50,6 +51,8 @@ type ChatFullInfo struct {
 	CustomEmojiStickerSetName          string            `json:"custom_emoji_sticker_set_name,omitempty"`
 	LinkedChatID                       int64             `json:"linked_chat_id,omitempty"`
 	Location                           *ChatLocation     `json:"location,omitempty"`
+	UniqueGiftColors                   *UniqueGiftColors `json:"unique_gift_colors,omitempty"`      // 9.3
+	PaidMessageStarCount               int               `json:"paid_message_star_count,omitempty"` // 9.3
 }
 
 // ChatLocation represents a location to which a chat is connected.

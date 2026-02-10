@@ -156,6 +156,24 @@ func (c *Client) GetUserProfilePhotos(ctx context.Context, userID int64, opts ..
 	return &photos, nil
 }
 
+// GetUserProfileAudios returns a user's profile audios.
+// Added in Bot API 9.4.
+func (c *Client) GetUserProfileAudios(ctx context.Context, userID int64, opts ...GetUserProfileAudiosOption) (*tg.UserProfileAudios, error) {
+	req := GetUserProfileAudiosRequest{UserID: userID}
+	for _, opt := range opts {
+		opt(&req)
+	}
+	resp, err := c.executeRequest(ctx, "getUserProfileAudios", req)
+	if err != nil {
+		return nil, err
+	}
+	var audios tg.UserProfileAudios
+	if err := json.Unmarshal(resp.Result, &audios); err != nil {
+		return nil, err
+	}
+	return &audios, nil
+}
+
 // ================== Location/Contact Methods ==================
 
 // SendLocation sends a location.
@@ -265,6 +283,23 @@ func WithPhotosOffset(offset int) GetUserProfilePhotosOption {
 // WithPhotosLimit sets the limit for user profile photos.
 func WithPhotosLimit(limit int) GetUserProfilePhotosOption {
 	return func(r *GetUserProfilePhotosRequest) {
+		r.Limit = limit
+	}
+}
+
+// GetUserProfileAudiosOption configures GetUserProfileAudios.
+type GetUserProfileAudiosOption func(*GetUserProfileAudiosRequest)
+
+// WithAudiosOffset sets the offset for user profile audios.
+func WithAudiosOffset(offset int) GetUserProfileAudiosOption {
+	return func(r *GetUserProfileAudiosRequest) {
+		r.Offset = offset
+	}
+}
+
+// WithAudiosLimit sets the limit for user profile audios (1-100, default 100).
+func WithAudiosLimit(limit int) GetUserProfileAudiosOption {
+	return func(r *GetUserProfileAudiosRequest) {
 		r.Limit = limit
 	}
 }

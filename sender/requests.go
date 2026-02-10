@@ -265,6 +265,14 @@ type GetUserProfilePhotosRequest struct {
 	Limit  int   `json:"limit,omitempty"`
 }
 
+// GetUserProfileAudiosRequest represents a request to get user profile audios.
+// Added in Bot API 9.4.
+type GetUserProfileAudiosRequest struct {
+	UserID int64 `json:"user_id"`
+	Offset int   `json:"offset,omitempty"`
+	Limit  int   `json:"limit,omitempty"` // 1-100, default 100
+}
+
 // ================== Location/Contact Methods ==================
 
 // SendLocationRequest represents a request to send a location.

@@ -866,6 +866,52 @@ func TestGetUserProfilePhotos_WithOptions(t *testing.T) {
 	cap.AssertJSONField(t, "limit", float64(3))
 }
 
+// ================== Profile Audios (Bot API 9.4) ==================
+
+func TestGetUserProfileAudios_Success(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getUserProfileAudios", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, map[string]any{
+			"total_count": 1,
+			"audios": []map[string]any{
+				{"file_id": "audio1", "file_unique_id": "au1", "duration": 120},
+			},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	audios, err := client.GetUserProfileAudios(context.Background(), 12345)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, audios.TotalCount)
+	require.Len(t, audios.Audios, 1)
+	assert.Equal(t, "audio1", audios.Audios[0].FileID)
+}
+
+func TestGetUserProfileAudios_WithOptions(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getUserProfileAudios", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyOK(w, map[string]any{
+			"total_count": 5,
+			"audios":      []map[string]any{},
+		})
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.GetUserProfileAudios(context.Background(), 12345,
+		sender.WithAudiosOffset(10),
+		sender.WithAudiosLimit(50),
+	)
+
+	require.NoError(t, err)
+
+	cap := server.LastCapture()
+	cap.AssertJSONField(t, "offset", float64(10))
+	cap.AssertJSONField(t, "limit", float64(50))
+}
+
 // ================== Location/Contact Methods ==================
 
 func TestSendLocation_Success(t *testing.T) {

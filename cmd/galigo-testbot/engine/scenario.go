@@ -176,7 +176,7 @@ func (rt *Runtime) ProbeChat(ctx context.Context) error {
 		rt.ChatCtx.CanInviteUsers = true
 	} else if status == "administrator" {
 		rt.ChatCtx.BotIsAdmin = true
-		if admin, ok := member.(*tg.ChatMemberAdministrator); ok {
+		if admin, ok := member.(tg.ChatMemberAdministrator); ok {
 			rt.ChatCtx.CanChangeInfo = admin.CanChangeInfo
 			rt.ChatCtx.CanDeleteMessages = admin.CanDeleteMessages
 			rt.ChatCtx.CanRestrictMembers = admin.CanRestrictMembers
@@ -291,6 +291,7 @@ type SenderClient interface {
 	// Reactions & User info
 	SetMessageReaction(ctx context.Context, chatID int64, messageID int, emoji string, isBig bool) error
 	GetUserProfilePhotos(ctx context.Context, userID int64) (*tg.UserProfilePhotos, error)
+	GetUserProfileAudios(ctx context.Context, userID int64) (*tg.UserProfileAudios, error) // 9.4
 	GetUserChatBoosts(ctx context.Context, chatID, userID int64) (*tg.UserChatBoosts, error)
 
 	// Bulk operations

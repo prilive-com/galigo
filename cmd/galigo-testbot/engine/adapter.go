@@ -547,6 +547,11 @@ func (a *SenderAdapter) GetUserProfilePhotos(ctx context.Context, userID int64) 
 	return a.client.GetUserProfilePhotos(ctx, userID)
 }
 
+// GetUserProfileAudios returns a user's profile audios. Added in Bot API 9.4.
+func (a *SenderAdapter) GetUserProfileAudios(ctx context.Context, userID int64) (*tg.UserProfileAudios, error) {
+	return a.client.GetUserProfileAudios(ctx, userID)
+}
+
 // GetUserChatBoosts returns a user's boosts in the chat.
 func (a *SenderAdapter) GetUserChatBoosts(ctx context.Context, chatID, userID int64) (*tg.UserChatBoosts, error) {
 	return a.client.GetUserChatBoosts(ctx, sender.GetUserChatBoostsRequest{

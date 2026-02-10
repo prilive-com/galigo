@@ -42,8 +42,11 @@ func (s *SaveChatPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	}, nil
 }
 
-// SetChatPhotoStep sets the chat photo using the inline MinimalPNG fixture.
-type SetChatPhotoStep struct{}
+// SetChatPhotoStep sets the chat photo using the sticker fixture (512x512 PNG).
+// Chat photos require at least 160x160 pixels.
+type SetChatPhotoStep struct {
+	PhotoBytes []byte // If nil, uses ChatPhotoPNG
+}
 
 func (s *SetChatPhotoStep) Name() string { return "setChatPhoto" }
 
@@ -52,8 +55,13 @@ func (s *SetChatPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResul
 		return nil, err
 	}
 
-	// Use FromBytes for retry-safety
-	photo := sender.FromBytes(MinimalPNG, "test.png")
+	// Use ChatPhotoPNG (160x160) by default, or custom bytes if provided
+	photoBytes := s.PhotoBytes
+	if photoBytes == nil {
+		photoBytes = ChatPhotoPNG
+	}
+
+	photo := sender.FromBytes(photoBytes, "chatphoto.png")
 
 	err := rt.Sender.SetChatPhoto(ctx, rt.ChatID, photo)
 	if err != nil {
@@ -63,7 +71,7 @@ func (s *SetChatPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResul
 	return &StepResult{
 		Method: "setChatPhoto",
 		Evidence: map[string]any{
-			"photo_size": len(MinimalPNG),
+			"photo_size": len(photoBytes),
 		},
 	}, nil
 }

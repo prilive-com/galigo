@@ -54,3 +54,71 @@ type AcceptedGiftTypes struct {
 	UniqueGifts         bool `json:"unique_gifts,omitempty"`
 	PremiumSubscription bool `json:"premium_subscription,omitempty"`
 }
+
+// UniqueGiftModel describes the model of a unique gift.
+// Added in Bot API 9.0, updated in 9.4.
+type UniqueGiftModel struct {
+	Name           string  `json:"name"`
+	Sticker        Sticker `json:"sticker"`
+	RarityPerMille int     `json:"rarity_per_mille"` // 9.0 — required, 0 for crafted
+	Rarity         string  `json:"rarity,omitempty"` // 9.4: "uncommon"|"rare"|"epic"|"legendary"
+}
+
+// UniqueGiftSymbol describes the symbol of a unique gift.
+// Added in Bot API 9.0.
+type UniqueGiftSymbol struct {
+	Name           string  `json:"name"`
+	Sticker        Sticker `json:"sticker"`
+	RarityPerMille int     `json:"rarity_per_mille"` // required, 0 for crafted
+}
+
+// UniqueGiftBackdropColors describes the colors of the backdrop of a unique gift.
+// All fields are RGB24 integers (0..16777215 / 0x000000..0xFFFFFF).
+// Added in Bot API 9.0.
+type UniqueGiftBackdropColors struct {
+	CenterColor int `json:"center_color"`
+	EdgeColor   int `json:"edge_color"`
+	SymbolColor int `json:"symbol_color"`
+	TextColor   int `json:"text_color"`
+}
+
+// UniqueGiftBackdrop describes the backdrop of a unique gift.
+// Added in Bot API 9.0.
+type UniqueGiftBackdrop struct {
+	Name           string                   `json:"name"`
+	Colors         UniqueGiftBackdropColors `json:"colors"`
+	RarityPerMille int                      `json:"rarity_per_mille"` // required, 0 for crafted
+}
+
+// UniqueGiftColors describes the color scheme for a user's name,
+// message replies and link previews based on a unique gift.
+// Added in Bot API 9.3.
+type UniqueGiftColors struct {
+	ModelCustomEmojiID    string `json:"model_custom_emoji_id"`
+	SymbolCustomEmojiID   string `json:"symbol_custom_emoji_id"`
+	LightThemeMainColor   int    `json:"light_theme_main_color"`   // RGB24
+	LightThemeOtherColors []int  `json:"light_theme_other_colors"` // 1-3 RGB24 colors
+	DarkThemeMainColor    int    `json:"dark_theme_main_color"`    // RGB24
+	DarkThemeOtherColors  []int  `json:"dark_theme_other_colors"`  // 1-3 RGB24 colors
+}
+
+// UniqueGift represents a gift upgraded to a unique one.
+// Added in Bot API 9.0, updated in 9.3 and 9.4.
+type UniqueGift struct {
+	BaseName string             `json:"base_name"`
+	Name     string             `json:"name"`
+	Number   int                `json:"number"`
+	Model    UniqueGiftModel    `json:"model"`
+	Symbol   UniqueGiftSymbol   `json:"symbol"`
+	Backdrop UniqueGiftBackdrop `json:"backdrop"`
+	Colors   *UniqueGiftColors  `json:"colors,omitempty"`    // 9.3 — optional
+	IsBurned bool               `json:"is_burned,omitempty"` // 9.4
+}
+
+// UniqueGiftModel rarity constants (added in Bot API 9.4).
+const (
+	GiftRarityUncommon  = "uncommon"
+	GiftRarityRare      = "rare"
+	GiftRarityEpic      = "epic"
+	GiftRarityLegendary = "legendary"
+)

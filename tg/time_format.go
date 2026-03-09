@@ -12,7 +12,7 @@ func TimeHTML(unix int64, format, fallbackText string) string {
 	if format == "" {
 		return fmt.Sprintf(`<tg-time unix="%d">%s</tg-time>`, unix, fallbackText)
 	}
-	return fmt.Sprintf(`<tg-time unix="%d" format="%s">%s</tg-time>`, unix, format, fallbackText)
+	return fmt.Sprintf(`<tg-time unix="%d" format=%q>%s</tg-time>`, unix, format, fallbackText)
 }
 
 // TimeMarkdownV2 returns a MarkdownV2 date/time string for Telegram.

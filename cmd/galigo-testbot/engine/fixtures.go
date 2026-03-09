@@ -26,8 +26,8 @@ var MinimalPNG = []byte{
 var ChatPhotoPNG = func() []byte {
 	img := image.NewRGBA(image.Rect(0, 0, 160, 160))
 	red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
-	for y := 0; y < 160; y++ {
-		for x := 0; x < 160; x++ {
+	for y := range 160 {
+		for x := range 160 {
 			img.Set(x, y, red)
 		}
 	}

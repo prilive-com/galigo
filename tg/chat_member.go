@@ -81,24 +81,24 @@ func (ChatMemberMember) Status() string { return "member" }
 // ChatMemberRestricted represents a restricted user.
 type ChatMemberRestricted struct {
 	chatMemberBase
-	IsMember              bool  `json:"is_member"`
-	CanSendMessages       bool  `json:"can_send_messages"`
-	CanSendAudios         bool  `json:"can_send_audios"`
-	CanSendDocuments      bool  `json:"can_send_documents"`
-	CanSendPhotos         bool  `json:"can_send_photos"`
-	CanSendVideos         bool  `json:"can_send_videos"`
-	CanSendVideoNotes     bool  `json:"can_send_video_notes"`
-	CanSendVoiceNotes     bool  `json:"can_send_voice_notes"`
-	CanSendPolls          bool  `json:"can_send_polls"`
-	CanSendOtherMessages  bool  `json:"can_send_other_messages"`
-	CanAddWebPagePreviews bool  `json:"can_add_web_page_previews"`
-	CanChangeInfo         bool  `json:"can_change_info"`
-	CanInviteUsers        bool  `json:"can_invite_users"`
-	CanPinMessages        bool  `json:"can_pin_messages"`
+	IsMember              bool   `json:"is_member"`
+	CanSendMessages       bool   `json:"can_send_messages"`
+	CanSendAudios         bool   `json:"can_send_audios"`
+	CanSendDocuments      bool   `json:"can_send_documents"`
+	CanSendPhotos         bool   `json:"can_send_photos"`
+	CanSendVideos         bool   `json:"can_send_videos"`
+	CanSendVideoNotes     bool   `json:"can_send_video_notes"`
+	CanSendVoiceNotes     bool   `json:"can_send_voice_notes"`
+	CanSendPolls          bool   `json:"can_send_polls"`
+	CanSendOtherMessages  bool   `json:"can_send_other_messages"`
+	CanAddWebPagePreviews bool   `json:"can_add_web_page_previews"`
+	CanChangeInfo         bool   `json:"can_change_info"`
+	CanInviteUsers        bool   `json:"can_invite_users"`
+	CanPinMessages        bool   `json:"can_pin_messages"`
 	CanManageTopics       bool   `json:"can_manage_topics"`
 	UntilDate             int64  `json:"until_date"`
-	Tag                   string `json:"tag,omitempty"`  // 9.5
-	CanEditTag            bool   `json:"can_edit_tag"`   // 9.5 — plain bool, NO omitempty (restriction pattern)
+	Tag                   string `json:"tag,omitempty"` // 9.5
+	CanEditTag            bool   `json:"can_edit_tag"`  // 9.5 — plain bool, NO omitempty (restriction pattern)
 }
 
 func (ChatMemberRestricted) chatMember()    {}

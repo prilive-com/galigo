@@ -151,9 +151,9 @@ func TestUnmarshalChatMember_MemberNoTag(t *testing.T) {
 
 func TestUnmarshalChatMember_RestrictedCanEditTag(t *testing.T) {
 	data, _ := json.Marshal(map[string]any{
-		"status": "restricted",
-		"user":   map[string]any{"id": 789, "first_name": "Bob", "is_bot": false},
-		"is_member": true,
+		"status":            "restricted",
+		"user":              map[string]any{"id": 789, "first_name": "Bob", "is_bot": false},
+		"is_member":         true,
 		"can_send_messages": true, "can_send_audios": true, "can_send_documents": true,
 		"can_send_photos": true, "can_send_videos": true, "can_send_video_notes": true,
 		"can_send_voice_notes": true, "can_send_polls": true, "can_send_other_messages": true,
@@ -171,8 +171,8 @@ func TestUnmarshalChatMember_RestrictedCanEditTag(t *testing.T) {
 
 func TestUnmarshalChatMember_AdminCanManageTags(t *testing.T) {
 	data, _ := json.Marshal(map[string]any{
-		"status": "administrator",
-		"user":   map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
+		"status":        "administrator",
+		"user":          map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
 		"can_be_edited": true, "can_manage_chat": true,
 		"can_manage_tags": true, "is_anonymous": false,
 	})
@@ -185,8 +185,8 @@ func TestUnmarshalChatMember_AdminCanManageTags(t *testing.T) {
 
 func TestUnmarshalChatMember_AdminCanManageTags_Absent(t *testing.T) {
 	data, _ := json.Marshal(map[string]any{
-		"status": "administrator",
-		"user":   map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
+		"status":        "administrator",
+		"user":          map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
 		"can_be_edited": true, "can_manage_chat": true, "is_anonymous": false,
 	})
 	member, err := UnmarshalChatMember(data)

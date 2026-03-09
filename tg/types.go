@@ -134,12 +134,12 @@ type ChatPhoto struct {
 
 // MessageEntity represents a special entity in a text message.
 type MessageEntity struct {
-	Type          string `json:"type"`
-	Offset        int    `json:"offset"`
-	Length        int    `json:"length"`
-	URL           string `json:"url,omitempty"`
-	User          *User  `json:"user,omitempty"`
-	Language      string `json:"language,omitempty"`
+	Type           string `json:"type"`
+	Offset         int    `json:"offset"`
+	Length         int    `json:"length"`
+	URL            string `json:"url,omitempty"`
+	User           *User  `json:"user,omitempty"`
+	Language       string `json:"language,omitempty"`
 	CustomEmojiID  string `json:"custom_emoji_id,omitempty"`
 	UnixTime       int64  `json:"unix_time,omitempty"`        // 9.5: date_time entity
 	DateTimeFormat string `json:"date_time_format,omitempty"` // 9.5: date_time entity

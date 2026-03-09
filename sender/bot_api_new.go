@@ -130,6 +130,38 @@ func (c *Client) EditChatSubscriptionInviteLink(ctx context.Context, req EditCha
 	return &result, nil
 }
 
+// ================== Bot API 9.5 Methods ==================
+
+// SendMessageDraft sends a draft message for streaming.
+// Call repeatedly with the same DraftID and growing text for a streaming effect.
+// ChatID must be an integer (private chats only).
+// Available to all bots since Bot API 9.5.
+func (c *Client) SendMessageDraft(ctx context.Context, req SendMessageDraftRequest) error {
+	// sendMessageDraft requires integer chat_id (private chats only)
+	switch v := req.ChatID.(type) {
+	case int64:
+		if v == 0 {
+			return tg.NewValidationError("chat_id", "must be non-zero")
+		}
+	case int:
+		if v == 0 {
+			return tg.NewValidationError("chat_id", "must be non-zero")
+		}
+	case nil:
+		return tg.NewValidationError("chat_id", "required")
+	default:
+		return tg.NewValidationError("chat_id", "must be integer for sendMessageDraft (private chats only)")
+	}
+	if req.DraftID <= 0 {
+		return tg.NewValidationError("draft_id", "must be positive")
+	}
+	if req.Text == "" {
+		return tg.NewValidationError("text", "required")
+	}
+
+	return c.callJSON(ctx, "sendMessageDraft", req, nil, extractChatID(req.ChatID))
+}
+
 // GetOwnedGifts returns the gifts owned by the specified user.
 func (c *Client) GetOwnedGifts(ctx context.Context, req GetOwnedGiftsRequest) (*tg.OwnedGifts, error) {
 	if req.UserID <= 0 {

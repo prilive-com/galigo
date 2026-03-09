@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+	"unicode/utf8"
 
 	"github.com/prilive-com/galigo/tg"
 )
@@ -27,6 +28,7 @@ type PromoteChatMemberRequest struct {
 	CanEditStories      *bool     `json:"can_edit_stories,omitempty"`
 	CanDeleteStories    *bool     `json:"can_delete_stories,omitempty"`
 	CanManageTopics     *bool     `json:"can_manage_topics,omitempty"`
+	CanManageTags       *bool     `json:"can_manage_tags,omitempty"` // 9.5
 }
 
 // SetChatAdministratorCustomTitleRequest represents a setChatAdministratorCustomTitle request.
@@ -87,6 +89,7 @@ func (c *Client) PromoteChatMemberWithRights(ctx context.Context, chatID tg.Chat
 		CanEditStories:      rights.CanEditStories,
 		CanDeleteStories:    rights.CanDeleteStories,
 		CanManageTopics:     rights.CanManageTopics,
+		CanManageTags:       rights.CanManageTags,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -115,6 +118,7 @@ func (c *Client) DemoteChatMember(ctx context.Context, chatID tg.ChatID, userID 
 		CanPostMessages:     &f,
 		CanEditMessages:     &f,
 		CanPinMessages:      &f,
+		CanManageTags:       &f,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -129,7 +133,7 @@ func (c *Client) SetChatAdministratorCustomTitle(ctx context.Context, chatID tg.
 	if err := validateUserID(userID); err != nil {
 		return err
 	}
-	if len(customTitle) > 16 {
+	if utf8.RuneCountInString(customTitle) > 16 {
 		return tg.NewValidationError("custom_title", "must be at most 16 characters")
 	}
 
@@ -226,5 +230,13 @@ func WithCanPinMessages(can bool) PromoteOption {
 func WithCanManageTopics(can bool) PromoteOption {
 	return func(r *PromoteChatMemberRequest) {
 		r.CanManageTopics = &can
+	}
+}
+
+// WithCanManageTags grants ability to manage member tags.
+// Added in Bot API 9.5.
+func WithCanManageTags(can bool) PromoteOption {
+	return func(r *PromoteChatMemberRequest) {
+		r.CanManageTags = &can
 	}
 }

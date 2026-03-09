@@ -17,6 +17,7 @@ type ChatPermissions struct {
 	CanInviteUsers        *bool `json:"can_invite_users,omitempty"`
 	CanPinMessages        *bool `json:"can_pin_messages,omitempty"`
 	CanManageTopics       *bool `json:"can_manage_topics,omitempty"`
+	CanEditTag            *bool `json:"can_edit_tag,omitempty"` // 9.5
 }
 
 // boolPtr returns a pointer to a bool value.
@@ -39,6 +40,7 @@ func AllPermissions() ChatPermissions {
 		CanInviteUsers:        boolPtr(true),
 		CanPinMessages:        boolPtr(true),
 		CanManageTopics:       boolPtr(true),
+		CanEditTag:            boolPtr(true),
 	}
 }
 
@@ -59,6 +61,7 @@ func NoPermissions() ChatPermissions {
 		CanInviteUsers:        boolPtr(false),
 		CanPinMessages:        boolPtr(false),
 		CanManageTopics:       boolPtr(false),
+		CanEditTag:            boolPtr(false),
 	}
 }
 

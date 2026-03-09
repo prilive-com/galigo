@@ -643,7 +643,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, pr)
 		if err != nil {
 			pr.Close() // Ensure pipe is cleaned up
-			return nil, fmt.Errorf("failed to create request: %w", err)
+			return nil, fmt.Errorf("failed to create request: %w", scrub.TokenFromError(err, c.config.Token))
 		}
 		req.Header.Set("Content-Type", contentType)
 	} else {
@@ -655,7 +655,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonData))
 		if err != nil {
-			return nil, fmt.Errorf("failed to create request: %w", err)
+			return nil, fmt.Errorf("failed to create request: %w", scrub.TokenFromError(err, c.config.Token))
 		}
 		req.Header.Set("Content-Type", "application/json")
 	}

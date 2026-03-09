@@ -92,7 +92,7 @@ func main() {
 | Component | Version | Notes |
 |-----------|---------|-------|
 | **Go** | 1.25+ | Uses generics, iter.Seq, log/slog |
-| **Telegram Bot API** | 8.0+ | Stars, Gifts, Business, Checklists |
+| **Telegram Bot API** | 8.0–9.5 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming |
 | **Platforms** | Linux, macOS, Windows | Pure Go, no CGO |
 
 ### Supported API Methods
@@ -102,6 +102,8 @@ galigo implements **150+ methods** covering:
 - Messages, media, files, and albums
 - Inline keyboards and callback queries
 - Chat administration and moderation
+- Member tags and date/time entities (Bot API 9.5)
+- Message streaming via drafts (Bot API 9.5)
 - Forum topics and permissions
 - Stickers and custom emoji
 - Payments, Stars, and Gifts

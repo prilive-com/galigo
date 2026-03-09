@@ -123,6 +123,78 @@ func TestIsAdmin_IncludesOwner(t *testing.T) {
 	assert.False(t, IsAdmin(member))
 }
 
+// ==================== Bot API 9.5: Tags ====================
+
+func TestUnmarshalChatMember_MemberTag(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"status": "member",
+		"user":   map[string]any{"id": 123, "first_name": "Alice", "is_bot": false},
+		"tag":    "Developer",
+	})
+	member, err := UnmarshalChatMember(data)
+	require.NoError(t, err)
+	m, ok := member.(ChatMemberMember)
+	require.True(t, ok)
+	assert.Equal(t, "Developer", m.Tag)
+}
+
+func TestUnmarshalChatMember_MemberNoTag(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"status": "member",
+		"user":   map[string]any{"id": 123, "first_name": "Alice", "is_bot": false},
+	})
+	member, err := UnmarshalChatMember(data)
+	require.NoError(t, err)
+	m := member.(ChatMemberMember)
+	assert.Empty(t, m.Tag)
+}
+
+func TestUnmarshalChatMember_RestrictedCanEditTag(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"status": "restricted",
+		"user":   map[string]any{"id": 789, "first_name": "Bob", "is_bot": false},
+		"is_member": true,
+		"can_send_messages": true, "can_send_audios": true, "can_send_documents": true,
+		"can_send_photos": true, "can_send_videos": true, "can_send_video_notes": true,
+		"can_send_voice_notes": true, "can_send_polls": true, "can_send_other_messages": true,
+		"can_add_web_page_previews": true, "can_change_info": false, "can_invite_users": false,
+		"can_pin_messages": false, "can_manage_topics": false, "until_date": 0,
+		"tag": "Intern", "can_edit_tag": false,
+	})
+	member, err := UnmarshalChatMember(data)
+	require.NoError(t, err)
+	r, ok := member.(ChatMemberRestricted)
+	require.True(t, ok)
+	assert.Equal(t, "Intern", r.Tag)
+	assert.False(t, r.CanEditTag)
+}
+
+func TestUnmarshalChatMember_AdminCanManageTags(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"status": "administrator",
+		"user":   map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
+		"can_be_edited": true, "can_manage_chat": true,
+		"can_manage_tags": true, "is_anonymous": false,
+	})
+	member, err := UnmarshalChatMember(data)
+	require.NoError(t, err)
+	admin := member.(ChatMemberAdministrator)
+	require.NotNil(t, admin.CanManageTags)
+	assert.True(t, *admin.CanManageTags)
+}
+
+func TestUnmarshalChatMember_AdminCanManageTags_Absent(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"status": "administrator",
+		"user":   map[string]any{"id": 789, "first_name": "Bot", "is_bot": true},
+		"can_be_edited": true, "can_manage_chat": true, "is_anonymous": false,
+	})
+	member, err := UnmarshalChatMember(data)
+	require.NoError(t, err)
+	admin := member.(ChatMemberAdministrator)
+	assert.Nil(t, admin.CanManageTags)
+}
+
 func TestChatMemberUpdated_UnmarshalJSON(t *testing.T) {
 	data := []byte(`{
 		"chat": {"id": -100123, "type": "supergroup", "title": "Test"},

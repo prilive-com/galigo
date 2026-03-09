@@ -63,6 +63,7 @@ type Message struct {
 	ChannelChatCreated    bool                  `json:"channel_chat_created,omitempty"`
 	ChatOwnerLeft         *ChatOwnerLeft        `json:"chat_owner_left,omitempty"`    // 9.4
 	ChatOwnerChanged      *ChatOwnerChanged     `json:"chat_owner_changed,omitempty"` // 9.4
+	SenderTag             string                `json:"sender_tag,omitempty"`         // 9.5
 	ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
@@ -139,7 +140,9 @@ type MessageEntity struct {
 	URL           string `json:"url,omitempty"`
 	User          *User  `json:"user,omitempty"`
 	Language      string `json:"language,omitempty"`
-	CustomEmojiID string `json:"custom_emoji_id,omitempty"`
+	CustomEmojiID  string `json:"custom_emoji_id,omitempty"`
+	UnixTime       int64  `json:"unix_time,omitempty"`        // 9.5: date_time entity
+	DateTimeFormat string `json:"date_time_format,omitempty"` // 9.5: date_time entity
 }
 
 // PhotoSize represents one size of a photo or thumbnail.

@@ -3,6 +3,7 @@ package sender
 import (
 	"context"
 	"time"
+	"unicode/utf8"
 
 	"github.com/prilive-com/galigo/tg"
 )
@@ -43,6 +44,14 @@ type BanChatSenderChatRequest struct {
 type UnbanChatSenderChatRequest struct {
 	ChatID       tg.ChatID `json:"chat_id"`
 	SenderChatID int64     `json:"sender_chat_id"`
+}
+
+// SetChatMemberTagRequest represents a setChatMemberTag request.
+// Added in Bot API 9.5.
+type SetChatMemberTagRequest struct {
+	ChatID tg.ChatID `json:"chat_id"`
+	UserID int64     `json:"user_id"`
+	Tag    string    `json:"tag"` // NO omitempty — empty string removes tag
 }
 
 // ================== Moderation Methods ==================
@@ -131,6 +140,30 @@ func (c *Client) UnbanChatSenderChat(ctx context.Context, chatID tg.ChatID, send
 	return c.callJSON(ctx, "unbanChatSenderChat", UnbanChatSenderChatRequest{
 		ChatID:       chatID,
 		SenderChatID: senderChatID,
+	}, nil, extractChatID(chatID))
+}
+
+// ================== Member Tags (9.5) ==================
+
+// SetChatMemberTag sets or removes a custom tag for a regular member.
+// Pass an empty string as tag to remove the tag.
+// Tag must be 0-16 characters, emoji are not allowed.
+// The bot must be an administrator with can_manage_tags right.
+func (c *Client) SetChatMemberTag(ctx context.Context, chatID tg.ChatID, userID int64, tag string) error {
+	if err := validateChatID(chatID); err != nil {
+		return err
+	}
+	if err := validateUserID(userID); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(tag) > 16 {
+		return tg.NewValidationError("tag", "must be at most 16 characters")
+	}
+
+	return c.callJSON(ctx, "setChatMemberTag", SetChatMemberTagRequest{
+		ChatID: chatID,
+		UserID: userID,
+		Tag:    tag,
 	}, nil, extractChatID(chatID))
 }
 

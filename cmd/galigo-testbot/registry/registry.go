@@ -140,6 +140,10 @@ var AllMethods = []Method{
 	{Name: "setMyDefaultAdministratorRights", Category: CategoryExtended},
 	{Name: "getMyDefaultAdministratorRights", Category: CategoryExtended},
 
+	// === Bot API 9.5 ===
+	{Name: "setChatMemberTag", Category: CategoryChatAdmin},
+	{Name: "sendMessageDraft", Category: CategoryMessaging},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

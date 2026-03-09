@@ -2,6 +2,7 @@ package sender_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -231,4 +232,73 @@ func TestGetOwnedGifts_Validation(t *testing.T) {
 	_, err := client.GetOwnedGifts(context.Background(), sender.GetOwnedGiftsRequest{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "user_id")
+}
+
+// ==================== SendMessageDraft (9.5) ====================
+
+func TestSendMessageDraft(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessageDraft", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		json.NewDecoder(r.Body).Decode(&req)
+		assert.Equal(t, float64(123456789), req["chat_id"])
+		assert.Equal(t, float64(42), req["draft_id"])
+		assert.Equal(t, "Generating...", req["text"])
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
+		ChatID: int64(123456789), DraftID: 42, Text: "Generating...",
+	})
+	assert.NoError(t, err)
+}
+
+func TestSendMessageDraft_RejectsStringChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
+		ChatID: "@username", DraftID: 1, Text: "test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chat_id")
+	assert.Equal(t, 0, server.CaptureCount())
+}
+
+func TestSendMessageDraft_Validation_DraftIDZero(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
+		ChatID: int64(123456789), DraftID: 0, Text: "test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "draft_id")
+	assert.Equal(t, 0, server.CaptureCount())
+}
+
+func TestSendMessageDraft_Validation_NegativeDraftID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
+		ChatID: int64(123456789), DraftID: -1, Text: "test",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "draft_id")
+	assert.Equal(t, 0, server.CaptureCount())
+}
+
+func TestSendMessageDraft_Validation_EmptyText(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
+		ChatID: int64(123456789), DraftID: 1, Text: "",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "text")
+	assert.Equal(t, 0, server.CaptureCount())
 }

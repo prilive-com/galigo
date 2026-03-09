@@ -228,18 +228,21 @@ func (c *Client) GetMyShortDescription(ctx context.Context, opts ...LanguageOpti
 
 // SetMyProfilePhoto sets the bot's profile photo.
 // Added in Bot API 9.4.
-func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputFile, isPersonal bool) error {
-	req := SetMyProfilePhotoRequest{
-		Photo:      photo,
-		IsPersonal: isPersonal,
+func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputFile, opts ...ProfilePhotoOption) error {
+	req := SetMyProfilePhotoRequest{Photo: photo}
+	for _, opt := range opts {
+		opt.applyToSetProfilePhoto(&req)
 	}
 	return c.callJSON(ctx, "setMyProfilePhoto", req, nil)
 }
 
 // RemoveMyProfilePhoto removes the bot's profile photo.
 // Added in Bot API 9.4.
-func (c *Client) RemoveMyProfilePhoto(ctx context.Context, isPersonal bool) error {
-	req := RemoveMyProfilePhotoRequest{IsPersonal: isPersonal}
+func (c *Client) RemoveMyProfilePhoto(ctx context.Context, opts ...ProfilePhotoOption) error {
+	req := RemoveMyProfilePhotoRequest{}
+	for _, opt := range opts {
+		opt.applyToRemoveProfilePhoto(&req)
+	}
 	return c.callJSON(ctx, "removeMyProfilePhoto", req, nil)
 }
 
@@ -352,4 +355,27 @@ func ForChannels() AdminRightsOption {
 // WithAdminRightsForChannels sets the default administrator rights for channels.
 func WithAdminRightsForChannels(rights tg.ChatAdministratorRights) AdminRightsOption {
 	return adminRightsOption{rights: &rights, forChannels: true}
+}
+
+// ProfilePhotoOption configures profile photo methods.
+type ProfilePhotoOption interface {
+	applyToSetProfilePhoto(*SetMyProfilePhotoRequest)
+	applyToRemoveProfilePhoto(*RemoveMyProfilePhotoRequest)
+}
+
+type profilePhotoOption struct {
+	isPersonal bool
+}
+
+func (o profilePhotoOption) applyToSetProfilePhoto(r *SetMyProfilePhotoRequest) {
+	r.IsPersonal = o.isPersonal
+}
+
+func (o profilePhotoOption) applyToRemoveProfilePhoto(r *RemoveMyProfilePhotoRequest) {
+	r.IsPersonal = o.isPersonal
+}
+
+// PersonalPhoto marks the photo as visible only to the current user chat.
+func PersonalPhoto() ProfilePhotoOption {
+	return profilePhotoOption{isPersonal: true}
 }

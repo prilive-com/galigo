@@ -74,7 +74,7 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 	apiURL := fmt.Sprintf("%s%s/setWebhook", telegramAPIBaseURL, token.Value())
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", scrub.TokenFromError(err, token))
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -113,7 +113,7 @@ func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToke
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", scrub.TokenFromError(err, token))
 	}
 
 	resp, err := client.Do(req)
@@ -150,7 +150,7 @@ func GetWebhookInfo(ctx context.Context, client *http.Client, token tg.SecretTok
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", scrub.TokenFromError(err, token))
 	}
 
 	resp, err := client.Do(req)

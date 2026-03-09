@@ -359,15 +359,22 @@ type DeleteMessagesRequest struct {
 
 // SetMessageReactionRequest represents a request to set a message reaction.
 type SetMessageReactionRequest struct {
-	ChatID    tg.ChatID      `json:"chat_id"`
-	MessageID int            `json:"message_id"`
-	Reaction  []ReactionType `json:"reaction,omitempty"`
-	IsBig     bool           `json:"is_big,omitempty"`
+	ChatID    tg.ChatID         `json:"chat_id"`
+	MessageID int               `json:"message_id"`
+	Reaction  []tg.ReactionType `json:"reaction,omitempty"`
+	IsBig     bool              `json:"is_big,omitempty"`
 }
 
-// ReactionType represents a reaction type.
-type ReactionType struct {
-	Type        string `json:"type"` // "emoji" or "custom_emoji"
-	Emoji       string `json:"emoji,omitempty"`
-	CustomEmoji string `json:"custom_emoji_id,omitempty"`
+// ReactionType is an alias for tg.ReactionType for backward compatibility.
+type ReactionType = tg.ReactionType
+
+// SendMessageDraftRequest represents a sendMessageDraft request.
+// Added in Bot API 9.3, generally available since 9.5.
+type SendMessageDraftRequest struct {
+	ChatID          tg.ChatID          `json:"chat_id"` // tg.ChatID for consistency; validated integer-only
+	DraftID         int                `json:"draft_id"`
+	Text            string             `json:"text"`
+	MessageThreadID int                `json:"message_thread_id,omitempty"`
+	ParseMode       tg.ParseMode       `json:"parse_mode,omitempty"`
+	Entities        []tg.MessageEntity `json:"entities,omitempty"`
 }

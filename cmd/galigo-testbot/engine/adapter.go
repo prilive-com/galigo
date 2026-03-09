@@ -730,5 +730,17 @@ func (a *SenderAdapter) GetUpdates(ctx context.Context, offset int64, limit int,
 	return result.Result, nil
 }
 
+// SetChatMemberTag sets a custom tag for a member.
+func (a *SenderAdapter) SetChatMemberTag(ctx context.Context, chatID int64, userID int64, tag string) error {
+	return a.client.SetChatMemberTag(ctx, chatID, userID, tag)
+}
+
+// SendMessageDraft sends a streaming draft.
+func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draftID int, text string) error {
+	return a.client.SendMessageDraft(ctx, sender.SendMessageDraftRequest{
+		ChatID: chatID, DraftID: draftID, Text: text,
+	})
+}
+
 // Ensure SenderAdapter implements SenderClient.
 var _ SenderClient = (*SenderAdapter)(nil)

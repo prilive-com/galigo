@@ -153,6 +153,52 @@ func TestUser_AllowsUsersToCreateTopics(t *testing.T) {
 	assert.True(t, u.AllowsUsersToCreateTopics)
 }
 
+// ==================== Bot API 9.5 Types ====================
+
+func TestMessageEntity_DateTime_Unmarshal(t *testing.T) {
+	data := []byte(`{"type":"date_time","offset":0,"length":16,"unix_time":1647531900,"date_time_format":"wDT"}`)
+	var e tg.MessageEntity
+	require.NoError(t, json.Unmarshal(data, &e))
+	assert.Equal(t, "date_time", e.Type)
+	assert.Equal(t, int64(1647531900), e.UnixTime)
+	assert.Equal(t, "wDT", e.DateTimeFormat)
+}
+
+func TestMessageEntity_DateTime_NoFormat(t *testing.T) {
+	data := []byte(`{"type":"date_time","offset":0,"length":10,"unix_time":1647531900}`)
+	var e tg.MessageEntity
+	require.NoError(t, json.Unmarshal(data, &e))
+	assert.Equal(t, int64(1647531900), e.UnixTime)
+	assert.Empty(t, e.DateTimeFormat)
+}
+
+func TestMessageEntity_Bold_NoDateTimeFields(t *testing.T) {
+	e := tg.MessageEntity{Type: "bold", Offset: 0, Length: 5}
+	data, err := json.Marshal(e)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "unix_time")
+	assert.NotContains(t, string(data), "date_time_format")
+}
+
+func TestMessage_SenderTag_Unmarshal(t *testing.T) {
+	data := []byte(`{
+		"message_id":42,"date":1647531900,
+		"chat":{"id":-1001234567890,"type":"supergroup","title":"Dev"},
+		"from":{"id":123456,"is_bot":false,"first_name":"Alice"},
+		"text":"Hello","sender_tag":"Team Lead"
+	}`)
+	var m tg.Message
+	require.NoError(t, json.Unmarshal(data, &m))
+	assert.Equal(t, "Team Lead", m.SenderTag)
+}
+
+func TestMessage_SenderTag_Absent(t *testing.T) {
+	data := []byte(`{"message_id":1,"date":1,"chat":{"id":1,"type":"private"},"text":"hi"}`)
+	var m tg.Message
+	require.NoError(t, json.Unmarshal(data, &m))
+	assert.Empty(t, m.SenderTag)
+}
+
 func TestMessage_ChatOwnerServiceMessages(t *testing.T) {
 	raw := `{"message_id":1,"date":1234,"chat":{"id":1,"type":"group"},"chat_owner_left":{"new_owner":{"id":99,"is_bot":false,"first_name":"X"}}}`
 	var m tg.Message

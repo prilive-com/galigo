@@ -94,3 +94,23 @@ func TestBreakerSuccess_ContextCancelIsSuccess(t *testing.T) {
 	assert.True(t, isBreakerSuccess(context.Canceled))
 	assert.True(t, isBreakerSuccess(context.DeadlineExceeded))
 }
+
+func TestNoTokenInErrors_MalformedBaseURL(t *testing.T) {
+	token := "123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+	// Control character in BaseURL causes http.NewRequestWithContext to fail
+	client, err := New(token, WithBaseURL("https://api.telegram.org/\x7f"))
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+	defer client.Close()
+
+	_, err = client.GetMe(context.Background())
+	if err == nil {
+		t.Fatal("expected error from malformed base URL")
+	}
+
+	assert.NotContains(t, err.Error(), "ABCdef",
+		"token must not appear in request-creation error")
+	assert.NotContains(t, err.Error(), token,
+		"full token must not appear in error")
+}

@@ -141,6 +141,19 @@ func TestSetChatAdministratorCustomTitle_Validation_TooLong(t *testing.T) {
 	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
 }
 
+func TestSetChatAdministratorCustomTitle_Validation_MultibyteChars(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setChatAdministratorCustomTitle", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	// 16 runes but >16 bytes in UTF-8 — must be accepted
+	title := "Ünîcödë Àdmïn!!" // 16 runes
+	err := client.SetChatAdministratorCustomTitle(context.Background(), int64(-100123), 456, title)
+	assert.NoError(t, err, "multi-byte title within 16-char limit should be accepted")
+}
+
 func TestSetChatAdministratorCustomTitle_Empty(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/setChatAdministratorCustomTitle", func(w http.ResponseWriter, r *http.Request) {
@@ -168,6 +181,41 @@ func TestPromoteOptions(t *testing.T) {
 		sender.WithCanEditMessages(true),
 		sender.WithCanPinMessages(true),
 		sender.WithCanManageTopics(true),
+		sender.WithCanManageTags(true),
 	}
-	assert.Len(t, opts, 12)
+	assert.Len(t, opts, 13)
+}
+
+// ==================== Bot API 9.5: CanManageTags ====================
+
+func TestPromoteChatMember_WithCanManageTags(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/promoteChatMember", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		json.NewDecoder(r.Body).Decode(&req)
+		assert.Equal(t, true, req["can_manage_tags"])
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.PromoteChatMember(context.Background(), int64(-100123), int64(789),
+		sender.WithCanManageTags(true),
+	)
+	assert.NoError(t, err)
+}
+
+func TestDemoteChatMember_ClearsCanManageTags(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/promoteChatMember", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		json.NewDecoder(r.Body).Decode(&req)
+		assert.Equal(t, false, req["can_manage_tags"])
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.DemoteChatMember(context.Background(), int64(-100123), int64(789))
+	assert.NoError(t, err)
 }

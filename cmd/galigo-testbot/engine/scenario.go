@@ -85,6 +85,7 @@ type ChatContext struct {
 	CanPinMessages     bool
 	CanManageTopics    bool
 	CanInviteUsers     bool
+	CanManageTags      bool
 }
 
 // ChatPhotoSnapshot stores state for restore.
@@ -174,6 +175,7 @@ func (rt *Runtime) ProbeChat(ctx context.Context) error {
 		rt.ChatCtx.CanPinMessages = true
 		rt.ChatCtx.CanManageTopics = true
 		rt.ChatCtx.CanInviteUsers = true
+		rt.ChatCtx.CanManageTags = true
 	} else if status == "administrator" {
 		rt.ChatCtx.BotIsAdmin = true
 		if admin, ok := member.(tg.ChatMemberAdministrator); ok {
@@ -187,6 +189,9 @@ func (rt *Runtime) ProbeChat(ctx context.Context) error {
 			}
 			if admin.CanManageTopics != nil {
 				rt.ChatCtx.CanManageTopics = *admin.CanManageTopics
+			}
+			if admin.CanManageTags != nil {
+				rt.ChatCtx.CanManageTags = *admin.CanManageTags
 			}
 		}
 	}
@@ -324,6 +329,12 @@ type SenderClient interface {
 
 	// Polling
 	GetUpdates(ctx context.Context, offset int64, limit int, timeout int) ([]tg.Update, error)
+
+	// Member tags (9.5)
+	SetChatMemberTag(ctx context.Context, chatID int64, userID int64, tag string) error
+
+	// Message streaming (9.3+9.5)
+	SendMessageDraft(ctx context.Context, chatID int64, draftID int, text string) error
 }
 
 // WebhookInfo contains information about the current webhook configuration.

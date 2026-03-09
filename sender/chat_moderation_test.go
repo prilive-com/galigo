@@ -163,3 +163,81 @@ func TestUnbanChatSenderChat(t *testing.T) {
 	err := client.UnbanChatSenderChat(context.Background(), int64(-100123), int64(-100456))
 	assert.NoError(t, err)
 }
+
+// ==================== SetChatMemberTag (9.5) ====================
+
+func TestSetChatMemberTag(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setChatMemberTag", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		json.NewDecoder(r.Body).Decode(&req)
+		assert.Equal(t, "Team Lead", req["tag"])
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetChatMemberTag(context.Background(), int64(-1001234567890), int64(123456), "Team Lead")
+	assert.NoError(t, err)
+}
+
+// CRITICAL TDD TEST — catches the omitempty trap
+func TestSetChatMemberTag_RemoveTag_EmptyStringPresent(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setChatMemberTag", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		json.NewDecoder(r.Body).Decode(&req)
+		val, exists := req["tag"]
+		assert.True(t, exists, "tag field must be present even when empty")
+		assert.Equal(t, "", val, "empty tag must be sent as empty string")
+		testutil.ReplyBool(w, true)
+	})
+
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetChatMemberTag(context.Background(), int64(-1001234567890), int64(123456), "")
+	assert.NoError(t, err)
+}
+
+func TestSetChatMemberTag_Validation_InvalidChatID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetChatMemberTag(context.Background(), nil, int64(123456), "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "chat_id")
+	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
+}
+
+func TestSetChatMemberTag_Validation_InvalidUserID(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetChatMemberTag(context.Background(), int64(-100123), int64(0), "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "user_id")
+	assert.Equal(t, 0, server.CaptureCount())
+}
+
+func TestSetChatMemberTag_Validation_TagTooLong(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	err := client.SetChatMemberTag(context.Background(), int64(-100123), int64(123456), "This Is Way Too Long")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "tag")
+	assert.Equal(t, 0, server.CaptureCount())
+}
+
+func TestSetChatMemberTag_Validation_TagMultibyteChars(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/setChatMemberTag", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	// 16 characters but >16 bytes in UTF-8 — must be accepted
+	tag := "Tëäm Lëäd Ünît" // 15 runes, >15 bytes
+	err := client.SetChatMemberTag(context.Background(), int64(-100123), int64(123456), tag)
+	assert.NoError(t, err, "multi-byte tag within 16-char limit should be accepted")
+}

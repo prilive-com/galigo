@@ -18,6 +18,7 @@ type ChatAdministratorRights struct {
 	CanDeleteStories        *bool `json:"can_delete_stories,omitempty"`
 	CanManageTopics         *bool `json:"can_manage_topics,omitempty"`
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
+	CanManageTags           *bool `json:"can_manage_tags,omitempty"` // 9.5
 }
 
 // FullAdminRights returns administrator rights with all permissions enabled.
@@ -39,6 +40,7 @@ func FullAdminRights() ChatAdministratorRights {
 		CanDeleteStories:        boolPtr(true),
 		CanManageTopics:         boolPtr(true),
 		CanManageDirectMessages: boolPtr(true),
+		CanManageTags:           boolPtr(true),
 	}
 }
 

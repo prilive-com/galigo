@@ -61,6 +61,7 @@ type ChatMemberAdministrator struct {
 	CanDeleteStories        *bool  `json:"can_delete_stories,omitempty"`
 	CanManageTopics         *bool  `json:"can_manage_topics,omitempty"`
 	CanManageDirectMessages *bool  `json:"can_manage_direct_messages,omitempty"`
+	CanManageTags           *bool  `json:"can_manage_tags,omitempty"` // 9.5
 	CustomTitle             string `json:"custom_title,omitempty"`
 }
 
@@ -70,7 +71,8 @@ func (ChatMemberAdministrator) Status() string { return "administrator" }
 // ChatMemberMember represents a regular chat member.
 type ChatMemberMember struct {
 	chatMemberBase
-	UntilDate int64 `json:"until_date,omitempty"`
+	UntilDate int64  `json:"until_date,omitempty"`
+	Tag       string `json:"tag,omitempty"` // 9.5
 }
 
 func (ChatMemberMember) chatMember()    {}
@@ -93,8 +95,10 @@ type ChatMemberRestricted struct {
 	CanChangeInfo         bool  `json:"can_change_info"`
 	CanInviteUsers        bool  `json:"can_invite_users"`
 	CanPinMessages        bool  `json:"can_pin_messages"`
-	CanManageTopics       bool  `json:"can_manage_topics"`
-	UntilDate             int64 `json:"until_date"`
+	CanManageTopics       bool   `json:"can_manage_topics"`
+	UntilDate             int64  `json:"until_date"`
+	Tag                   string `json:"tag,omitempty"`  // 9.5
+	CanEditTag            bool   `json:"can_edit_tag"`   // 9.5 — plain bool, NO omitempty (restriction pattern)
 }
 
 func (ChatMemberRestricted) chatMember()    {}

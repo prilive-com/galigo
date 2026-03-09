@@ -79,6 +79,35 @@ func TestChatPermissions_JSON_Roundtrip(t *testing.T) {
 	assert.True(t, *decoded.CanManageTopics)
 }
 
+// ==================== Bot API 9.5: CanEditTag ====================
+
+func TestChatPermissions_CanEditTag_Present(t *testing.T) {
+	data := []byte(`{"can_send_messages":true,"can_edit_tag":true}`)
+	var p ChatPermissions
+	require.NoError(t, json.Unmarshal(data, &p))
+	require.NotNil(t, p.CanEditTag)
+	assert.True(t, *p.CanEditTag)
+}
+
+func TestChatPermissions_CanEditTag_Absent(t *testing.T) {
+	data := []byte(`{"can_send_messages":true}`)
+	var p ChatPermissions
+	require.NoError(t, json.Unmarshal(data, &p))
+	assert.Nil(t, p.CanEditTag)
+}
+
+func TestAllPermissions_CanEditTag(t *testing.T) {
+	p := AllPermissions()
+	require.NotNil(t, p.CanEditTag)
+	assert.True(t, *p.CanEditTag)
+}
+
+func TestNoPermissions_CanEditTag(t *testing.T) {
+	p := NoPermissions()
+	require.NotNil(t, p.CanEditTag)
+	assert.False(t, *p.CanEditTag)
+}
+
 func TestFullAdminRights(t *testing.T) {
 	r := FullAdminRights()
 	assert.True(t, r.CanManageChat)
@@ -88,6 +117,8 @@ func TestFullAdminRights(t *testing.T) {
 	assert.True(t, *r.CanPostMessages)
 	assert.NotNil(t, r.CanManageDirectMessages)
 	assert.True(t, *r.CanManageDirectMessages)
+	assert.NotNil(t, r.CanManageTags)
+	assert.True(t, *r.CanManageTags)
 }
 
 func TestModeratorRights(t *testing.T) {

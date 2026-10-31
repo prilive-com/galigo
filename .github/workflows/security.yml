@@ -32,7 +32,11 @@ jobs:
 
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1
+        env:
+          GOTOOLCHAIN: auto  # let the action's setup-go read the toolchain line
         with:
+          go-version-input: ''  # empty, so go-version-file decides
+          go-version-file: go.mod
           go-package: ./...
 
   # ============================================================
@@ -49,7 +53,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.22.11
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
 
       - name: Run gosec
         run: gosec -no-fail -fmt sarif -out gosec.sarif ./...

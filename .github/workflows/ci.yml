@@ -47,7 +47,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.8.0
+          version: v2.15.0
           args: --timeout=5m
           only-new-issues: ${{ github.event_name == 'pull_request' }}
 
@@ -55,19 +55,18 @@ jobs:
   # JOB 2: Test Matrix - Cross-platform, multi-version testing
   # ============================================================
   test:
-    name: Test (${{ matrix.os }}, Go ${{ matrix.go }})
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go: [stable]  # go.mod requires 1.25, oldstable (1.24) not supported
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version-file: go.mod  # go 1.25 line, then Go switches to the toolchain line
 
       - name: Run tests
         shell: bash
@@ -77,6 +76,28 @@ jobs:
           else
             go test ./... -shuffle=on -count=1 -timeout=10m
           fi
+
+  # ============================================================
+  # JOB 2b: Minimum Go - the go 1.25 line in go.mod still builds and passes
+  # ============================================================
+  test-minimum:
+    name: Test (ubuntu-latest, Go 1.25 minimum)
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local  # do not switch to the toolchain line
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.14'  # newest 1.25 patch
+
+      - name: Build, vet and test on the minimum
+        run: |
+          go version
+          go build ./...
+          go vet ./...
+          go test ./... -shuffle=on -count=1 -timeout=10m
 
   # ============================================================
   # JOB 3: Coverage - Track test coverage with threshold

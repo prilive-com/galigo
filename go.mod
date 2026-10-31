@@ -2,6 +2,8 @@ module github.com/prilive-com/galigo
 
 go 1.25
 
+toolchain go1.27.3
+
 require (
 	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.8.4

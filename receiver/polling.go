@@ -15,13 +15,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/sony/gobreaker/v2"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -535,13 +535,13 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, &APIError{Description: "failed to create request", Err: err}
+		return nil, &APIError{Description: "failed to create request", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	respBody, err := c.breaker.Execute(func() ([]byte, error) {
 		resp, doErr := c.client.Do(req)
 		if doErr != nil {
-			return nil, scrubTokenFromError(doErr, c.token)
+			return nil, scrub.TokenFromError(doErr, c.token)
 		}
 		defer func() {
 			io.Copy(io.Discard, resp.Body)
@@ -583,32 +583,6 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 	}
 
 	return response.Result, nil
-}
-
-// scrubbedError wraps an error with a token-scrubbed message while preserving the error chain.
-type scrubbedError struct {
-	msg string
-	err error
-}
-
-func (e *scrubbedError) Error() string { return e.msg }
-func (e *scrubbedError) Unwrap() error { return e.err }
-
-// scrubTokenFromError removes the bot token from error messages.
-// Preserves the error chain for errors.Is/As.
-func scrubTokenFromError(err error, token tg.SecretToken) error {
-	if err == nil {
-		return nil
-	}
-	msg := err.Error()
-	tokenVal := token.Value()
-	if tokenVal != "" && strings.Contains(msg, tokenVal) {
-		return &scrubbedError{
-			msg: strings.ReplaceAll(msg, tokenVal, "[REDACTED]"),
-			err: err,
-		}
-	}
-	return err
 }
 
 func (c *PollingClient) calculateBackoff(attempt int32) time.Duration {

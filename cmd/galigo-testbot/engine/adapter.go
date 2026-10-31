@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/receiver"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
@@ -699,7 +700,7 @@ func (a *SenderAdapter) GetUpdates(ctx context.Context, offset int64, limit int,
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/getUpdates?%s", a.token.Value(), params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, a.token)
 	}
 
 	client := a.httpClient
@@ -708,7 +709,7 @@ func (a *SenderAdapter) GetUpdates(ctx context.Context, offset int64, limit int,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, a.token)
 	}
 	defer func() {
 		io.Copy(io.Discard, resp.Body)

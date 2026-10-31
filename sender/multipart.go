@@ -84,7 +84,7 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 	}
 
 	rv := reflect.ValueOf(req)
-	if rv.Kind() == reflect.Ptr {
+	if rv.Kind() == reflect.Pointer {
 		rv = rv.Elem()
 	}
 

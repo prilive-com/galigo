@@ -4,6 +4,8 @@
 version: "2"
 
 run:
+  # Lint target: keep equal to the go line in go.mod (the minimum), not the toolchain line.
+  go: "1.25"
   timeout: 5m
   modules-download-mode: readonly
 
@@ -190,6 +192,11 @@ linters:
       - linters:
           - staticcheck
         text: "QF1003"
+
+      # staticcheck: Allow WriteString(fmt.Sprintf(...)) (same output as fmt.Fprintf)
+      - linters:
+          - staticcheck
+        text: "QF1012"
 
 formatters:
   enable:

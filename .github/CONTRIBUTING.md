@@ -62,7 +62,7 @@ go test ./...
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Install govulncheck
-go install golang.org/x/vuln/cmd/govulncheck@latest
+go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 ```
 
 ## Making Changes

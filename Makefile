@@ -81,8 +81,7 @@ bench:
 
 ## vuln: Run vulnerability check
 vuln:
-	@which govulncheck > /dev/null 2>&1 || (echo "Installing govulncheck..." && $(GO) install golang.org/x/vuln/cmd/govulncheck@latest)
-	govulncheck $(GO_PACKAGES)
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.9.0 $(GO_PACKAGES)
 
 ## fmt: Format code
 fmt:

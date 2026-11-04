@@ -124,6 +124,10 @@ func (f *fake100) SendMessageDraft(_ context.Context, chatID int64, draftID int,
 // api100Writes are the fake's write methods; no read-only step may call one.
 var api100Writes = []string{"deleteMessageReaction", "deleteAllMessageReactions", "sendMessageDraft"}
 
+// api100OtherChatID is a second chat id for the fresh-runtime rows: not TestChatID, so a step that reads the
+// wrong chat (a stale LastMessage, a fixed id) fails them (X-C2-01).
+const api100OtherChatID int64 = -1001000000100
+
 func api100Runtime(f *fake100) *Runtime {
 	rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 	rt.LastMessage = &tg.Message{MessageID: 4242, Chat: &tg.Chat{ID: testutil.TestChatID},
@@ -345,6 +349,21 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 		assert.Equal(t, map[string]int{"getChat": 1, "getMe": 1, "getChatMember": 1, "getChatAdministratorsWithBots": 1}, f.calls)
 		assert.Equal(t, []int64{testutil.TestChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 	})
+	t.Run("fresh runtime", func(t *testing.T) {
+		// API100 T-tb-4 (d): rt.ChatID only; no LastMessage (X-C2-01)
+		f := newFake100().script("getChatAdministratorsWithBots", fake100Reply{members: []tg.ChatMember{api100Admin(api100BotID, true, false)}})
+		rt := NewRuntime(f, api100OtherChatID, testutil.TestUserID)
+		rt.ChatCtx = &ChatContext{BotIsAdmin: true}
+		var (
+			res *StepResult
+			err error
+		)
+		require.NotPanics(t, func() { res, err = step.Execute(context.Background(), rt) })
+		require.NoError(t, err)
+		api100Fields(t, step, res, "getChatAdministrators")
+		assert.Equal(t, map[string]int{"getChatAdministratorsWithBots": 1}, f.calls)
+		assert.Equal(t, []int64{api100OtherChatID}, f.chatIDs["getChatAdministratorsWithBots"])
+	})
 }
 
 // T-tb-4 (e): getChat must carry permissions with can_react_to_messages set (true or false).
@@ -381,6 +400,20 @@ func TestAPI100Steps_ChatPermissionsReact(t *testing.T) {
 			assert.Equal(t, []int64{testutil.TestChatID}, fk.chatIDs["getChat"])
 		})
 	}
+	t.Run("fresh runtime", func(t *testing.T) {
+		// API100 T-tb-4 (e): rt.ChatID only; no LastMessage (X-C2-01)
+		fk := newFake100().script("getChat", fake100Reply{chat: &tg.ChatFullInfo{ID: api100OtherChatID, Type: "supergroup", Permissions: &tg.ChatPermissions{CanReactToMessages: &tr}}})
+		rt := NewRuntime(fk, api100OtherChatID, testutil.TestUserID)
+		var (
+			res *StepResult
+			err error
+		)
+		require.NotPanics(t, func() { res, err = step.Execute(context.Background(), rt) })
+		require.NoError(t, err)
+		api100Fields(t, step, res, "getChat")
+		assert.Equal(t, map[string]int{"getChat": 1}, fk.calls)
+		assert.Equal(t, []int64{api100OtherChatID}, fk.chatIDs["getChat"])
+	})
 }
 
 // T-tb-4 (f): the empty draft goes to the admin's private chat; no admin is a Skip.

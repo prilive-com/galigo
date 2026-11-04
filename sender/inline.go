@@ -24,6 +24,12 @@ type AnswerWebAppQueryRequest struct {
 	Result        tg.InlineQueryResult `json:"result"`
 }
 
+// AnswerGuestQueryRequest represents an answerGuestQuery request (Bot API 10.0).
+type AnswerGuestQueryRequest struct {
+	GuestQueryID string               `json:"guest_query_id"`
+	Result       tg.InlineQueryResult `json:"result"`
+}
+
 // SendChecklistRequest represents a sendChecklist request.
 type SendChecklistRequest struct {
 	ChatID              tg.ChatID           `json:"chat_id"`
@@ -66,6 +72,23 @@ func (c *Client) AnswerWebAppQuery(ctx context.Context, req AnswerWebAppQueryReq
 
 	var result tg.SentWebAppMessage
 	if err := c.callJSON(ctx, "answerWebAppQuery", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// AnswerGuestQuery sends a message in response to a guest query (Bot API 10.0); see tg.Message.GuestQueryID.
+// It is not retried: a repeat could post the message twice.
+func (c *Client) AnswerGuestQuery(ctx context.Context, req AnswerGuestQueryRequest) (*tg.SentGuestMessage, error) {
+	if req.GuestQueryID == "" {
+		return nil, tg.NewValidationError("guest_query_id", "required")
+	}
+	if req.Result == nil {
+		return nil, tg.NewValidationError("result", "required")
+	}
+
+	var result tg.SentGuestMessage
+	if err := c.callJSON(ctx, "answerGuestQuery", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

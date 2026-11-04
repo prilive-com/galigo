@@ -2,6 +2,8 @@ package sender_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -910,6 +912,47 @@ func TestGetUserProfileAudios_WithOptions(t *testing.T) {
 	cap := server.LastCapture()
 	cap.AssertJSONField(t, "offset", float64(10))
 	cap.AssertJSONField(t, "limit", float64(50))
+}
+
+// Bot API 10.0 getUserPersonalChatMessages (B-25 slice 2a, TEST-PLAN §3).
+func TestAPI100_GetUserPersonalChatMessages(t *testing.T) {
+	// API100 T-s-13
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getUserPersonalChatMessages", func(w http.ResponseWriter, _ *http.Request) {
+		api96ReplyRaw(w, `{"ok":true,"result":[`+
+			`{"message_id":301,"date":1793799001,"chat":{"id":-1007770001111,"type":"channel","title":"Personal"},"text":"first"},`+
+			`{"message_id":302,"date":1793799002,"chat":{"id":-1007770001111,"type":"channel","title":"Personal"},"text":"second"}]}`)
+	})
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	got, err := client.GetUserPersonalChatMessages(context.Background(), sender.GetUserPersonalChatMessagesRequest{UserID: 42, Limit: 5})
+	require.NoError(t, err)
+	ch := &tg.Chat{ID: -1007770001111, Type: "channel", Title: "Personal"}
+	assert.Equal(t, []*tg.Message{
+		{MessageID: 301, Date: 1793799001, Chat: ch, Text: "first"},
+		{MessageID: 302, Date: 1793799002, Chat: ch, Text: "second"},
+	}, got)
+	require.Equal(t, 1, server.CaptureCount())
+	server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/getUserPersonalChatMessages")
+	assert.JSONEq(t, `{"user_id":42,"limit":5}`, server.LastCapture().BodyString())
+
+	// the spec's limit range 1-20 is not checked by the client: 0 and 21 are sent as given
+	for _, limit := range []int{0, 21} {
+		server.ResetCaptures()
+		_, err := client.GetUserPersonalChatMessages(context.Background(), sender.GetUserPersonalChatMessagesRequest{UserID: 42, Limit: limit})
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		assert.JSONEq(t, fmt.Sprintf(`{"user_id":42,"limit":%d}`, limit), server.LastCapture().BodyString())
+	}
+
+	for _, id := range []int64{0, -1} {
+		server.ResetCaptures()
+		_, err := client.GetUserPersonalChatMessages(context.Background(), sender.GetUserPersonalChatMessagesRequest{UserID: id, Limit: 5})
+		var ve *tg.ValidationError
+		require.True(t, errors.As(err, &ve), "user %d: error %v", id, err)
+		assert.Equal(t, "user_id", ve.Field)
+		assert.Equal(t, 0, server.CaptureCount())
+	}
 }
 
 // ================== Location/Contact Methods ==================

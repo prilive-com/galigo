@@ -176,6 +176,11 @@ type SentWebAppMessage struct {
 	InlineMessageID string `json:"inline_message_id,omitempty"`
 }
 
+// SentGuestMessage describes an inline message sent by a guest bot. Added in Bot API 10.0.
+type SentGuestMessage struct {
+	InlineMessageID string `json:"inline_message_id"`
+}
+
 // PreparedInlineMessage represents a prepared inline message.
 type PreparedInlineMessage struct {
 	ID             string `json:"id"`

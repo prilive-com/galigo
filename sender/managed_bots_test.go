@@ -3,6 +3,7 @@ package sender_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -190,4 +191,95 @@ func TestManagedBotToken96_ObjectResult(t *testing.T) {
 			assert.Equal(t, 1, server.CaptureCount(), "exactly one request seen")
 		})
 	}
+}
+
+// ==================== Bot API 10.0: managed bot access settings (B-25 slice 2a, TEST-PLAN §3) ====================
+
+func TestAPI100_GetManagedBotAccessSettings(t *testing.T) {
+	// API100 T-s-10
+	u1 := tg.User{ID: testutil.TestUserID, FirstName: "Test", Username: testutil.TestUsername}
+	u2 := tg.User{ID: 555000111, IsBot: true, FirstName: "Managed", Username: "managed_test_bot"}
+	rows := []struct {
+		name   string
+		result string
+		want   *tg.BotAccessSettings
+	}{
+		{"(a) restricted with users", `{"is_access_restricted":true,"added_users":[` +
+			`{"id":987654321,"is_bot":false,"first_name":"Test","username":"testuser"},` +
+			`{"id":555000111,"is_bot":true,"first_name":"Managed","username":"managed_test_bot"}]}`,
+			&tg.BotAccessSettings{IsAccessRestricted: true, AddedUsers: []tg.User{u1, u2}}},
+		{"(b) not restricted", `{"is_access_restricted":false}`, &tg.BotAccessSettings{}},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			server.On("/bot"+testutil.TestToken+"/getManagedBotAccessSettings", func(w http.ResponseWriter, _ *http.Request) {
+				api96ReplyRaw(w, `{"ok":true,"result":`+r.result+`}`)
+			})
+			client := testutil.NewTestClient(t, server.BaseURL())
+			got, err := client.GetManagedBotAccessSettings(context.Background(), 42)
+			require.NoError(t, err)
+			assert.Equal(t, r.want, got)
+			require.Equal(t, 1, server.CaptureCount())
+			server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/getManagedBotAccessSettings")
+			assert.JSONEq(t, `{"user_id":42}`, server.LastCapture().BodyString())
+		})
+	}
+}
+
+func TestAPI100_GetManagedBotAccessSettings_Validation(t *testing.T) {
+	// API100 T-s-11
+	for _, id := range []int64{0, -1} {
+		server := testutil.NewMockServer(t)
+		client := testutil.NewTestClient(t, server.BaseURL())
+		_, err := client.GetManagedBotAccessSettings(context.Background(), id)
+		var ve *tg.ValidationError
+		require.True(t, errors.As(err, &ve), "user %d: error %v", id, err)
+		assert.Equal(t, "user_id", ve.Field)
+		assert.Equal(t, 0, server.CaptureCount())
+	}
+}
+
+func TestAPI100_SetManagedBotAccessSettings(t *testing.T) {
+	// API100 T-s-12
+	ten := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	eleven := append(append([]int64{}, ten...), 11)
+	rows := []struct {
+		name string
+		req  sender.SetManagedBotAccessSettingsRequest
+		body string
+	}{
+		{"(a) false, nil ids", sender.SetManagedBotAccessSettingsRequest{UserID: 42},
+			`{"user_id":42,"is_access_restricted":false}`},
+		{"(b) 10 ids", sender.SetManagedBotAccessSettingsRequest{UserID: 42, IsAccessRestricted: true, AddedUserIDs: ten},
+			`{"user_id":42,"is_access_restricted":true,"added_user_ids":[1,2,3,4,5,6,7,8,9,10]}`},
+		{"(c) empty ids", sender.SetManagedBotAccessSettingsRequest{UserID: 42, IsAccessRestricted: true, AddedUserIDs: []int64{}},
+			`{"user_id":42,"is_access_restricted":true,"added_user_ids":[]}`},
+		{"(d) 11 ids, sent as given", sender.SetManagedBotAccessSettingsRequest{UserID: 42, IsAccessRestricted: true, AddedUserIDs: eleven},
+			`{"user_id":42,"is_access_restricted":true,"added_user_ids":[1,2,3,4,5,6,7,8,9,10,11]}`},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			server.On("/bot"+testutil.TestToken+"/setManagedBotAccessSettings", func(w http.ResponseWriter, _ *http.Request) {
+				testutil.ReplyBool(w, true)
+			})
+			client := testutil.NewTestClient(t, server.BaseURL())
+			require.NoError(t, client.SetManagedBotAccessSettings(context.Background(), r.req))
+			require.Equal(t, 1, server.CaptureCount())
+			server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/setManagedBotAccessSettings")
+			assert.JSONEq(t, r.body, server.LastCapture().BodyString())
+		})
+	}
+	t.Run("(e) user 0 and -1", func(t *testing.T) {
+		for _, id := range []int64{0, -1} {
+			server := testutil.NewMockServer(t)
+			client := testutil.NewTestClient(t, server.BaseURL())
+			err := client.SetManagedBotAccessSettings(context.Background(), sender.SetManagedBotAccessSettingsRequest{UserID: id})
+			var ve *tg.ValidationError
+			require.True(t, errors.As(err, &ve), "user %d: error %v", id, err)
+			assert.Equal(t, "user_id", ve.Field)
+			assert.Equal(t, 0, server.CaptureCount())
+		}
+	})
 }

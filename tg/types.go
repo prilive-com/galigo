@@ -68,7 +68,14 @@ type Message struct {
 	PollOptionAdded       *PollOptionAdded      `json:"poll_option_added,omitempty"`       // 9.6
 	PollOptionDeleted     *PollOptionDeleted    `json:"poll_option_deleted,omitempty"`     // 9.6
 	ReplyToPollOptionID   string                `json:"reply_to_poll_option_id,omitempty"` // 9.6: persistent id of the option replied to
+	GuestBotCallerUser    *User                 `json:"guest_bot_caller_user,omitempty"`   // 10.0: guest mode, the user who summoned the bot
+	GuestBotCallerChat    *Chat                 `json:"guest_bot_caller_chat,omitempty"`   // 10.0: guest mode, the chat that summoned the bot
 	ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	// GuestQueryID (Bot API 10.0) is set when the message belongs to the chat where this bot was summoned as a
+	// guest. That chat may not coincide with other bot chats that share the same id. Answer it with
+	// Client.AnswerGuestQuery; do not use its chat id as a normal chat, and do not edit the message through
+	// Editable or MessageSig, because they would target that chat id.
+	GuestQueryID string `json:"guest_query_id,omitempty"`
 }
 
 // MessageSig implements Editable.
@@ -100,6 +107,7 @@ type User struct {
 	SupportsInlineQueries     bool   `json:"supports_inline_queries,omitempty"`
 	AllowsUsersToCreateTopics bool   `json:"allows_users_to_create_topics,omitempty"` // 9.4
 	CanManageBots             bool   `json:"can_manage_bots,omitempty"`               // 9.6: getMe only
+	SupportsGuestQueries      bool   `json:"supports_guest_queries,omitempty"`        // 10.0: getMe only
 }
 
 // Chat represents a Telegram chat.

@@ -135,7 +135,8 @@ func (c *Client) EditChatSubscriptionInviteLink(ctx context.Context, req EditCha
 // SendMessageDraft sends a draft message for streaming.
 // Call repeatedly with the same DraftID and growing text for a streaming effect.
 // ChatID must be an integer (private chats only).
-// Available to all bots since Bot API 9.5.
+// Available to all bots since Bot API 9.5. Since Bot API 10.0 the text may be empty; Telegram then shows a
+// placeholder.
 func (c *Client) SendMessageDraft(ctx context.Context, req SendMessageDraftRequest) error {
 	// sendMessageDraft requires integer chat_id (private chats only)
 	switch v := req.ChatID.(type) {
@@ -154,9 +155,6 @@ func (c *Client) SendMessageDraft(ctx context.Context, req SendMessageDraftReque
 	}
 	if req.DraftID <= 0 {
 		return tg.NewValidationError("draft_id", "must be positive")
-	}
-	if req.Text == "" {
-		return tg.NewValidationError("text", "required")
 	}
 
 	return c.callJSON(ctx, "sendMessageDraft", req, nil, extractChatID(req.ChatID))

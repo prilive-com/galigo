@@ -744,6 +744,21 @@ func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draf
 	})
 }
 
+// DeleteMessageReaction removes a user's or a chat's reaction from a message (Bot API 10.0).
+func (a *SenderAdapter) DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error {
+	return a.client.DeleteMessageReaction(ctx, req)
+}
+
+// DeleteAllMessageReactions removes a user's or a chat's recent reactions in a chat (Bot API 10.0).
+func (a *SenderAdapter) DeleteAllMessageReactions(ctx context.Context, req sender.DeleteAllMessageReactionsRequest) error {
+	return a.client.DeleteAllMessageReactions(ctx, req)
+}
+
+// GetChatAdministratorsWithBots returns chat admins, other bots included (return_bots, Bot API 10.0).
+func (a *SenderAdapter) GetChatAdministratorsWithBots(ctx context.Context, chatID int64) ([]tg.ChatMember, error) {
+	return a.client.GetChatAdministratorsWithBots(ctx, chatID)
+}
+
 // SendPoll sends a poll built from a whole request (9.6).
 func (a *SenderAdapter) SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error) {
 	return a.client.SendPoll(ctx, req)

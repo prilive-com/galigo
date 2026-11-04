@@ -10,3 +10,9 @@ type ManagedBotUpdated struct {
 	User *User `json:"user"` // the user who owns the bot
 	Bot  *User `json:"bot"`  // the managed bot
 }
+
+// BotAccessSettings describes the access settings of a managed bot. Added in Bot API 10.0.
+type BotAccessSettings struct {
+	IsAccessRestricted bool   `json:"is_access_restricted"`  // only selected users can access the bot; its owner always can
+	AddedUsers         []User `json:"added_users,omitempty"` // the users who can access the bot when access is restricted
+}

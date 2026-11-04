@@ -339,6 +339,11 @@ type SenderClient interface {
 	// Polls and prepared keyboard buttons (9.6)
 	SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error)
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
+
+	// Reactions and administrators (10.0)
+	DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error
+	DeleteAllMessageReactions(ctx context.Context, req sender.DeleteAllMessageReactionsRequest) error
+	GetChatAdministratorsWithBots(ctx context.Context, chatID int64) ([]tg.ChatMember, error)
 }
 
 // WebhookInfo contains information about the current webhook configuration.

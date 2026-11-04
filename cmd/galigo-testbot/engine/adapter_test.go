@@ -121,3 +121,51 @@ func TestSenderAdapter96(t *testing.T) {
 			server.LastCapture().BodyString())
 	})
 }
+
+// T-tb-5 (B-25 slice 2a, Bot API 10.0): the adapter passes the whole delete requests (actor_chat_id included)
+// and calls getChatAdministrators with return_bots, with exact bodies.
+func TestSenderAdapter100(t *testing.T) {
+	newAdapter := func(t *testing.T, path string, reply func(http.ResponseWriter)) (*SenderAdapter, *testutil.MockTelegramServer) {
+		server := testutil.NewMockServer(t)
+		server.On("/bot"+testutil.TestToken+"/"+path, func(w http.ResponseWriter, _ *http.Request) { reply(w) })
+		return NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), server
+	}
+	ok := func(w http.ResponseWriter) { testutil.ReplyBool(w, true) }
+
+	t.Run("DeleteMessageReaction with actor_chat_id", func(t *testing.T) {
+		// API100 T-tb-5
+		a, server := newAdapter(t, "deleteMessageReaction", ok)
+		err := a.DeleteMessageReaction(context.Background(), sender.DeleteMessageReactionRequest{
+			ChatID: int64(-1001234567890), MessageID: 4242, UserID: 7001, ActorChatID: -1009876543210})
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/deleteMessageReaction")
+		assert.JSONEq(t, `{"chat_id":-1001234567890,"message_id":4242,"user_id":7001,"actor_chat_id":-1009876543210}`,
+			server.LastCapture().BodyString())
+	})
+	t.Run("DeleteAllMessageReactions with actor_chat_id", func(t *testing.T) {
+		// API100 T-tb-5
+		a, server := newAdapter(t, "deleteAllMessageReactions", ok)
+		err := a.DeleteAllMessageReactions(context.Background(), sender.DeleteAllMessageReactionsRequest{
+			ChatID: int64(-1001234567890), UserID: 7001, ActorChatID: -1009876543210})
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/deleteAllMessageReactions")
+		assert.JSONEq(t, `{"chat_id":-1001234567890,"user_id":7001,"actor_chat_id":-1009876543210}`,
+			server.LastCapture().BodyString())
+	})
+	t.Run("GetChatAdministratorsWithBots", func(t *testing.T) {
+		// API100 T-tb-5
+		a, server := newAdapter(t, "getChatAdministrators", func(w http.ResponseWriter) {
+			testutil.ReplyOK(w, []map[string]any{{"status": "administrator",
+				"user": map[string]any{"id": 7001, "is_bot": true, "first_name": "b"}}})
+		})
+		got, err := a.GetChatAdministratorsWithBots(context.Background(), -1001234567890)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.Equal(t, int64(7001), got[0].GetUser().ID)
+		require.Equal(t, 1, server.CaptureCount())
+		server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/getChatAdministrators")
+		assert.JSONEq(t, `{"chat_id":-1001234567890,"return_bots":true}`, server.LastCapture().BodyString())
+	})
+}

@@ -149,6 +149,14 @@ var AllMethods = []Method{
 	{Name: "replaceManagedBotToken", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
 	{Name: "savePreparedKeyboardButton", Category: CategoryExtended},
 
+	// === Bot API 10.0 ===
+	{Name: "answerGuestQuery", Category: CategoryExtended, Notes: "needs a guest summon (guest mode)"},
+	{Name: "deleteMessageReaction", Category: CategoryMessaging},
+	{Name: "deleteAllMessageReactions", Category: CategoryMessaging},
+	{Name: "getManagedBotAccessSettings", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
+	{Name: "setManagedBotAccessSettings", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
+	{Name: "getUserPersonalChatMessages", Category: CategoryExtended, Notes: "needs a user with a personal channel"},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

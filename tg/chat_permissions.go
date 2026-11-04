@@ -18,6 +18,10 @@ type ChatPermissions struct {
 	CanPinMessages        *bool `json:"can_pin_messages,omitempty"`
 	CanManageTopics       *bool `json:"can_manage_topics,omitempty"`
 	CanEditTag            *bool `json:"can_edit_tag,omitempty"` // 9.5
+	// CanReactToMessages (Bot API 10.0): when nil it is not sent, and Telegram then uses the value of
+	// can_send_messages. The permission helpers below leave it nil, so it follows the CanSendMessages value
+	// that is finally sent; set it explicitly to make it differ.
+	CanReactToMessages *bool `json:"can_react_to_messages,omitempty"`
 }
 
 // boolPtr returns a pointer to a bool value.

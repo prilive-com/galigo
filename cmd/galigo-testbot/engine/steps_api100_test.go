@@ -224,7 +224,7 @@ func TestAPI100Steps_DeleteReactions(t *testing.T) {
 		api100Fields(t, step, res, "deleteMessageReaction")
 		assert.Empty(t, res.MessageIDs)
 		assert.Equal(t, []sender.DeleteMessageReactionRequest{
-			{ChatID: int64(testutil.TestChatID), MessageID: 4242, UserID: api100BotID}}, f.deleteReqs)
+			{ChatID: testutil.TestChatID, MessageID: 4242, UserID: api100BotID}}, f.deleteReqs)
 		assert.Equal(t, map[string]int{"deleteMessageReaction": 1}, f.calls)
 	})
 	t.Run("all", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestAPI100Steps_DeleteReactions(t *testing.T) {
 		api100Fields(t, step, res, "deleteAllMessageReactions")
 		assert.Empty(t, res.MessageIDs)
 		assert.Equal(t, []sender.DeleteAllMessageReactionsRequest{
-			{ChatID: int64(testutil.TestChatID), UserID: api100BotID}}, f.deleteAllReqs)
+			{ChatID: testutil.TestChatID, UserID: api100BotID}}, f.deleteAllReqs)
 		assert.Empty(t, f.deleteReqs)
 		assert.Equal(t, map[string]int{"deleteAllMessageReactions": 1}, f.calls)
 	})

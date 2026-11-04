@@ -272,7 +272,7 @@ func TestAPI100_GetChatAdministratorsWithBots(t *testing.T) {
 
 func TestAPI100_GetChatAdministrators_ParseErrors(t *testing.T) {
 	// API100 T-s-4: the moved parse loop keeps today's error texts; both methods give the same text
-	var want error = json.Unmarshal([]byte(`"x"`), new([]json.RawMessage))
+	want := json.Unmarshal([]byte(`"x"`), new([]json.RawMessage))
 	require.Error(t, want)
 	rows := []struct {
 		name, result, text string

@@ -3,6 +3,7 @@ package sender_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -225,6 +226,18 @@ func TestAPI100_GetManagedBotAccessSettings(t *testing.T) {
 			assert.JSONEq(t, `{"user_id":42}`, server.LastCapture().BodyString())
 		})
 	}
+	t.Run("(c) malformed result", func(t *testing.T) {
+		server := testutil.NewMockServer(t)
+		server.On("/bot"+testutil.TestToken+"/getManagedBotAccessSettings", func(w http.ResponseWriter, _ *http.Request) {
+			api96ReplyRaw(w, `{"ok":true,"result":"x"}`)
+		})
+		_, err := testutil.NewTestClient(t, server.BaseURL()).GetManagedBotAccessSettings(context.Background(), 42)
+		// a malformed result: callJSON's wrap names the method and keeps the decode error (A-C1-03)
+		require.Error(t, err)
+		assert.True(t, strings.HasPrefix(err.Error(), "galigo: getManagedBotAccessSettings: failed to parse response: "), err.Error())
+		var ute *json.UnmarshalTypeError
+		assert.True(t, errors.As(err, &ute), "error %v", err)
+	})
 }
 
 func TestAPI100_GetManagedBotAccessSettings_Validation(t *testing.T) {
@@ -236,6 +249,7 @@ func TestAPI100_GetManagedBotAccessSettings_Validation(t *testing.T) {
 		var ve *tg.ValidationError
 		require.True(t, errors.As(err, &ve), "user %d: error %v", id, err)
 		assert.Equal(t, "user_id", ve.Field)
+		assert.Equal(t, "galigo: validation: user_id - must be positive", err.Error()) // the whole text (A-C1-02)
 		assert.Equal(t, 0, server.CaptureCount())
 	}
 }
@@ -279,6 +293,7 @@ func TestAPI100_SetManagedBotAccessSettings(t *testing.T) {
 			var ve *tg.ValidationError
 			require.True(t, errors.As(err, &ve), "user %d: error %v", id, err)
 			assert.Equal(t, "user_id", ve.Field)
+			assert.Equal(t, "galigo: validation: user_id - must be positive", err.Error()) // the whole text (A-C1-02)
 			assert.Equal(t, 0, server.CaptureCount())
 		}
 	})

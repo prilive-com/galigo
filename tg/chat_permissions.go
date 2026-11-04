@@ -20,7 +20,9 @@ type ChatPermissions struct {
 	CanEditTag            *bool `json:"can_edit_tag,omitempty"` // 9.5
 	// CanReactToMessages (Bot API 10.0): when nil it is not sent, and Telegram then uses the value of
 	// can_send_messages. The permission helpers below leave it nil, so it follows the CanSendMessages value
-	// that is finally sent; set it explicitly to make it differ.
+	// that is finally sent; set it explicitly to make it differ. A value read from Telegram
+	// (ChatFullInfo.Permissions) has it set: if you change CanSendMessages on such a value before you send it
+	// back, also set or clear CanReactToMessages.
 	CanReactToMessages *bool `json:"can_react_to_messages,omitempty"`
 }
 

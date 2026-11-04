@@ -2,8 +2,10 @@ package sender_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,6 +40,18 @@ func TestAPI100_AnswerGuestQuery(t *testing.T) {
 	server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/answerGuestQuery")
 	assert.JSONEq(t, `{"guest_query_id":"gq-100","result":{"type":"article","id":"1","title":"t",`+
 		`"input_message_content":{"message_text":"x"}}}`, server.LastCapture().BodyString())
+
+	bad := testutil.NewMockServer(t)
+	bad.On("/bot"+testutil.TestToken+"/answerGuestQuery", func(w http.ResponseWriter, _ *http.Request) {
+		api96ReplyRaw(w, `{"ok":true,"result":"x"}`)
+	})
+	_, err = testutil.NewTestClient(t, bad.BaseURL()).AnswerGuestQuery(context.Background(),
+		sender.AnswerGuestQueryRequest{GuestQueryID: "gq-100", Result: api100Article()})
+	// a malformed result: callJSON's wrap names the method and keeps the decode error (A-C1-03)
+	require.Error(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), "galigo: answerGuestQuery: failed to parse response: "), err.Error())
+	var ute *json.UnmarshalTypeError
+	assert.True(t, errors.As(err, &ute), "error %v", err)
 }
 
 func TestAPI100_AnswerGuestQuery_Validation(t *testing.T) {
@@ -46,9 +60,10 @@ func TestAPI100_AnswerGuestQuery_Validation(t *testing.T) {
 		name  string
 		req   sender.AnswerGuestQueryRequest
 		field string
+		text  string
 	}{
-		{"empty id", sender.AnswerGuestQueryRequest{Result: api100Article()}, "guest_query_id"},
-		{"nil result", sender.AnswerGuestQueryRequest{GuestQueryID: "gq-100"}, "result"},
+		{"empty id", sender.AnswerGuestQueryRequest{Result: api100Article()}, "guest_query_id", "galigo: validation: guest_query_id - required"},
+		{"nil result", sender.AnswerGuestQueryRequest{GuestQueryID: "gq-100"}, "result", "galigo: validation: result - required"},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
@@ -58,6 +73,7 @@ func TestAPI100_AnswerGuestQuery_Validation(t *testing.T) {
 			var ve *tg.ValidationError
 			require.True(t, errors.As(err, &ve), "error %v", err)
 			assert.Equal(t, r.field, ve.Field)
+			assert.Equal(t, r.text, err.Error()) // the whole text (A-C1-02)
 			assert.Equal(t, 0, server.CaptureCount())
 		})
 	}

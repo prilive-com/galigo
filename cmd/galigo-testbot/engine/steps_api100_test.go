@@ -20,12 +20,14 @@ import (
 const api100BotID = int64(7001) // the bot: ≠ admin (987654321) ≠ chat (123456789) ≠ message (4242)
 
 // fake100 is a SenderClient for the 10.0 steps: it embeds the interface (calling any other method panics) and
-// overrides only the eight methods the steps use. It counts calls per method, records each request whole, and
-// returns scripted replies per method in order (an unscripted call returns the zero reply).
+// overrides only the eight methods the steps use. It counts calls per method, records each request whole (and the
+// chat id of each getChat and getChatAdministratorsWithBots call), and returns scripted replies per method in order
+// (an unscripted call returns the zero reply).
 type fake100 struct {
 	SenderClient
 
-	calls map[string]int
+	calls   map[string]int
+	chatIDs map[string][]int64 // per method: the chat id of each getChat / getChatAdministratorsWithBots call
 
 	memberUserIDs []int64
 	deleteReqs    []sender.DeleteMessageReactionRequest
@@ -50,7 +52,7 @@ type fake100Reply struct {
 }
 
 func newFake100() *fake100 {
-	return &fake100{calls: map[string]int{}, replies: map[string][]fake100Reply{}}
+	return &fake100{calls: map[string]int{}, chatIDs: map[string][]int64{}, replies: map[string][]fake100Reply{}}
 }
 
 func (f *fake100) script(method string, r ...fake100Reply) *fake100 {
@@ -76,7 +78,8 @@ func (f *fake100) total() int {
 	return n
 }
 
-func (f *fake100) GetChat(_ context.Context, _ int64) (*tg.ChatFullInfo, error) {
+func (f *fake100) GetChat(_ context.Context, chatID int64) (*tg.ChatFullInfo, error) {
+	f.chatIDs["getChat"] = append(f.chatIDs["getChat"], chatID)
 	r := f.next("getChat")
 	return r.chat, r.err
 }
@@ -92,7 +95,8 @@ func (f *fake100) GetChatMember(_ context.Context, _ int64, userID int64) (tg.Ch
 	return r.member, r.err
 }
 
-func (f *fake100) GetChatAdministratorsWithBots(_ context.Context, _ int64) ([]tg.ChatMember, error) {
+func (f *fake100) GetChatAdministratorsWithBots(_ context.Context, chatID int64) ([]tg.ChatMember, error) {
+	f.chatIDs["getChatAdministratorsWithBots"] = append(f.chatIDs["getChatAdministratorsWithBots"], chatID)
 	r := f.next("getChatAdministratorsWithBots")
 	return r.members, r.err
 }
@@ -315,6 +319,8 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 			}
 			api100Fields(t, step, res, "getChatAdministrators")
 			assert.Equal(t, map[string]int{"getChatAdministratorsWithBots": 1}, f.calls)
+			// the test chat, not the admin's id (O-C1-01)
+			assert.Equal(t, []int64{testutil.TestChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 		})
 	}
 	t.Run("not admin", func(t *testing.T) {
@@ -337,6 +343,7 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 		require.NoError(t, err)
 		api100Fields(t, step, res, "getChatAdministrators")
 		assert.Equal(t, map[string]int{"getChat": 1, "getMe": 1, "getChatMember": 1, "getChatAdministratorsWithBots": 1}, f.calls)
+		assert.Equal(t, []int64{testutil.TestChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 	})
 }
 
@@ -370,6 +377,8 @@ func TestAPI100Steps_ChatPermissionsReact(t *testing.T) {
 			}
 			api100Fields(t, step, res, "getChat")
 			assert.Equal(t, map[string]int{"getChat": 1}, fk.calls)
+			// the test chat, not the admin's id (O-C1-01)
+			assert.Equal(t, []int64{testutil.TestChatID}, fk.chatIDs["getChat"])
 		})
 	}
 }

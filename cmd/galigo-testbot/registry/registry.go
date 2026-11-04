@@ -144,6 +144,11 @@ var AllMethods = []Method{
 	{Name: "setChatMemberTag", Category: CategoryChatAdmin},
 	{Name: "sendMessageDraft", Category: CategoryMessaging},
 
+	// === Bot API 9.6 ===
+	{Name: "getManagedBotToken", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
+	{Name: "replaceManagedBotToken", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
+	{Name: "savePreparedKeyboardButton", Category: CategoryExtended},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

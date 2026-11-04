@@ -56,6 +56,7 @@ func (a *SenderAdapter) SendMessage(ctx context.Context, chatID int64, text stri
 		Text:               text,
 		ParseMode:          tg.ParseMode(options.ParseMode),
 		LinkPreviewOptions: options.LinkPreviewOptions,
+		ReplyParameters:    options.ReplyParameters,
 	}
 
 	if options.ReplyMarkup != nil {
@@ -741,6 +742,16 @@ func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draf
 	return a.client.SendMessageDraft(ctx, sender.SendMessageDraftRequest{
 		ChatID: chatID, DraftID: draftID, Text: text,
 	})
+}
+
+// SendPoll sends a poll built from a whole request (9.6).
+func (a *SenderAdapter) SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error) {
+	return a.client.SendPoll(ctx, req)
+}
+
+// SavePreparedKeyboardButton stores a keyboard button for a user (9.6).
+func (a *SenderAdapter) SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error) {
+	return a.client.SavePreparedKeyboardButton(ctx, sender.SavePreparedKeyboardButtonRequest{UserID: userID, Button: button})
 }
 
 // Ensure SenderAdapter implements SenderClient.

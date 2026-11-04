@@ -1209,3 +1209,26 @@ func TestEditMessageText_LinkPreviewOptions_MutuallyExclusiveError(t *testing.T)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mutually exclusive")
 }
+
+// T-s-9 (B-25 slice 1, Bot API 9.6): SendMessageRequest.ReplyParameters is sent as reply_parameters, with
+// poll_option_id; absent when not set.
+func TestSendMessage96_ReplyParameters(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		testutil.ReplyMessage(w, 4242)
+	})
+	client := testutil.NewTestClient(t, server.BaseURL())
+
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+		ChatID: int64(-100123), Text: "hi", ReplyParameters: &tg.ReplyParameters{MessageID: 5, PollOptionID: "1"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, server.CaptureCount())
+	assert.JSONEq(t, `{"chat_id":-100123,"text":"hi","reply_parameters":{"message_id":5,"poll_option_id":"1"}}`,
+		server.LastCapture().BodyString())
+
+	_, err = client.SendMessage(context.Background(), sender.SendMessageRequest{ChatID: int64(-100123), Text: "hi"})
+	require.NoError(t, err)
+	require.Equal(t, 2, server.CaptureCount())
+	assert.JSONEq(t, `{"chat_id":-100123,"text":"hi"}`, server.LastCapture().BodyString())
+}

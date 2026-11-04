@@ -22,6 +22,7 @@ type Update struct {
 	MyChatMember       *ChatMemberUpdated  `json:"my_chat_member,omitempty"`
 	ChatMember         *ChatMemberUpdated  `json:"chat_member,omitempty"`
 	ChatJoinRequest    *ChatJoinRequest    `json:"chat_join_request,omitempty"`
+	ManagedBot         *ManagedBotUpdated  `json:"managed_bot,omitempty"` // 9.6
 }
 
 // CallbackQuery represents an incoming callback query from an inline keyboard.
@@ -109,10 +110,11 @@ type OrderInfo struct {
 
 // PollAnswer represents an answer of a user in a non-anonymous poll.
 type PollAnswer struct {
-	PollID    string `json:"poll_id"`
-	VoterChat *Chat  `json:"voter_chat,omitempty"`
-	User      *User  `json:"user,omitempty"`
-	OptionIDs []int  `json:"option_ids"`
+	PollID              string   `json:"poll_id"`
+	VoterChat           *Chat    `json:"voter_chat,omitempty"`
+	User                *User    `json:"user,omitempty"`
+	OptionIDs           []int    `json:"option_ids"`
+	OptionPersistentIDs []string `json:"option_persistent_ids"` // 9.6
 }
 
 // ChatMemberUpdated represents changes in the status of a chat member.

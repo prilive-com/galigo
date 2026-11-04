@@ -61,9 +61,13 @@ type Message struct {
 	GroupChatCreated      bool                  `json:"group_chat_created,omitempty"`
 	SupergroupChatCreated bool                  `json:"supergroup_chat_created,omitempty"`
 	ChannelChatCreated    bool                  `json:"channel_chat_created,omitempty"`
-	ChatOwnerLeft         *ChatOwnerLeft        `json:"chat_owner_left,omitempty"`    // 9.4
-	ChatOwnerChanged      *ChatOwnerChanged     `json:"chat_owner_changed,omitempty"` // 9.4
-	SenderTag             string                `json:"sender_tag,omitempty"`         // 9.5
+	ChatOwnerLeft         *ChatOwnerLeft        `json:"chat_owner_left,omitempty"`         // 9.4
+	ChatOwnerChanged      *ChatOwnerChanged     `json:"chat_owner_changed,omitempty"`      // 9.4
+	SenderTag             string                `json:"sender_tag,omitempty"`              // 9.5
+	ManagedBotCreated     *ManagedBotCreated    `json:"managed_bot_created,omitempty"`     // 9.6
+	PollOptionAdded       *PollOptionAdded      `json:"poll_option_added,omitempty"`       // 9.6
+	PollOptionDeleted     *PollOptionDeleted    `json:"poll_option_deleted,omitempty"`     // 9.6
+	ReplyToPollOptionID   string                `json:"reply_to_poll_option_id,omitempty"` // 9.6: persistent id of the option replied to
 	ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
@@ -95,6 +99,7 @@ type User struct {
 	CanReadAllGroupMessages   bool   `json:"can_read_all_group_messages,omitempty"`
 	SupportsInlineQueries     bool   `json:"supports_inline_queries,omitempty"`
 	AllowsUsersToCreateTopics bool   `json:"allows_users_to_create_topics,omitempty"` // 9.4
+	CanManageBots             bool   `json:"can_manage_bots,omitempty"`               // 9.6: getMe only
 }
 
 // Chat represents a Telegram chat.
@@ -242,25 +247,53 @@ type Venue struct {
 
 // Poll represents a poll.
 type Poll struct {
-	ID                    string          `json:"id"`
-	Question              string          `json:"question"`
-	Options               []PollOption    `json:"options"`
-	TotalVoterCount       int             `json:"total_voter_count"`
-	IsClosed              bool            `json:"is_closed"`
-	IsAnonymous           bool            `json:"is_anonymous"`
-	Type                  string          `json:"type"`
-	AllowsMultipleAnswers bool            `json:"allows_multiple_answers"`
-	CorrectOptionID       int             `json:"correct_option_id,omitempty"`
-	Explanation           string          `json:"explanation,omitempty"`
-	ExplanationEntities   []MessageEntity `json:"explanation_entities,omitempty"`
-	OpenPeriod            int             `json:"open_period,omitempty"`
-	CloseDate             int64           `json:"close_date,omitempty"`
+	ID                    string       `json:"id"`
+	Question              string       `json:"question"`
+	Options               []PollOption `json:"options"`
+	TotalVoterCount       int          `json:"total_voter_count"`
+	IsClosed              bool         `json:"is_closed"`
+	IsAnonymous           bool         `json:"is_anonymous"`
+	Type                  string       `json:"type"`
+	AllowsMultipleAnswers bool         `json:"allows_multiple_answers"`
+	// Deprecated: Use CorrectOptionIDs (Bot API 9.6). Telegram leaves correct_option_id out for a quiz with
+	// several correct answers, and then this field is 0, which reads like "option 0".
+	CorrectOptionID     int             `json:"correct_option_id,omitempty"`
+	Explanation         string          `json:"explanation,omitempty"`
+	ExplanationEntities []MessageEntity `json:"explanation_entities,omitempty"`
+	OpenPeriod          int             `json:"open_period,omitempty"`
+	CloseDate           int64           `json:"close_date,omitempty"`
+	CorrectOptionIDs    []int           `json:"correct_option_ids,omitempty"`   // 9.6: quiz only, when known to the bot
+	AllowsRevoting      bool            `json:"allows_revoting"`                // 9.6
+	Description         string          `json:"description,omitempty"`          // 9.6
+	DescriptionEntities []MessageEntity `json:"description_entities,omitempty"` // 9.6
 }
 
 // PollOption contains information about one answer option in a poll.
 type PollOption struct {
-	Text       string `json:"text"`
-	VoterCount int    `json:"voter_count"`
+	Text         string `json:"text"`
+	VoterCount   int    `json:"voter_count"`
+	PersistentID string `json:"persistent_id"`           // 9.6: stays the same when options are added or deleted
+	AddedByUser  *User  `json:"added_by_user,omitempty"` // 9.6
+	AddedByChat  *Chat  `json:"added_by_chat,omitempty"` // 9.6
+	AdditionDate int64  `json:"addition_date,omitempty"` // 9.6
+}
+
+// PollOptionAdded is a service message: an option was added to a poll. Added in Bot API 9.6.
+// PollMessage is a MaybeInaccessibleMessage in the API: an inaccessible message has Date 0.
+type PollOptionAdded struct {
+	PollMessage        *Message        `json:"poll_message,omitempty"`
+	OptionPersistentID string          `json:"option_persistent_id"`
+	OptionText         string          `json:"option_text"`
+	OptionTextEntities []MessageEntity `json:"option_text_entities,omitempty"`
+}
+
+// PollOptionDeleted is a service message: an option was deleted from a poll. Added in Bot API 9.6.
+// PollMessage is a MaybeInaccessibleMessage in the API: an inaccessible message has Date 0.
+type PollOptionDeleted struct {
+	PollMessage        *Message        `json:"poll_message,omitempty"`
+	OptionPersistentID string          `json:"option_persistent_id"`
+	OptionText         string          `json:"option_text"`
+	OptionTextEntities []MessageEntity `json:"option_text_entities,omitempty"`
 }
 
 // MessageID represents a message identifier (returned by copyMessage).
@@ -365,6 +398,7 @@ type ReplyParameters struct {
 	QuoteParseMode           string          `json:"quote_parse_mode,omitempty"`
 	QuoteEntities            []MessageEntity `json:"quote_entities,omitempty"`
 	QuotePosition            int             `json:"quote_position,omitempty"`
+	PollOptionID             string          `json:"poll_option_id,omitempty"` // 9.6: persistent id of a poll option to reply to
 }
 
 // LinkPreviewOptions describes options for link preview generation.

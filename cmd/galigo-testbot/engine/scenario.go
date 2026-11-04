@@ -335,6 +335,10 @@ type SenderClient interface {
 
 	// Message streaming (9.3+9.5)
 	SendMessageDraft(ctx context.Context, chatID int64, draftID int, text string) error
+
+	// Polls and prepared keyboard buttons (9.6)
+	SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error)
+	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
 }
 
 // WebhookInfo contains information about the current webhook configuration.
@@ -363,6 +367,7 @@ type SendOptions struct {
 	ParseMode          string
 	Caption            string                 // For media methods (sendPhoto, sendDocument, etc.)
 	LinkPreviewOptions *tg.LinkPreviewOptions // For sendMessage
+	ReplyParameters    *tg.ReplyParameters    // For sendMessage (9.6)
 }
 
 // WithReplyMarkup sets the reply markup.
@@ -390,6 +395,13 @@ func WithCaption(caption string) SendOption {
 func WithLinkPreviewOptions(opts *tg.LinkPreviewOptions) SendOption {
 	return func(o *SendOptions) {
 		o.LinkPreviewOptions = opts
+	}
+}
+
+// WithReplyParameters sets reply parameters for sendMessage (9.6).
+func WithReplyParameters(rp *tg.ReplyParameters) SendOption {
+	return func(o *SendOptions) {
+		o.ReplyParameters = rp
 	}
 }
 

@@ -16,16 +16,28 @@ type SendPollRequest struct {
 	IsAnonymous           *bool             `json:"is_anonymous,omitempty"`
 	Type                  string            `json:"type,omitempty"` // "regular" or "quiz"
 	AllowsMultipleAnswers bool              `json:"allows_multiple_answers,omitempty"`
-	CorrectOptionID       *int              `json:"correct_option_id,omitempty"` // For quiz
-	Explanation           string            `json:"explanation,omitempty"`
-	ExplanationParseMode  tg.ParseMode      `json:"explanation_parse_mode,omitempty"`
-	OpenPeriod            int               `json:"open_period,omitempty"` // 5-600 seconds
-	CloseDate             int64             `json:"close_date,omitempty"`
-	IsClosed              bool              `json:"is_closed,omitempty"`
-	DisableNotification   bool              `json:"disable_notification,omitempty"`
-	ProtectContent        bool              `json:"protect_content,omitempty"`
-	ReplyToMessageID      int               `json:"reply_to_message_id,omitempty"`
-	ReplyMarkup           any               `json:"reply_markup,omitempty"`
+	// Deprecated: Use CorrectOptionIDs (Bot API 9.6). Set only one of the two. Telegram still accepted
+	// correct_option_id on 2026-11-04, but the API no longer lists it.
+	CorrectOptionID      *int         `json:"correct_option_id,omitempty"`
+	Explanation          string       `json:"explanation,omitempty"`
+	ExplanationParseMode tg.ParseMode `json:"explanation_parse_mode,omitempty"`
+	OpenPeriod           int          `json:"open_period,omitempty"` // 5-2628000 seconds
+	CloseDate            int64        `json:"close_date,omitempty"`
+	IsClosed             bool         `json:"is_closed,omitempty"`
+	DisableNotification  bool         `json:"disable_notification,omitempty"`
+	ProtectContent       bool         `json:"protect_content,omitempty"`
+	ReplyToMessageID     int          `json:"reply_to_message_id,omitempty"`
+	ReplyMarkup          any          `json:"reply_markup,omitempty"`
+	// CorrectOptionIDs are the 0-based indexes of the correct answers of a quiz, in increasing order (9.6).
+	CorrectOptionIDs []int `json:"correct_option_ids,omitempty"`
+	// AllowsRevoting is a pointer because Telegram's default is true for regular polls: set false to send false (9.6).
+	AllowsRevoting         *bool              `json:"allows_revoting,omitempty"`
+	ShuffleOptions         bool               `json:"shuffle_options,omitempty"`           // 9.6
+	AllowAddingOptions     bool               `json:"allow_adding_options,omitempty"`      // 9.6
+	HideResultsUntilCloses bool               `json:"hide_results_until_closes,omitempty"` // 9.6
+	Description            string             `json:"description,omitempty"`               // 9.6
+	DescriptionParseMode   tg.ParseMode       `json:"description_parse_mode,omitempty"`    // 9.6
+	DescriptionEntities    []tg.MessageEntity `json:"description_entities,omitempty"`      // 9.6
 }
 
 // InputPollOption represents a poll option.
@@ -81,6 +93,11 @@ func (c *Client) SendPollSimple(ctx context.Context, chatID tg.ChatID, question 
 }
 
 // SendQuiz sends a quiz poll with a correct answer.
+//
+// Since Bot API 9.6 it sends correct_option_ids ([correctOptionIndex]) and never the deprecated
+// correct_option_id, so it needs a Bot API server at 9.6 or newer. Options run first: one that changes
+// CorrectOptionID changes the index that is sent, and one that sets CorrectOptionIDs replaces the index
+// (include it yourself, in increasing order).
 func (c *Client) SendQuiz(ctx context.Context, chatID tg.ChatID, question string, options []string, correctOptionIndex int, opts ...PollOption) (*tg.Message, error) {
 	if err := validateChatID(chatID); err != nil {
 		return nil, err
@@ -104,6 +121,12 @@ func (c *Client) SendQuiz(ctx context.Context, chatID tg.ChatID, question string
 	for _, opt := range opts {
 		opt(&req)
 	}
+	// Bot API 9.6: send the index as correct_option_ids. Options may have read or changed CorrectOptionID, or set
+	// CorrectOptionIDs; a CorrectOptionID set to nil sends neither key, as before.
+	if len(req.CorrectOptionIDs) == 0 && req.CorrectOptionID != nil {
+		req.CorrectOptionIDs = []int{*req.CorrectOptionID}
+	}
+	req.CorrectOptionID = nil
 
 	var msg tg.Message
 	if err := c.callJSON(ctx, "sendPoll", req, &msg, extractChatID(chatID)); err != nil {
@@ -148,7 +171,7 @@ func WithPollAnonymous(anonymous bool) PollOption {
 	}
 }
 
-// WithMultipleAnswers allows multiple answers in regular polls.
+// WithMultipleAnswers allows multiple answers in polls and quizzes (quizzes since Bot API 9.6).
 func WithMultipleAnswers() PollOption {
 	return func(r *SendPollRequest) {
 		r.AllowsMultipleAnswers = true
@@ -163,7 +186,7 @@ func WithQuizExplanation(explanation string, parseMode tg.ParseMode) PollOption 
 	}
 }
 
-// WithPollOpenPeriod sets how long the poll is active (5-600 seconds).
+// WithPollOpenPeriod sets how long the poll is active (5-2628000 seconds since Bot API 9.6).
 func WithPollOpenPeriod(seconds int) PollOption {
 	return func(r *SendPollRequest) {
 		r.OpenPeriod = seconds

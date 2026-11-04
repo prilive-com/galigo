@@ -253,15 +253,28 @@ func Grid[T any](items []T, columns int, btnFunc func(T) InlineKeyboardButton) *
 
 // KeyboardButton represents one button of a reply keyboard.
 type KeyboardButton struct {
-	Text              string                      `json:"text"`
-	IconCustomEmojiID string                      `json:"icon_custom_emoji_id,omitempty"` // 9.4
-	Style             string                      `json:"style,omitempty"`                // 9.4
-	RequestUsers      *KeyboardButtonRequestUsers `json:"request_users,omitempty"`
-	RequestChat       *KeyboardButtonRequestChat  `json:"request_chat,omitempty"`
-	RequestContact    bool                        `json:"request_contact,omitempty"`
-	RequestLocation   bool                        `json:"request_location,omitempty"`
-	RequestPoll       *KeyboardButtonPollType     `json:"request_poll,omitempty"`
-	WebApp            *WebAppInfo                 `json:"web_app,omitempty"`
+	Text              string                           `json:"text"`
+	IconCustomEmojiID string                           `json:"icon_custom_emoji_id,omitempty"` // 9.4
+	Style             string                           `json:"style,omitempty"`                // 9.4
+	RequestUsers      *KeyboardButtonRequestUsers      `json:"request_users,omitempty"`
+	RequestChat       *KeyboardButtonRequestChat       `json:"request_chat,omitempty"`
+	RequestContact    bool                             `json:"request_contact,omitempty"`
+	RequestLocation   bool                             `json:"request_location,omitempty"`
+	RequestPoll       *KeyboardButtonPollType          `json:"request_poll,omitempty"`
+	WebApp            *WebAppInfo                      `json:"web_app,omitempty"`
+	RequestManagedBot *KeyboardButtonRequestManagedBot `json:"request_managed_bot,omitempty"` // 9.6
+}
+
+// KeyboardButtonRequestManagedBot defines the parameters of a request to create a managed bot. Added in Bot API 9.6.
+type KeyboardButtonRequestManagedBot struct {
+	RequestID         int    `json:"request_id"`
+	SuggestedName     string `json:"suggested_name,omitempty"`
+	SuggestedUsername string `json:"suggested_username,omitempty"`
+}
+
+// PreparedKeyboardButton is a keyboard button stored by savePreparedKeyboardButton. Added in Bot API 9.6.
+type PreparedKeyboardButton struct {
+	ID string `json:"id"`
 }
 
 // KeyboardButtonRequestUsers defines criteria for requesting users.

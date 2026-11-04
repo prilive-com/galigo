@@ -14,6 +14,8 @@ type SendMessageRequest struct {
 	ProtectContent      bool                   `json:"protect_content,omitempty"`
 	ReplyToMessageID    int                    `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any                    `json:"reply_markup,omitempty"`
+	// ReplyParameters describes the message to reply to, also a poll option (9.6). Set it or ReplyToMessageID, not both.
+	ReplyParameters *tg.ReplyParameters `json:"reply_parameters,omitempty"`
 
 	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.
 	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`

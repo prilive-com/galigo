@@ -106,6 +106,10 @@ func (f *fake96) SavePreparedKeyboardButton(_ context.Context, userID int64, but
 
 const api96MsgID = 4242
 
+// api96ReplyID is the id of a reply that a step sends; it differs from the source poll's id (api96MsgID), so a
+// result that reports the source id instead of the sent id fails (O-C1-01).
+const api96ReplyID = 4243
+
 func api96Runtime(f *fake96) *Runtime {
 	return NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 }
@@ -227,7 +231,7 @@ func TestAPI96Steps_Pass(t *testing.T) {
 		assert.Equal(t, 1, f.calls, "T-tb-4 (c) one call")
 	})
 	t.Run("T-tb-4 (a) ReplyToPollOptionStep", func(t *testing.T) {
-		reply := &tg.Message{MessageID: api96MsgID, Chat: &tg.Chat{ID: testutil.TestChatID}, ReplyToPollOptionID: "pb"}
+		reply := &tg.Message{MessageID: api96ReplyID, Chat: &tg.Chat{ID: testutil.TestChatID}, ReplyToPollOptionID: "pb"}
 		f := &fake96{replies: []fake96Reply{{msg: reply}}}
 		rt := api96Runtime(f)
 		rt.LastMessage = api96PollMsg(api96S48Poll())
@@ -238,8 +242,9 @@ func TestAPI96Steps_Pass(t *testing.T) {
 		assert.Equal(t, testutil.TestChatID, f.messages[0].chatID)
 		assert.Equal(t, &tg.ReplyParameters{MessageID: api96MsgID, PollOptionID: "pb"}, f.messages[0].opts.ReplyParameters,
 			"T-tb-4 (e) replies to LastMessage's option 1 by its persistent id")
-		assert.Equal(t, &StepResult{StepName: step.Name(), Method: "sendMessage", MessageIDs: []int{api96MsgID}}, api96NoEvidence(res))
-		assert.Equal(t, api96Tracked(), rt.CreatedMessages)
+		assert.Equal(t, &StepResult{StepName: step.Name(), Method: "sendMessage", MessageIDs: []int{api96ReplyID}}, api96NoEvidence(res),
+			"the sent reply's id, not the source poll's")
+		assert.Equal(t, []CreatedMessage{{ChatID: testutil.TestChatID, MessageID: api96ReplyID}}, rt.CreatedMessages)
 		assert.Equal(t, reply, rt.LastMessage)
 		assert.Equal(t, 1, f.calls, "T-tb-4 (c) one call")
 	})
@@ -306,7 +311,7 @@ func TestAPI96Steps_Checks(t *testing.T) {
 		{"quiz ids []", &SendQuizIDsStep{Index: 1}, nil, fake96Reply{msg: quiz()}, errPoll96CorrectIDs, true},
 		// another non-empty option id, so a non-empty-only check fails
 		{"reply option pc", &ReplyToPollOptionStep{}, api96PollMsg(api96S48Poll()),
-			fake96Reply{msg: &tg.Message{MessageID: api96MsgID, Chat: &tg.Chat{ID: testutil.TestChatID}, ReplyToPollOptionID: "pc"}},
+			fake96Reply{msg: &tg.Message{MessageID: api96ReplyID, Chat: &tg.Chat{ID: testutil.TestChatID}, ReplyToPollOptionID: "pc"}},
 			errPoll96ReplyOption, true},
 	}
 	for _, r := range rows {
@@ -317,9 +322,10 @@ func TestAPI96Steps_Checks(t *testing.T) {
 			res, err := api96Exec(t, r.step, rt)
 			require.ErrorIs(t, err, r.want)
 			if r.send {
+				sent := r.rep.msg.MessageID // the id of the message this step sent (the reply's id for the reply step)
 				require.NotNil(t, res, "the result keeps the sent id")
-				assert.Equal(t, []int{api96MsgID}, res.MessageIDs)
-				assert.Equal(t, api96Tracked(), rt.CreatedMessages)
+				assert.Equal(t, []int{sent}, res.MessageIDs)
+				assert.Equal(t, []CreatedMessage{{ChatID: testutil.TestChatID, MessageID: sent}}, rt.CreatedMessages)
 			}
 		})
 	}

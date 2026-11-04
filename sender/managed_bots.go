@@ -21,8 +21,9 @@ type managedBotUserRequest struct {
 
 // GetManagedBotToken returns the token of a bot that this bot manages (Bot API 9.6). userID is the managed bot's id.
 //
-// The token is a tg.SecretToken, so fmt and slog print it redacted. Call Value() to use or store it: JSON and
-// text marshalling also write [REDACTED].
+// The token is a tg.SecretToken. The fmt verbs %v, %+v, %#v and %s, slog, and JSON and text marshalling write
+// [REDACTED] in its place. fmt prints the real value for a verb that does not fit a string (such as %d) and for
+// an unexported struct field that holds it. Call Value() to use or store the token.
 func (c *Client) GetManagedBotToken(ctx context.Context, userID int64) (tg.SecretToken, error) {
 	return c.managedBotToken(ctx, "getManagedBotToken", userID)
 }
@@ -30,8 +31,8 @@ func (c *Client) GetManagedBotToken(ctx context.Context, userID int64) (tg.Secre
 // ReplaceManagedBotToken revokes the current token of a managed bot and returns the new one (Bot API 9.6).
 //
 // It is not retried: a repeat after a lost reply would revoke the token the first call returned. If the outcome is
-// unknown (timeout, cancel), call GetManagedBotToken to read the current token. Call Value() to use or store the
-// token: fmt, slog, JSON and text marshalling print it redacted.
+// unknown (timeout, cancel), call GetManagedBotToken to read the current token. The returned token is redacted in
+// output as GetManagedBotToken describes; call Value() to use or store it.
 func (c *Client) ReplaceManagedBotToken(ctx context.Context, userID int64) (tg.SecretToken, error) {
 	return c.managedBotToken(ctx, "replaceManagedBotToken", userID)
 }

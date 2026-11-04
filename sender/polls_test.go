@@ -181,6 +181,7 @@ func api96PollServer(t *testing.T) *testutil.MockTelegramServer {
 func TestSendPoll96_Body(t *testing.T) {
 	t.Run("T-s-1 all new fields", testSendPoll96AllNewFields)
 	t.Run("T-s-2 no new fields", testSendPoll96NoNewFields)
+	t.Run("T-s-11 legacy correct_option_id", testSendPoll96LegacyCorrectOptionID)
 }
 
 // T-s-1: SendPoll with every 9.6 field sends the exact body.
@@ -223,6 +224,22 @@ func testSendPoll96NoNewFields(t *testing.T) {
 	require.Equal(t, 1, server.CaptureCount())
 	assert.JSONEq(t, `{"chat_id":-100123,"question":"Q?","options":[{"text":"A"},{"text":"B"}]}`,
 		server.LastCapture().BodyString())
+}
+
+// T-s-11: SendPoll still sends the deprecated correct_option_id when only it is set (pre-9.6 code, plan AC4),
+// and does not add correct_option_ids.
+func testSendPoll96LegacyCorrectOptionID(t *testing.T) {
+	server := api96PollServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+	one := 1
+	_, err := client.SendPoll(context.Background(), sender.SendPollRequest{
+		ChatID: int64(-100123), Question: "Q?", Options: []sender.InputPollOption{{Text: "A"}, {Text: "B"}, {Text: "C"}},
+		Type: "quiz", CorrectOptionID: &one,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, server.CaptureCount())
+	assert.JSONEq(t, `{"chat_id":-100123,"question":"Q?","options":[{"text":"A"},{"text":"B"},{"text":"C"}],`+
+		`"type":"quiz","correct_option_id":1}`, server.LastCapture().BodyString())
 }
 
 // T-s-3: SendQuiz sends correct_option_ids (never correct_option_id), and option callbacks that read or change

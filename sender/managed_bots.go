@@ -23,7 +23,8 @@ type managedBotUserRequest struct {
 //
 // The token is a tg.SecretToken. The fmt verbs %v, %+v, %#v and %s, slog, and JSON and text marshalling write
 // [REDACTED] in its place. fmt prints the real value for a verb that does not fit a string (such as %d) and for
-// an unexported struct field that holds it. Call Value() to use or store the token.
+// an unexported struct field that holds it; slog's text handler prints such a field the same way. Call Value()
+// to use or store the token.
 func (c *Client) GetManagedBotToken(ctx context.Context, userID int64) (tg.SecretToken, error) {
 	return c.managedBotToken(ctx, "getManagedBotToken", userID)
 }

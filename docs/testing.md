@@ -478,25 +478,27 @@ go test -coverpkg=./... -coverprofile=coverage.out ./...
 
 ## CI Integration
 
-Tests run automatically on push/PR via GitHub Actions:
+GitHub Actions runs `.github/workflows/ci.yml` on every push to `main` or `develop` and on every pull request to `main`. Its test jobs:
 
-```yaml
-# .github/workflows/test.yml
-- go test -v -race ./...           # Race detector
-- go test -coverpkg=./... ...      # Coverage
-- govulncheck ./...                # Vulnerability scan
-```
+- `test`: `go test ./... -race -shuffle=on -count=1 -timeout=10m` on Linux. macOS and Windows run the same command without `-race`.
+- `test-minimum`: build, vet and test with the minimum Go version (1.25.14, `GOTOOLCHAIN=local`).
+- `coverage`: the coverage gate below.
+
+`govulncheck ./...` runs in `.github/workflows/security.yml` (push and pull request to `main`, and weekly), not in `ci.yml`.
 
 ### Coverage Gate
 
-CI fails if coverage drops below 80%:
+CI fails if total coverage is below 45%. The number is `COVERAGE_THRESHOLD` in `.github/workflows/ci.yml`. The `coverage` job runs these commands (here with the 45 written in):
 
 ```bash
+go test -coverprofile=coverage.out -covermode=atomic -shuffle=on -count=1 -timeout=10m ./...
 COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
-if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+if awk "BEGIN {exit !($COVERAGE < 45)}"; then
     exit 1
 fi
 ```
+
+`make check-coverage` is a stricter local check: it fails below 80% (`COVERAGE_THRESHOLD` in the `Makefile`). It reads the profile that `make test-coverage` writes with `-coverpkg=./...`, so its figure is not the same as the CI figure.
 
 ## Error Semantics
 

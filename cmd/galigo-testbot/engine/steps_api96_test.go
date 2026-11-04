@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -335,7 +334,7 @@ func TestAPI96Steps_429Repeat(t *testing.T) {
 	}}
 	rt := api96Runtime(f)
 	runner := NewRunner(rt, RunnerConfig{RetryOn429: true, Max429Retries: 1, MaxMessages: 10},
-		slog.New(slog.NewTextHandler(io.Discard, nil)))
+		slog.New(slog.DiscardHandler))
 	res := runner.Run(context.Background(), &BaseScenario{
 		ScenarioName: "T-tb-4 (d)", ScenarioSteps: []Step{&SendPoll96Step{Req: api96S48Req()}}, ScenarioTimeout: 10 * time.Second,
 	})

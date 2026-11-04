@@ -179,6 +179,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Check Telegram API method coverage
+        shell: bash
         run: |
           go run ./cmd/galigo-testbot --status | tee method-coverage.txt
           

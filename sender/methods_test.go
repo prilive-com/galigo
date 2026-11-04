@@ -957,17 +957,19 @@ func TestAPI100_GetUserPersonalChatMessages(t *testing.T) {
 		assert.Equal(t, 0, server.CaptureCount())
 	}
 
-	bad := testutil.NewMockServer(t)
-	bad.On("/bot"+testutil.TestToken+"/getUserPersonalChatMessages", func(w http.ResponseWriter, _ *http.Request) {
-		api96ReplyRaw(w, `{"ok":true,"result":"x"}`)
+	t.Run("malformed result", func(t *testing.T) {
+		bad := testutil.NewMockServer(t)
+		bad.On("/bot"+testutil.TestToken+"/getUserPersonalChatMessages", func(w http.ResponseWriter, _ *http.Request) {
+			api96ReplyRaw(w, `{"ok":true,"result":"x"}`)
+		})
+		_, err := testutil.NewTestClient(t, bad.BaseURL()).GetUserPersonalChatMessages(context.Background(),
+			sender.GetUserPersonalChatMessagesRequest{UserID: 42, Limit: 5})
+		// a malformed result: callJSON's wrap names the method and keeps the decode error (A-C1-03)
+		require.Error(t, err)
+		assert.True(t, strings.HasPrefix(err.Error(), "galigo: getUserPersonalChatMessages: failed to parse response: "), err.Error())
+		var ute *json.UnmarshalTypeError
+		assert.True(t, errors.As(err, &ute), "error %v", err)
 	})
-	_, err = testutil.NewTestClient(t, bad.BaseURL()).GetUserPersonalChatMessages(context.Background(),
-		sender.GetUserPersonalChatMessagesRequest{UserID: 42, Limit: 5})
-	// a malformed result: callJSON's wrap names the method and keeps the decode error (A-C1-03)
-	require.Error(t, err)
-	assert.True(t, strings.HasPrefix(err.Error(), "galigo: getUserPersonalChatMessages: failed to parse response: "), err.Error())
-	var ute *json.UnmarshalTypeError
-	assert.True(t, errors.As(err, &ute), "error %v", err)
 }
 
 // ================== Location/Contact Methods ==================

@@ -128,6 +128,17 @@ var api100Writes = []string{"deleteMessageReaction", "deleteAllMessageReactions"
 // wrong chat (a stale LastMessage, a fixed id) fails them (X-C2-01).
 const api100OtherChatID int64 = -1001000000100
 
+// api100StaleRuntime is a runtime whose other chat sources (LastMessage, ForumChatID, ChatCtx.ChatID,
+// TestUserID) all differ from rt.ChatID, so a step that falls back to any of them fails (X-C3-01).
+func api100StaleRuntime(f *fake100) *Runtime {
+	rt := api100Runtime(f)
+	rt.ChatID = api100OtherChatID
+	rt.ForumChatID = -1001000000200
+	rt.TestUserID = 1000000300
+	rt.ChatCtx = &ChatContext{ChatID: testutil.TestChatID, BotIsAdmin: true}
+	return rt
+}
+
 func api100Runtime(f *fake100) *Runtime {
 	rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 	rt.LastMessage = &tg.Message{MessageID: 4242, Chat: &tg.Chat{ID: testutil.TestChatID},
@@ -364,6 +375,15 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 		assert.Equal(t, map[string]int{"getChatAdministratorsWithBots": 1}, f.calls)
 		assert.Equal(t, []int64{api100OtherChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 	})
+	t.Run("stale runtime", func(t *testing.T) {
+		// API100 T-tb-4 (d): rt.ChatID, not another chat the runtime holds (X-C3-01)
+		f := newFake100().script("getChatAdministratorsWithBots", fake100Reply{members: []tg.ChatMember{api100Admin(api100BotID, true, false)}})
+		res, err := step.Execute(context.Background(), api100StaleRuntime(f))
+		require.NoError(t, err)
+		api100Fields(t, step, res, "getChatAdministrators")
+		assert.Equal(t, map[string]int{"getChatAdministratorsWithBots": 1}, f.calls)
+		assert.Equal(t, []int64{api100OtherChatID}, f.chatIDs["getChatAdministratorsWithBots"])
+	})
 }
 
 // T-tb-4 (e): getChat must carry permissions with can_react_to_messages set (true or false).
@@ -409,6 +429,15 @@ func TestAPI100Steps_ChatPermissionsReact(t *testing.T) {
 			err error
 		)
 		require.NotPanics(t, func() { res, err = step.Execute(context.Background(), rt) })
+		require.NoError(t, err)
+		api100Fields(t, step, res, "getChat")
+		assert.Equal(t, map[string]int{"getChat": 1}, fk.calls)
+		assert.Equal(t, []int64{api100OtherChatID}, fk.chatIDs["getChat"])
+	})
+	t.Run("stale runtime", func(t *testing.T) {
+		// API100 T-tb-4 (e): rt.ChatID, not another chat the runtime holds (X-C3-01)
+		fk := newFake100().script("getChat", fake100Reply{chat: &tg.ChatFullInfo{ID: api100OtherChatID, Type: "supergroup", Permissions: &tg.ChatPermissions{CanReactToMessages: &tr}}})
+		res, err := step.Execute(context.Background(), api100StaleRuntime(fk))
 		require.NoError(t, err)
 		api100Fields(t, step, res, "getChat")
 		assert.Equal(t, map[string]int{"getChat": 1}, fk.calls)

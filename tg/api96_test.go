@@ -307,8 +307,10 @@ func api96Strict(t *testing.T, b []byte, v any) error {
 // T-tg-12: every 9.6 object decodes strictly (DisallowUnknownFields) into its galigo type, so a tag typo fails
 // even when the value is zero.
 func TestAPI96_StrictDecode(t *testing.T) {
-	getMeUnmodelled := []string{"supports_guest_queries", "can_connect_to_business", "has_main_web_app",
-		"has_topics_enabled", "supports_join_request_queries"}
+	// API100 T-tg-12: supports_guest_queries is modelled since 10.0 (tg.User.SupportsGuestQueries), so it is no
+	// longer deleted before the strict decode.
+	getMeUnmodelled := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled",
+		"supports_join_request_queries"}
 	rows := []struct {
 		name string
 		b    []byte

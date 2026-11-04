@@ -97,8 +97,9 @@ type ChatMemberRestricted struct {
 	CanPinMessages        bool   `json:"can_pin_messages"`
 	CanManageTopics       bool   `json:"can_manage_topics"`
 	UntilDate             int64  `json:"until_date"`
-	Tag                   string `json:"tag,omitempty"` // 9.5
-	CanEditTag            bool   `json:"can_edit_tag"`  // 9.5 — plain bool, NO omitempty (restriction pattern)
+	Tag                   string `json:"tag,omitempty"`         // 9.5
+	CanEditTag            bool   `json:"can_edit_tag"`          // 9.5 — plain bool, NO omitempty (restriction pattern)
+	CanReactToMessages    bool   `json:"can_react_to_messages"` // 10.0 — plain bool, NO omitempty (restriction pattern)
 }
 
 func (ChatMemberRestricted) chatMember()    {}

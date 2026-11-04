@@ -275,6 +275,14 @@ type GetUserProfileAudiosRequest struct {
 	Limit  int   `json:"limit,omitempty"` // 1-100, default 100
 }
 
+// GetUserPersonalChatMessagesRequest represents a getUserPersonalChatMessages request (Bot API 10.0).
+type GetUserPersonalChatMessagesRequest struct {
+	UserID int64 `json:"user_id"`
+	// Limit is the number of messages to return. The spec range is 1-20; the client does not check it and sends
+	// the value as given.
+	Limit int `json:"limit"`
+}
+
 // ================== Location/Contact Methods ==================
 
 // SendLocationRequest represents a request to send a location.
@@ -365,6 +373,23 @@ type SetMessageReactionRequest struct {
 	MessageID int               `json:"message_id"`
 	Reaction  []tg.ReactionType `json:"reaction,omitempty"`
 	IsBig     bool              `json:"is_big,omitempty"`
+}
+
+// DeleteMessageReactionRequest represents a deleteMessageReaction request (Bot API 10.0). Set UserID, ActorChatID
+// or both.
+type DeleteMessageReactionRequest struct {
+	ChatID      tg.ChatID `json:"chat_id"`
+	MessageID   int       `json:"message_id"`
+	UserID      int64     `json:"user_id,omitempty"`       // the user whose reaction is removed
+	ActorChatID int64     `json:"actor_chat_id,omitempty"` // the chat whose reaction is removed
+}
+
+// DeleteAllMessageReactionsRequest represents a deleteAllMessageReactions request (Bot API 10.0). Set UserID,
+// ActorChatID or both.
+type DeleteAllMessageReactionsRequest struct {
+	ChatID      tg.ChatID `json:"chat_id"`
+	UserID      int64     `json:"user_id,omitempty"`       // the user whose reactions are removed
+	ActorChatID int64     `json:"actor_chat_id,omitempty"` // the chat whose reactions are removed
 }
 
 // ReactionType is an alias for tg.ReactionType for backward compatibility.

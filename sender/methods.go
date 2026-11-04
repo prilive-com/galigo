@@ -174,6 +174,19 @@ func (c *Client) GetUserProfileAudios(ctx context.Context, userID int64, opts ..
 	return &audios, nil
 }
 
+// GetUserPersonalChatMessages returns the last messages of a user's personal chat (Bot API 10.0). It is not
+// retried.
+func (c *Client) GetUserPersonalChatMessages(ctx context.Context, req GetUserPersonalChatMessagesRequest) ([]*tg.Message, error) {
+	if req.UserID <= 0 {
+		return nil, tg.NewValidationError("user_id", "must be positive")
+	}
+	var result []*tg.Message
+	if err := c.callJSON(ctx, "getUserPersonalChatMessages", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ================== Location/Contact Methods ==================
 
 // SendLocation sends a location.
@@ -266,6 +279,47 @@ func (c *Client) DeleteMessages(ctx context.Context, chatID tg.ChatID, messageID
 func (c *Client) SetMessageReaction(ctx context.Context, req SetMessageReactionRequest) error {
 	_, err := c.executeRequest(ctx, "setMessageReaction", req, extractChatID(req.ChatID))
 	return err
+}
+
+// DeleteMessageReaction removes the reaction of a user or a chat from a message (Bot API 10.0). It is not
+// retried.
+//
+// Set UserID, ActorChatID or both. The spec marks both optional, but the live server rejected a call with
+// neither ("Bad Request: sender_chat_id is empty", run on 2026-11-04), so the client requires at least one;
+// this rule comes from that run, not from the spec.
+func (c *Client) DeleteMessageReaction(ctx context.Context, req DeleteMessageReactionRequest) error {
+	if err := validateChatID(req.ChatID); err != nil {
+		return err
+	}
+	if req.MessageID <= 0 {
+		return tg.NewValidationError("message_id", "must be positive")
+	}
+	if req.UserID < 0 {
+		return tg.NewValidationError("user_id", "must be positive")
+	}
+	if req.UserID == 0 && req.ActorChatID == 0 {
+		return tg.NewValidationError("user_id", "user_id or actor_chat_id required")
+	}
+	return c.callJSON(ctx, "deleteMessageReaction", req, nil, extractChatID(req.ChatID))
+}
+
+// DeleteAllMessageReactions removes the recent reactions of a user or a chat in a chat (Bot API 10.0). The spec
+// bounds one call to at most 10000 recent reactions and does not say what a repeat does, so it is not retried.
+//
+// Set UserID, ActorChatID or both. The spec marks both optional, but the live server rejected a call with
+// neither ("Bad Request: sender_chat_id is empty", run on 2026-11-04), so the client requires at least one;
+// this rule comes from that run, not from the spec.
+func (c *Client) DeleteAllMessageReactions(ctx context.Context, req DeleteAllMessageReactionsRequest) error {
+	if err := validateChatID(req.ChatID); err != nil {
+		return err
+	}
+	if req.UserID < 0 {
+		return tg.NewValidationError("user_id", "must be positive")
+	}
+	if req.UserID == 0 && req.ActorChatID == 0 {
+		return tg.NewValidationError("user_id", "user_id or actor_chat_id required")
+	}
+	return c.callJSON(ctx, "deleteAllMessageReactions", req, nil, extractChatID(req.ChatID))
 }
 
 // ================== Options ==================

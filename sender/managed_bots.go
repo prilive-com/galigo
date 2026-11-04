@@ -61,3 +61,36 @@ func (c *Client) SavePreparedKeyboardButton(ctx context.Context, req SavePrepare
 	}
 	return &result, nil
 }
+
+// SetManagedBotAccessSettingsRequest represents a setManagedBotAccessSettings request (Bot API 10.0). UserID is
+// the managed bot's id.
+type SetManagedBotAccessSettingsRequest struct {
+	UserID             int64 `json:"user_id"`
+	IsAccessRestricted bool  `json:"is_access_restricted"`
+	// AddedUserIDs are the users who can access the bot when access is restricted. A nil list is not sent; a
+	// non-nil empty list sends []. Telegram does not specify how it handles an absent or empty list. The spec
+	// allows up to 10 ids; the client does not check that.
+	AddedUserIDs []int64 `json:"added_user_ids,omitzero"`
+}
+
+// GetManagedBotAccessSettings returns the access settings of a bot that this bot manages (Bot API 10.0). userID is
+// the managed bot's id. A null result gives the zero value and no error, as the 9.6 managed-bot methods.
+func (c *Client) GetManagedBotAccessSettings(ctx context.Context, userID int64) (*tg.BotAccessSettings, error) {
+	if userID <= 0 {
+		return nil, tg.NewValidationError("user_id", "must be positive")
+	}
+	var result tg.BotAccessSettings
+	if err := c.callJSON(ctx, "getManagedBotAccessSettings", managedBotUserRequest{UserID: userID}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SetManagedBotAccessSettings changes the access settings of a bot that this bot manages (Bot API 10.0). It is
+// not retried.
+func (c *Client) SetManagedBotAccessSettings(ctx context.Context, req SetManagedBotAccessSettingsRequest) error {
+	if req.UserID <= 0 {
+		return tg.NewValidationError("user_id", "must be positive")
+	}
+	return c.callJSON(ctx, "setManagedBotAccessSettings", req, nil)
+}

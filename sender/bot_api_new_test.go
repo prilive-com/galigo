@@ -291,14 +291,19 @@ func TestSendMessageDraft_Validation_NegativeDraftID(t *testing.T) {
 	assert.Equal(t, 0, server.CaptureCount())
 }
 
-func TestSendMessageDraft_Validation_EmptyText(t *testing.T) {
+// Since Bot API 10.0 an empty text is allowed: Telegram shows a placeholder.
+func TestSendMessageDraft_EmptyText(t *testing.T) {
+	// API100 T-s-9
 	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessageDraft", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyBool(w, true)
+	})
 	client := testutil.NewTestClient(t, server.BaseURL())
 
 	err := client.SendMessageDraft(context.Background(), sender.SendMessageDraftRequest{
 		ChatID: int64(123456789), DraftID: 1, Text: "",
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "text")
-	assert.Equal(t, 0, server.CaptureCount())
+	require.NoError(t, err)
+	require.Equal(t, 1, server.CaptureCount())
+	assert.JSONEq(t, `{"chat_id":123456789,"draft_id":1,"text":""}`, server.LastCapture().BodyString())
 }

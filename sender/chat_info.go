@@ -36,13 +36,30 @@ func (c *Client) GetChat(ctx context.Context, chatID tg.ChatID) (*tg.ChatFullInf
 	return &result, nil
 }
 
+// getChatAdministratorsRequest is the body of getChatAdministrators; ReturnBots is omitted when false.
+type getChatAdministratorsRequest struct {
+	ChatID     tg.ChatID `json:"chat_id"`
+	ReturnBots bool      `json:"return_bots,omitempty"`
+}
+
+// GetChatAdministratorsWithBots returns the administrators of a chat, other bots included (getChatAdministrators
+// with return_bots, Bot API 10.0).
+func (c *Client) GetChatAdministratorsWithBots(ctx context.Context, chatID tg.ChatID) ([]tg.ChatMember, error) {
+	return c.getChatAdministrators(ctx, chatID, true)
+}
+
 // GetChatAdministrators returns a list of administrators in a chat.
 func (c *Client) GetChatAdministrators(ctx context.Context, chatID tg.ChatID) ([]tg.ChatMember, error) {
+	return c.getChatAdministrators(ctx, chatID, false)
+}
+
+func (c *Client) getChatAdministrators(ctx context.Context, chatID tg.ChatID, returnBots bool) ([]tg.ChatMember, error) {
 	if err := validateChatID(chatID); err != nil {
 		return nil, err
 	}
 
-	resp, err := c.executeRequest(ctx, "getChatAdministrators", GetChatRequest{ChatID: chatID}, extractChatID(chatID))
+	resp, err := c.executeRequest(ctx, "getChatAdministrators",
+		getChatAdministratorsRequest{ChatID: chatID, ReturnBots: returnBots}, extractChatID(chatID))
 	if err != nil {
 		return nil, err
 	}

@@ -23,6 +23,11 @@ type Update struct {
 	ChatMember         *ChatMemberUpdated  `json:"chat_member,omitempty"`
 	ChatJoinRequest    *ChatJoinRequest    `json:"chat_join_request,omitempty"`
 	ManagedBot         *ManagedBotUpdated  `json:"managed_bot,omitempty"` // 9.6
+	// GuestMessage (Bot API 10.0) is a message in a chat where this bot was summoned as a guest. Its chat may
+	// not coincide with other bot chats that share the same id. Answer it with Client.AnswerGuestQuery and
+	// Message.GuestQueryID; do not use its chat id as a normal chat, and do not edit it through Editable or
+	// MessageSig.
+	GuestMessage *Message `json:"guest_message,omitempty"`
 }
 
 // CallbackQuery represents an incoming callback query from an inline keyboard.

@@ -129,7 +129,8 @@ make test-coverage
 # Run linter
 make lint
 
-# Run full CI suite
+# Run lint, race tests and coverage with the Makefile's 80% gate
+# (stricter than CI's 45%; see docs/testing.md, "Coverage Gate")
 make ci
 ```
 
@@ -177,10 +178,11 @@ go run ./cmd/galigo-testbot --run all
 
 ### Before Submitting
 
-1. **Run the full test suite**
+1. **Run the tests with the race detector**
    ```bash
-   make ci
+   make test-race
    ```
+   `make ci` also runs lint and the Makefile's 80% coverage gate, which is stricter than CI's 45% gate, so it can fail when CI passes.
 
 2. **Format your code**
    ```bash

@@ -47,6 +47,13 @@ type InputFile struct {
 
 	// ParseMode for caption (HTML, Markdown, MarkdownV2).
 	ParseMode string
+
+	// Photo is the static photo of a live photo item (Bot API 10.0): it is sent as
+	// the item's "photo" value in sendMediaGroup and editMessageMedia. Use a file id
+	// or an upload; the spec says a URL is not supported. Only those two item
+	// encoders read it: single-file fields (such as SendPhotoRequest.Photo) and
+	// MarshalJSON ignore it, and Photo.Photo is never read. Set it with WithPhoto.
+	Photo *InputFile
 }
 
 // FromReader creates an InputFile from an io.Reader.
@@ -128,6 +135,13 @@ func (f InputFile) WithParseMode(mode string) InputFile {
 // WithMediaType returns a copy with the media type set.
 func (f InputFile) WithMediaType(mediaType string) InputFile {
 	f.MediaType = mediaType
+	return f
+}
+
+// WithPhoto returns a copy with Photo set to a copy of photo (the static photo of
+// a live photo item).
+func (f InputFile) WithPhoto(photo InputFile) InputFile {
+	f.Photo = &photo
 	return f
 }
 

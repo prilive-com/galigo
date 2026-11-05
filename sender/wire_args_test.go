@@ -555,6 +555,14 @@ func fileCalls() []fileCall {
 	myPhoto := sender.SetMyProfilePhotoRequest{Photo: sender.FromFileID("A")}
 	upload := sender.UploadStickerFileRequest{UserID: 1, Sticker: sender.FromFileID("A"), StickerFormat: "static"}
 	thumb := sender.SetStickerSetThumbnailRequest{Name: "n", UserID: 1, Thumbnail: sender.FromFileID("A"), Format: "static"}
+	// API100B T-s-19: the three live-photo calls by file ids.
+	live := sender.SendLivePhotoRequest{ChatID: id, LivePhoto: sender.FromFileID("A"), Photo: sender.FromFileID("B"), Caption: "c"}
+	liveGroup := sender.SendMediaGroupRequest{ChatID: id, Media: []sender.InputFile{
+		sender.FromFileID("A").WithMediaType("live_photo").WithPhoto(sender.FromFileID("B")),
+		sender.FromFileID("C").WithMediaType("live_photo").WithPhoto(sender.FromFileID("D")),
+	}}
+	liveEdit := sender.EditMessageMediaRequest{ChatID: id, MessageID: 42,
+		Media: sender.NewInputMediaLivePhoto(sender.FromFileID("A"), sender.FromFileID("B"))}
 
 	msg := func(f func() (*tg.Message, error)) error { _, err := f(); return err }
 	return []fileCall{
@@ -588,6 +596,16 @@ func fileCalls() []fileCall {
 		}},
 		{"editMessageMedia", "editMessageMedia", edit, mp, func(ctx context.Context, c *sender.Client) error {
 			return msg(func() (*tg.Message, error) { return c.EditMessageMedia(ctx, edit) })
+		}},
+		{"sendLivePhoto", "sendLivePhoto", live, js, func(ctx context.Context, c *sender.Client) error {
+			return msg(func() (*tg.Message, error) { return c.SendLivePhoto(ctx, live) })
+		}},
+		{"sendMediaGroup live", "sendMediaGroup", liveGroup, mp, func(ctx context.Context, c *sender.Client) error {
+			_, err := c.SendMediaGroup(ctx, liveGroup)
+			return err
+		}},
+		{"editMessageMedia live", "editMessageMedia", liveEdit, mp, func(ctx context.Context, c *sender.Client) error {
+			return msg(func() (*tg.Message, error) { return c.EditMessageMedia(ctx, liveEdit) })
 		}},
 		{"setChatPhoto", "setChatPhoto", chatPhoto, js, func(ctx context.Context, c *sender.Client) error {
 			return c.SetChatPhoto(ctx, id, sender.FromFileID("A"))
@@ -652,12 +670,12 @@ func TestWire_W7_Routing(t *testing.T) {
 			assertFiles(t, map[string]wireFile{}, files)
 		})
 	}
-	assert.Equal(t, 14, n, "W7 rows")
+	assert.Equal(t, 17, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows
 }
 
 func TestWire_W8_ContentType(t *testing.T) {
 	calls := fileCalls()
-	require.Len(t, calls, 20)
+	require.Len(t, calls, 23) // API100B T-s-19: 20 + 3 live-photo rows
 	for _, fc := range calls {
 		t.Run(fc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
@@ -683,6 +701,7 @@ var guardPartA = []string{
 	"SendAnimationRequest", "SendVoiceRequest", "SendVideoNoteRequest", "SendStickerRequest",
 	"SendMediaGroupRequest", "EditMessageMediaRequest", "SetChatPhotoRequest",
 	"SetMyProfilePhotoRequest", "UploadStickerFileRequest", "SetStickerSetThumbnailRequest",
+	"SendLivePhotoRequest", // API100B T-s-19
 }
 
 var guardPartB = []string{
@@ -690,6 +709,7 @@ var guardPartB = []string{
 	"PostStoryRequest", "EditStoryRequest", "SetBusinessAccountProfilePhotoRequest",
 	"InputMedia", "InputSticker", "InputProfilePhotoStatic", "InputProfilePhotoAnimated",
 	"InputStoryContentPhoto", "InputStoryContentVideo",
+	"InputFile", // API100B T-s-19: InputFile.Photo is a nested *InputFile
 }
 
 // guardTypes returns the union of set 1 (exported structs with a field of a
@@ -785,7 +805,7 @@ func senderSources(t *testing.T) map[string]string {
 func TestWire_W7_Guard(t *testing.T) {
 	want := append(append([]string{}, guardPartA...), guardPartB...)
 	sort.Strings(want)
-	require.Len(t, want, 26)
+	require.Len(t, want, 28) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile
 
 	assert.Equal(t, want, guardTypes(t, senderSources(t)))
 
@@ -1021,4 +1041,354 @@ func TestBuildMultipartRequest_Default_D8_NullStaysNull(t *testing.T) {
 	}{json.RawMessage("null"), nilKeyboard})
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"r": "null", "p": "null"}, got.Params)
+}
+
+// ================== Bot API 10.0 part b: live photos in albums and edits (B-25 10.0b, TEST-PLAN §3) ==================
+// Rows T-s-9 … T-s-18, T-s-22 … T-s-24. Every expected media value is a literal.
+
+var (
+	lpV1 = []byte("video-one")
+	lpP1 = []byte("photo-one")
+	lpV2 = []byte("video-two")
+	lpP2 = []byte("photo-two")
+)
+
+func liveItem(video, photo sender.InputFile) sender.InputFile {
+	return video.WithMediaType("live_photo").WithPhoto(photo)
+}
+
+func sendGroup(media ...sender.InputFile) func(ctx context.Context, c *sender.Client) error {
+	return func(ctx context.Context, c *sender.Client) error {
+		_, err := c.SendMediaGroup(ctx, sender.SendMediaGroupRequest{ChatID: testutil.TestChatID, Media: media})
+		return err
+	}
+}
+
+func editMedia(m sender.InputMedia) func(ctx context.Context, c *sender.Client) error {
+	return func(ctx context.Context, c *sender.Client) error {
+		_, err := c.EditMessageMedia(ctx, sender.EditMessageMediaRequest{ChatID: testutil.TestChatID, MessageID: 42, Media: m})
+		return err
+	}
+}
+
+// noRequest runs call on a fresh mock server and returns its error; the call must send nothing.
+func noRequest(t *testing.T, call func(ctx context.Context, c *sender.Client) error) error {
+	t.Helper()
+	server := testutil.NewMockServer(t)
+	client := testutil.NewTestClient(t, server.BaseURL())
+	err := call(context.Background(), client)
+	assert.Equal(t, 0, server.CaptureCount(), "no request sent")
+	return err
+}
+
+func TestWire_W15_LiveAlbumFileID(t *testing.T) { // API100B T-s-9
+	mediaType, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+		sender.FromFileID("V1").WithMediaType("live_photo").WithCaption("c").WithParseMode("HTML").WithPhoto(sender.FromFileID("P1")),
+		liveItem(sender.FromFileID("V2"), sender.FromFileID("P2")),
+	))
+	require.NoError(t, err)
+	assert.Equal(t, "multipart/form-data", mediaType)
+	assertArgs(t, map[string]string{
+		"chat_id": wireChatID,
+		"media": `[{"type":"live_photo","media":"V1","photo":"P1","caption":"c","parse_mode":"HTML"},` +
+			`{"type":"live_photo","media":"V2","photo":"P2"}]`,
+	}, args)
+	assertFiles(t, map[string]wireFile{}, files)
+}
+
+func TestWire_W16_LiveAlbumUploads(t *testing.T) { // API100B T-s-10
+	_, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+		liveItem(sender.FromBytes(lpV1, "v1.mp4"), sender.FromBytes(lpP1, "p1.jpg")),
+		liveItem(sender.FromBytes(lpV2, "v2.mp4"), sender.FromBytes(lpP2, "p2.jpg")),
+	))
+	require.NoError(t, err)
+	assertArgs(t, map[string]string{
+		"chat_id": wireChatID,
+		"media": `[{"type":"live_photo","media":"attach://file0","photo":"attach://file1"},` +
+			`{"type":"live_photo","media":"attach://file2","photo":"attach://file3"}]`,
+	}, args)
+	assertFiles(t, map[string]wireFile{
+		"file0": {FileName: "v1.mp4", Data: lpV1},
+		"file1": {FileName: "p1.jpg", Data: lpP1},
+		"file2": {FileName: "v2.mp4", Data: lpV2},
+		"file3": {FileName: "p2.jpg", Data: lpP2},
+	}, files)
+}
+
+func TestWire_W17_LiveAlbumMixed(t *testing.T) { // API100B T-s-11
+	// Item 0 has no upload, so the photo upload of item 3 takes attach index 2, not its item index 3 (M14).
+	_, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+		liveItem(sender.FromFileID("V0"), sender.FromFileID("P0")),
+		liveItem(sender.FromBytes(lpV1, "v1.mp4"), sender.FromFileID("P1")),
+		sender.FromBytes(lpP1, "plain.jpg").WithMediaType("photo"),
+		liveItem(sender.FromFileID("V3"), sender.FromBytes(lpP2, "p3.jpg")),
+	))
+	require.NoError(t, err)
+	assertArgs(t, map[string]string{
+		"chat_id": wireChatID,
+		"media": `[{"type":"live_photo","media":"V0","photo":"P0"},` +
+			`{"type":"live_photo","media":"attach://file0","photo":"P1"},` +
+			`{"type":"photo","media":"attach://file1"},` +
+			`{"type":"live_photo","media":"V3","photo":"attach://file2"}]`,
+	}, args)
+	assertFiles(t, map[string]wireFile{
+		"file0": {FileName: "v1.mp4", Data: lpV1},
+		"file1": {FileName: "plain.jpg", Data: lpP1},
+		"file2": {FileName: "p3.jpg", Data: lpP2},
+	}, files)
+}
+
+func TestWire_W18_LiveAlbumPhotoURL(t *testing.T) { // API100B T-s-12
+	_, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+		liveItem(sender.FromFileID("V1"), sender.FromURL("https://x/p.jpg")),
+		liveItem(sender.FromFileID("V2"), sender.FromFileID("P2")),
+	))
+	require.NoError(t, err)
+	assertArgs(t, map[string]string{
+		"chat_id": wireChatID,
+		"media": `[{"type":"live_photo","media":"V1","photo":"https://x/p.jpg"},` +
+			`{"type":"live_photo","media":"V2","photo":"P2"}]`,
+	}, args)
+	assertFiles(t, map[string]wireFile{}, files)
+}
+
+func TestWire_W19_LiveAlbumErrors(t *testing.T) { // API100B T-s-13
+	t.Run("live item without Photo", func(t *testing.T) {
+		err := noRequest(t, sendGroup(
+			liveItem(sender.FromFileID("V1"), sender.FromFileID("P1")),
+			sender.FromFileID("V2").WithMediaType("live_photo"),
+		))
+		require.Error(t, err)
+		assert.Equal(t, "failed to build request: field media: item 1: live_photo requires Photo", err.Error())
+	})
+	t.Run("live item with an empty Photo", func(t *testing.T) {
+		err := noRequest(t, sendGroup(liveItem(sender.FromFileID("V1"), sender.InputFile{})))
+		require.Error(t, err)
+		assert.Equal(t, "failed to build request: field media: item 0: photo: InputFile must have FileID, URL, or Reader set", err.Error())
+	})
+}
+
+func TestWire_W20_PhotoOnPlainItem(t *testing.T) {
+	t.Run("album", func(t *testing.T) { // API100B T-s-14
+		_, args, _, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+			sender.FromFileID("A").WithMediaType("photo").WithPhoto(sender.FromFileID("B")),
+		))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{"chat_id": wireChatID, "media": `[{"type":"photo","media":"A","photo":"B"}]`}, args)
+	})
+	t.Run("edit", func(t *testing.T) { // API100B T-s-14e
+		_, args, _, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(sender.InputMedia{
+			Type: "photo", Media: sender.FromFileID("A").WithPhoto(sender.FromFileID("B")),
+		}))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{
+			"chat_id": wireChatID, "message_id": "42", "media": `{"type":"photo","media":"A","photo":"B"}`,
+		}, args)
+	})
+}
+
+func TestWire_W21_EditLive(t *testing.T) { // API100B T-s-15
+	t.Run("by file ids", func(t *testing.T) {
+		mediaType, args, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(
+			sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), sender.FromFileID("P1")).WithCaption("c").WithParseMode("HTML"),
+		))
+		require.NoError(t, err)
+		assert.Equal(t, "multipart/form-data", mediaType)
+		assertArgs(t, map[string]string{
+			"chat_id": wireChatID, "message_id": "42",
+			"media": `{"type":"live_photo","media":"V1","photo":"P1","caption":"c","parse_mode":"HTML"}`,
+		}, args)
+		assertFiles(t, map[string]wireFile{}, files)
+	})
+	t.Run("uploads", func(t *testing.T) {
+		_, args, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(
+			sender.NewInputMediaLivePhoto(sender.FromBytes(lpV1, "v.mp4"), sender.FromBytes(lpP1, "p.jpg")),
+		))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{
+			"chat_id": wireChatID, "message_id": "42",
+			"media": `{"type":"live_photo","media":"attach://file0","photo":"attach://file1"}`,
+		}, args)
+		assertFiles(t, map[string]wireFile{
+			"file0": {FileName: "v.mp4", Data: lpV1},
+			"file1": {FileName: "p.jpg", Data: lpP1},
+		}, files)
+	})
+}
+
+func TestWire_W22_EditLivePhotoURL(t *testing.T) { // API100B T-s-15u
+	_, args, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(
+		sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), sender.FromURL("https://x/p.jpg")),
+	))
+	require.NoError(t, err)
+	assertArgs(t, map[string]string{
+		"chat_id": wireChatID, "message_id": "42", "media": `{"type":"live_photo","media":"V1","photo":"https://x/p.jpg"}`,
+	}, args)
+	assertFiles(t, map[string]wireFile{}, files)
+}
+
+func TestWire_W23_EditLiveErrors(t *testing.T) { // API100B T-s-16
+	t.Run("live_photo without Media.Photo", func(t *testing.T) {
+		err := noRequest(t, editMedia(sender.InputMedia{Type: "live_photo", Media: sender.FromFileID("V1")}))
+		require.Error(t, err)
+		assert.Equal(t, "failed to build request: field media: InputMedia: live_photo requires Media.Photo", err.Error())
+	})
+	t.Run("live_photo with an empty Media.Photo", func(t *testing.T) {
+		err := noRequest(t, editMedia(sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), sender.InputFile{})))
+		require.Error(t, err)
+		assert.Equal(t, "failed to build request: field media: InputMedia.Media.Photo: InputFile must have FileID, URL, or Reader set", err.Error())
+	})
+}
+
+func TestWire_W24_LiveConstructors(t *testing.T) { // API100B T-s-17
+	p := sender.FromFileID("P1")
+	m := sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), p)
+	assert.Equal(t, sender.InputMedia{Type: "live_photo", Media: sender.InputFile{FileID: "V1", Photo: &sender.InputFile{FileID: "P1"}}}, m)
+
+	f := sender.FromFileID("V2")
+	g := f.WithPhoto(p)
+	assert.Nil(t, f.Photo, "WithPhoto returns a copy")
+	assert.Equal(t, sender.InputFile{FileID: "V2", Photo: &sender.InputFile{FileID: "P1"}}, g)
+
+	p.FileID = "CHANGED"
+	require.NotNil(t, m.Media.Photo)
+	require.NotNil(t, g.Photo)
+	assert.Equal(t, "P1", m.Media.Photo.FileID, "a later change to photo does not reach the item")
+	assert.Equal(t, "P1", g.Photo.FileID, "a later change to photo does not reach the copy")
+}
+
+func TestWire_W25_PhotoIgnoredElsewhere(t *testing.T) { // API100B T-s-18 (a control: it may be green on the stub)
+	t.Run("sendPhoto by id", func(t *testing.T) {
+		pa := sender.FromFileID("B")
+		in := sender.FromFileID("A")
+		in.Photo = &pa
+		require.NotNil(t, in.Photo)
+		mediaType, args, files, err := wireCall(t, "sendPhoto", replyMessage, func(ctx context.Context, c *sender.Client) error {
+			_, err := c.SendPhoto(ctx, sender.SendPhotoRequest{ChatID: testutil.TestChatID, Photo: in})
+			return err
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "application/json", mediaType)
+		assertArgs(t, map[string]string{"chat_id": wireChatID, "photo": "A"}, args)
+		assertFiles(t, map[string]wireFile{}, files)
+	})
+	t.Run("sendPhoto upload", func(t *testing.T) {
+		pa := sender.FromBytes(lpP2, "inner.jpg")
+		in := sender.FromBytes(lpP1, "outer.jpg")
+		in.Photo = &pa
+		require.NotNil(t, in.Photo)
+		_, args, files, err := wireCall(t, "sendPhoto", replyMessage, func(ctx context.Context, c *sender.Client) error {
+			_, err := c.SendPhoto(ctx, sender.SendPhotoRequest{ChatID: testutil.TestChatID, Photo: in})
+			return err
+		})
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{"chat_id": wireChatID}, args)
+		assertFiles(t, map[string]wireFile{"photo": {FileName: "outer.jpg", Data: lpP1}}, files)
+	})
+	t.Run("MarshalJSON", func(t *testing.T) {
+		pa := sender.FromFileID("B")
+		in := sender.FromFileID("A")
+		in.Photo = &pa
+		b, err := json.Marshal(in)
+		require.NoError(t, err)
+		assert.Equal(t, `"A"`, string(b))
+	})
+}
+
+func TestWire_W26_SourcePhotoReread(t *testing.T) { // API100B T-s-22
+	t.Run("album", func(t *testing.T) {
+		req := sender.SendMediaGroupRequest{ChatID: testutil.TestChatID, Media: []sender.InputFile{
+			liveItem(sender.FromFileID("V1"), sender.FromBytes(lpP1, "p.jpg")),
+		}}
+		for i := range 2 {
+			_, _, files, err := wireCall(t, "sendMediaGroup", replyAlbum, func(ctx context.Context, c *sender.Client) error {
+				_, err := c.SendMediaGroup(ctx, req)
+				return err
+			})
+			require.NoError(t, err, "send %d", i)
+			assertFiles(t, map[string]wireFile{"file0": {FileName: "p.jpg", Data: lpP1}}, files)
+		}
+		require.NotNil(t, req.Media[0].Photo)
+		assert.NotNil(t, req.Media[0].Photo.Source)
+	})
+	t.Run("edit", func(t *testing.T) {
+		m := sender.NewInputMediaLivePhoto(sender.FromBytes(lpV1, "v.mp4"), sender.FromBytes(lpP1, "p.jpg"))
+		for i := range 2 {
+			_, _, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(m))
+			require.NoError(t, err, "send %d", i)
+			assertFiles(t, map[string]wireFile{
+				"file0": {FileName: "v.mp4", Data: lpV1},
+				"file1": {FileName: "p.jpg", Data: lpP1},
+			}, files)
+		}
+		require.NotNil(t, m.Media.Photo)
+		assert.NotNil(t, m.Media.Photo.Source)
+	})
+}
+
+func TestWire_W27_ReaderPhoto(t *testing.T) { // API100B T-s-23
+	t.Run("album reader only", func(t *testing.T) {
+		_, _, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(
+			liveItem(sender.FromFileID("V1"), sender.FromReader(bytes.NewReader(lpP2), "r.jpg")),
+		))
+		require.NoError(t, err)
+		assertFiles(t, map[string]wireFile{"file0": {FileName: "r.jpg", Data: lpP2}}, files)
+	})
+	t.Run("edit reader only", func(t *testing.T) {
+		_, _, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(
+			sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), sender.FromReader(bytes.NewReader(lpP2), "r.jpg")),
+		))
+		require.NoError(t, err)
+		assertFiles(t, map[string]wireFile{"file0": {FileName: "r.jpg", Data: lpP2}}, files)
+	})
+	t.Run("Source wins over Reader", func(t *testing.T) {
+		both := sender.FromBytes(lpP1, "s.jpg")
+		both.Reader = bytes.NewReader(lpP2)
+		_, _, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(liveItem(sender.FromFileID("V1"), both)))
+		require.NoError(t, err)
+		assertFiles(t, map[string]wireFile{"file0": {FileName: "s.jpg", Data: lpP1}}, files)
+	})
+}
+
+func TestWire_W28_SecondLevelPhotoIgnored(t *testing.T) { // API100B T-s-24
+	byID := func() sender.InputFile {
+		p := sender.FromFileID("P1")
+		n := sender.FromFileID("NESTED")
+		p.Photo = &n
+		return p
+	}
+	upload := func() sender.InputFile {
+		p := sender.FromBytes(lpP1, "p.jpg")
+		nf := sender.FromBytes(lpP2, "n.jpg")
+		p.Photo = &nf
+		return p
+	}
+	t.Run("album by id", func(t *testing.T) {
+		_, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(liveItem(sender.FromFileID("V1"), byID())))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{"chat_id": wireChatID, "media": `[{"type":"live_photo","media":"V1","photo":"P1"}]`}, args)
+		assertFiles(t, map[string]wireFile{}, files)
+	})
+	t.Run("edit by id", func(t *testing.T) {
+		_, args, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), byID())))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{
+			"chat_id": wireChatID, "message_id": "42", "media": `{"type":"live_photo","media":"V1","photo":"P1"}`,
+		}, args)
+		assertFiles(t, map[string]wireFile{}, files)
+	})
+	t.Run("album upload", func(t *testing.T) {
+		_, args, files, err := wireCall(t, "sendMediaGroup", replyAlbum, sendGroup(liveItem(sender.FromFileID("V1"), upload())))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{"chat_id": wireChatID, "media": `[{"type":"live_photo","media":"V1","photo":"attach://file0"}]`}, args)
+		assertFiles(t, map[string]wireFile{"file0": {FileName: "p.jpg", Data: lpP1}}, files)
+	})
+	t.Run("edit upload", func(t *testing.T) {
+		_, args, files, err := wireCall(t, "editMessageMedia", replyMessage, editMedia(sender.NewInputMediaLivePhoto(sender.FromFileID("V1"), upload())))
+		require.NoError(t, err)
+		assertArgs(t, map[string]string{
+			"chat_id": wireChatID, "message_id": "42", "media": `{"type":"live_photo","media":"V1","photo":"attach://file0"}`,
+		}, args)
+		assertFiles(t, map[string]wireFile{"file0": {FileName: "p.jpg", Data: lpP1}}, files)
+	})
 }

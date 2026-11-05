@@ -229,6 +229,16 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 		return fmt.Errorf("InputMedia.Media must have FileID, URL, or Reader set")
 	}
 
+	if media.Media.Photo != nil {
+		ref, err := attachRef(req, *media.Media.Photo, attachIdx)
+		if err != nil {
+			return fmt.Errorf("InputMedia.Media.Photo: %w", err)
+		}
+		item["photo"] = ref
+	} else if media.Type == "live_photo" {
+		return fmt.Errorf("InputMedia: live_photo requires Media.Photo")
+	}
+
 	if media.Caption != "" {
 		item["caption"] = media.Caption
 	}
@@ -302,6 +312,16 @@ func handleInputFileSlice(req *MultipartRequest, fieldName string, files []Input
 			return fmt.Errorf("item %d: InputFile must have FileID, URL, or Reader set", i)
 		}
 
+		if file.Photo != nil {
+			ref, err := attachRef(req, *file.Photo, attachIdx)
+			if err != nil {
+				return fmt.Errorf("item %d: photo: %w", i, err)
+			}
+			item["photo"] = ref
+		} else if file.MediaType == "live_photo" {
+			return fmt.Errorf("item %d: live_photo requires Photo", i)
+		}
+
 		if file.Caption != "" {
 			item["caption"] = file.Caption
 		}
@@ -319,6 +339,21 @@ func handleInputFileSlice(req *MultipartRequest, fieldName string, files []Input
 	req.Params[fieldName] = string(data)
 
 	return nil
+}
+
+// attachRef returns the media value of f inside an item (file id, URL, or
+// attach://fileN for an upload). An upload adds its file part and takes the
+// next attach index; a file id or URL takes none.
+func attachRef(req *MultipartRequest, f InputFile, attachIdx *int) (string, error) {
+	ref, part, err := resolveInputFile(f, fmt.Sprintf("file%d", *attachIdx))
+	if err != nil {
+		return "", err
+	}
+	if part != nil {
+		req.Files = append(req.Files, *part)
+		*attachIdx++
+	}
+	return ref, nil
 }
 
 func getJSONFieldName(field reflect.StructField) string {

@@ -41,6 +41,12 @@ func NewInputMediaAnimation(media InputFile) InputMedia {
 	return InputMedia{Type: "animation", Media: media}
 }
 
+// NewInputMediaLivePhoto creates an InputMedia of type "live_photo" (Bot API
+// 10.0): video is the live photo's video and photo its static photo.
+func NewInputMediaLivePhoto(video, photo InputFile) InputMedia {
+	return InputMedia{Type: "live_photo", Media: video.WithPhoto(photo)}
+}
+
 // WithCaption returns a copy with the caption set.
 func (m InputMedia) WithCaption(caption string) InputMedia {
 	m.Caption = caption

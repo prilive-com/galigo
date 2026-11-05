@@ -327,3 +327,133 @@ func TestAPI100_RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// ================== Bot API 10.0 part b: live photos (B-25 10.0b, TEST-PLAN §2, rows T-tg-1 … T-tg-7) ==================
+//
+// Live fixtures: replies of 2026-11-05 (E9/lookups/probe100b/01 sendLivePhoto upload, 02 sendLivePhoto by file id,
+// 07 editMessageMedia into a live photo). Edits, and only these: "from" -> the testutil bot (id
+// testutil.TestBotID, first name "Test Bot", username testutil.TestBotUsername); "chat" -> testutil.TestChatID and
+// title "Test Chat"; every file_id / file_unique_id -> a synthetic value (LPV-* the video, LPS90-* and LPS100-* the
+// two static sizes). Sizes, dimensions, duration, mime type, captions and dates are byte-exact.
+
+const (
+	api100bProbe01 = `{"message_id":1047,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},` +
+		`"chat":{"id":123456789,"title":"Test Chat","is_forum":true,"type":"supergroup"},"date":1793904606,` +
+		`"live_photo":{"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"duration":1,"width":320,"height":240,"mime_type":"video/mp4","file_id":"LPV-file","file_unique_id":"LPV-uniq","file_size":663},` +
+		`"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"caption":"probe100b upload"}`
+
+	api100bProbe02 = `{"message_id":1048,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},` +
+		`"chat":{"id":123456789,"title":"Test Chat","is_forum":true,"type":"supergroup"},"date":1793904606,` +
+		`"live_photo":{"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"duration":1,"width":320,"height":240,"mime_type":"video/mp4","file_id":"LPV-file","file_unique_id":"LPV-uniq","file_size":663},` +
+		`"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"caption":"probe100b by id","show_caption_above_media":true,"has_media_spoiler":true}`
+
+	api100bProbe07 = `{"message_id":1055,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},` +
+		`"chat":{"id":123456789,"title":"Test Chat","is_forum":true,"type":"supergroup"},"date":1793904611,"edit_date":1793904611,` +
+		`"live_photo":{"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"duration":1,"width":320,"height":240,"mime_type":"video/mp4","file_id":"LPV-file","file_unique_id":"LPV-uniq","file_size":663},` +
+		`"photo":[{"file_id":"LPS90-file","file_unique_id":"LPS90-uniq","file_size":341,"width":90,"height":90},` +
+		`{"file_id":"LPS100-file","file_unique_id":"LPS100-uniq","file_size":361,"width":100,"height":100}],` +
+		`"caption":"edited"}`
+)
+
+func api100bSizes() []tg.PhotoSize {
+	return []tg.PhotoSize{
+		{FileID: "LPS90-file", FileUniqueID: "LPS90-uniq", Width: 90, Height: 90, FileSize: 341},
+		{FileID: "LPS100-file", FileUniqueID: "LPS100-uniq", Width: 100, Height: 100, FileSize: 361},
+	}
+}
+
+func api100bLive() *tg.LivePhoto {
+	return &tg.LivePhoto{
+		Photo: api100bSizes(), FileID: "LPV-file", FileUniqueID: "LPV-uniq",
+		Width: 320, Height: 240, Duration: 1, MimeType: "video/mp4", FileSize: 663,
+	}
+}
+
+func api100bMessage(id int, date, editDate int64, caption string) *tg.Message {
+	return &tg.Message{
+		MessageID: id, From: api96Bot(), Chat: api96ChatValue(), Date: date, EditDate: editDate,
+		LivePhoto: api100bLive(), Photo: api100bSizes(), Caption: caption,
+	}
+}
+
+// T-tg-1 … T-tg-5, T-tg-7: live photo objects and messages decode to the whole expected value.
+func TestAPI100B_DecodeLivePhoto(t *testing.T) {
+	t.Run("T-tg-1 probe 01 live_photo", func(t *testing.T) { // API100B T-tg-1
+		raw := api96Sub(t, api100bProbe01, []any{"live_photo"})
+		var got tg.LivePhoto
+		require.NoError(t, json.Unmarshal(raw, &got))
+		assert.Equal(t, *api100bLive(), got)
+		var strict tg.LivePhoto
+		require.NoError(t, api96Strict(t, raw, &strict))
+	})
+	t.Run("T-tg-2 spec-shape minimal", func(t *testing.T) { // API100B T-tg-2
+		const raw = `{"file_id":"LPV-min","file_unique_id":"LPV-min-uniq","width":1,"height":2,"duration":3}`
+		got := api96Decode[tg.LivePhoto](t, raw)
+		assert.Equal(t, tg.LivePhoto{FileID: "LPV-min", FileUniqueID: "LPV-min-uniq", Width: 1, Height: 2, Duration: 3}, got)
+		b, err := json.Marshal(got)
+		require.NoError(t, err)
+		assert.JSONEq(t, raw, string(b))
+	})
+	t.Run("T-tg-2b zero value encode", func(t *testing.T) { // API100B T-tg-2b
+		b, err := json.Marshal(tg.LivePhoto{})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"file_id":"","file_unique_id":"","width":0,"height":0,"duration":0}`, string(b))
+	})
+	t.Run("T-tg-3 probe 01 message", func(t *testing.T) { // API100B T-tg-3
+		got := api96Decode[tg.Message](t, api100bProbe01)
+		assert.Equal(t, *api100bMessage(1047, 1793904606, 0, "probe100b upload"), got)
+		var strict tg.Message
+		require.NoError(t, api96Strict(t, []byte(api100bProbe01), &strict))
+	})
+	t.Run("T-tg-4 probe 07 edited message", func(t *testing.T) { // API100B T-tg-4
+		got := api96Decode[tg.Message](t, api100bProbe07)
+		assert.Equal(t, *api100bMessage(1055, 1793904611, 1793904611, "edited"), got)
+		var strict tg.Message
+		require.NoError(t, api96Strict(t, []byte(api100bProbe07), &strict))
+	})
+	t.Run("T-tg-5 64-bit file_size", func(t *testing.T) { // API100B T-tg-5
+		got := api96Decode[tg.LivePhoto](t, `{"file_id":"a","file_unique_id":"b","width":1,"height":1,"duration":1,"file_size":4294967296}`)
+		want := int64(1)
+		want <<= 32 // computed at run time, so an int32 field fails here, not at build time
+		assert.Equal(t, want, got.FileSize)
+	})
+	t.Run("T-tg-7 probe 02 by-id message", func(t *testing.T) { // API100B T-tg-7
+		got := api96Decode[tg.Message](t, api100bProbe02)
+		assert.Equal(t, *api100bMessage(1048, 1793904606, 0, "probe100b by id"), got)
+		// has_media_spoiler and show_caption_above_media are not modelled on Message (B-28); strict decode without them.
+		raw := api96Sub(t, api100bProbe02, nil, "has_media_spoiler", "show_caption_above_media")
+		var strict tg.Message
+		require.NoError(t, api96Strict(t, raw, &strict))
+	})
+}
+
+// T-tg-6: round trip; a Message without a live photo has no live_photo key.
+func TestAPI100B_EncodeLivePhoto(t *testing.T) { // API100B T-tg-6
+	b, err := json.Marshal(api100bLive())
+	require.NoError(t, err)
+	assert.JSONEq(t, string(api96Sub(t, api100bProbe01, []any{"live_photo"})), string(b))
+	var back tg.LivePhoto
+	require.NoError(t, json.Unmarshal(b, &back))
+	assert.Equal(t, *api100bLive(), back)
+
+	mb, err := json.Marshal(tg.Message{MessageID: 1, LivePhoto: api100bLive()})
+	require.NoError(t, err)
+	var keys map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(mb, &keys))
+	require.Contains(t, keys, "live_photo")
+	assert.JSONEq(t, string(b), string(keys["live_photo"]))
+
+	nb, err := json.Marshal(tg.Message{MessageID: 1})
+	require.NoError(t, err)
+	assert.NotContains(t, string(nb), `"live_photo"`)
+}

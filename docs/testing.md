@@ -671,8 +671,9 @@ go run ./cmd/galigo-testbot --run api95                  # All 9.5 tests
 # Bot API 9.6 scenarios (S47-S50)
 go run ./cmd/galigo-testbot --run api96                  # All 9.6 tests
 
-# Bot API 10.0 scenarios (S51-S54)
+# Bot API 10.0 scenarios (S51-S54, S57-S59)
 go run ./cmd/galigo-testbot --run api100                 # All 10.0 tests
+go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -794,7 +795,7 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S49-ReplyToPollOption | sendPoll, sendMessage | Reply to a poll option with `reply_parameters.poll_option_id` |
 | S50-PreparedKeyboardButton | savePreparedKeyboardButton | Save a prepared keyboard button for the first `TESTBOT_ADMINS` user |
 
-#### Bot API 10.0 (S51-S54)
+#### Bot API 10.0 (S51-S54, S57-S59)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
@@ -802,6 +803,9 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S52-ChatPermissionsReact | getChat | The chat's permissions carry `can_react_to_messages` |
 | S53-AdminsWithBots | getChatAdministrators | `return_bots` smoke check: at least one administrator is a bot (the effect of `return_bots` is proved by mock tests only) |
 | S54-EmptyDraft | sendMessageDraft | Draft with an empty text to the first `TESTBOT_ADMINS` user |
+| S57-SendLivePhoto | sendLivePhoto | Send a live photo by upload (video + still), then again by the returned `file_id`s |
+| S58-LivePhotoAlbum | sendLivePhoto, sendMediaGroup | Album of two live photos by upload, then by `file_id` |
+| S59-EditToLivePhoto | sendLivePhoto, sendPhoto, editMessageMedia | Replace a plain photo with a live photo through `editMessageMedia` |
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -822,9 +826,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **86 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **87 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 81 covered methods and 6 missing. 80 of the 86 registry methods have a scenario; the 81st covered method, `getUserProfileAudios` (S39), is not in the registry. The 6 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 82 covered methods and 6 missing. 81 of the 87 registry methods have a scenario; the 82nd covered method, `getUserProfileAudios` (S39), is not in the registry. The 6 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -887,7 +891,7 @@ cmd/galigo-testbot/
 │   ├── steps_api94.go         # Bot API 9.4 steps (styled buttons, profile audios, video qualities)
 │   ├── steps_api95.go         # Bot API 9.5 steps (date_time entity, member tags, message streaming)
 │   ├── steps_api96.go         # Bot API 9.6 steps (polls, quizzes, poll option replies, prepared buttons)
-│   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft)
+│   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -907,7 +911,7 @@ cmd/galigo-testbot/
 │   ├── api94.go       # Phase H: Bot API 9.4 (S38-S42: styled buttons, profile audios, video qualities)
 │   ├── api95.go       # Bot API 9.5 (S44-S46: date_time entity, member tags, message streaming)
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
-│   ├── api100.go      # Bot API 10.0 (S51-S54: reaction deletes, can_react_to_messages, admins with bots, empty draft)
+│   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S59: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
@@ -915,7 +919,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (86 methods)
+├── registry/       # Target method list and coverage checking (87 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

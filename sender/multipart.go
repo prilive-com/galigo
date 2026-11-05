@@ -78,6 +78,16 @@ func (e *MultipartEncoder) writeFile(file FilePart) error {
 // BuildMultipartRequest creates a MultipartRequest from a typed request struct.
 // Uses reflection for field iteration, but explicit handling for known types.
 func BuildMultipartRequest(req any) (MultipartRequest, error) {
+	result, _, err := buildMultipartRequest(req)
+	return result, err
+}
+
+// buildMultipartRequest is BuildMultipartRequest plus formOnly: true when a
+// field (InputMedia, []InputFile) is encoded by a handler whose value
+// json.Marshal of the payload would not produce, so the request must be sent
+// as multipart/form-data even without files (B-45).
+func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
+	formOnly := false
 	result := MultipartRequest{
 		Files:  make([]FilePart, 0),
 		Params: make(map[string]string),
@@ -115,24 +125,26 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 		switch v := value.Interface().(type) {
 		case InputFile:
 			if err := handleInputFile(&result, fieldName, v, &attachIdx); err != nil {
-				return result, fmt.Errorf("field %s: %w", fieldName, err)
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
 		case *InputFile:
 			if v != nil {
 				if err := handleInputFile(&result, fieldName, *v, &attachIdx); err != nil {
-					return result, fmt.Errorf("field %s: %w", fieldName, err)
+					return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 				}
 			}
 
 		case []InputFile:
+			formOnly = true
 			if err := handleInputFileSlice(&result, fieldName, v, &attachIdx); err != nil {
-				return result, fmt.Errorf("field %s: %w", fieldName, err)
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
 		case InputMedia:
+			formOnly = true
 			if err := handleInputMedia(&result, fieldName, v, &attachIdx); err != nil {
-				return result, fmt.Errorf("field %s: %w", fieldName, err)
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
 		case string:
@@ -167,13 +179,27 @@ func BuildMultipartRequest(req any) (MultipartRequest, error) {
 			// Complex types (structs, slices, maps) -> JSON encode
 			data, err := json.Marshal(v)
 			if err != nil {
-				return result, fmt.Errorf("field %s: JSON marshal: %w", fieldName, err)
+				return result, false, fmt.Errorf("field %s: JSON marshal: %w", fieldName, err)
 			}
-			result.Params[fieldName] = string(data)
+			result.Params[fieldName] = formValue(data)
 		}
 	}
 
-	return result, nil
+	return result, formOnly, nil
+}
+
+// formValue returns the form text of a JSON-encoded value. A JSON string (a
+// named string in an any field, a json.RawMessage holding a string) is sent
+// as its decoded text: the Bot API server reads a JSON body's string value the
+// same way (B-45). Any other JSON value is sent as its JSON text.
+func formValue(data []byte) string {
+	if len(data) > 0 && data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err == nil {
+			return s
+		}
+	}
+	return string(data)
 }
 
 func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia, attachIdx *int) error {

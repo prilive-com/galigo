@@ -481,24 +481,25 @@ go test -coverpkg=./... -coverprofile=coverage.out ./...
 GitHub Actions runs `.github/workflows/ci.yml` on every push to `main` or `develop` and on every pull request to `main`. Its test jobs:
 
 - `test`: `go test ./... -race -shuffle=on -count=1 -timeout=10m` on Linux. macOS and Windows run the same command without `-race`.
-- `test-minimum`: build, vet and test with the minimum Go version (1.25.14, `GOTOOLCHAIN=local`).
+- `test-minimum`: build, vet and test on the oldest supported Go line, 1.25 (`go 1.25` in `go.mod`), with Go 1.25.14 and `GOTOOLCHAIN=local`.
 - `coverage`: the coverage gate below.
 
 `govulncheck ./...` runs in `.github/workflows/security.yml` (push and pull request to `main`, and weekly), not in `ci.yml`.
 
 ### Coverage Gate
 
-CI fails if total coverage is below 45%. The number is `COVERAGE_THRESHOLD` in `.github/workflows/ci.yml`. The `coverage` job runs these commands (here with the 45 written in):
+CI fails if total coverage is below 45%. The number is `COVERAGE_THRESHOLD` in `.github/workflows/ci.yml`. The `coverage` job runs these commands in two steps. Here they are one script for `bash`, with the 45 written in and `|| exit 1` so that a failing test also stops the script:
 
 ```bash
-go test -coverprofile=coverage.out -covermode=atomic -shuffle=on -count=1 -timeout=10m ./...
+go test -coverprofile=coverage.out -covermode=atomic -shuffle=on -count=1 -timeout=10m ./... || exit 1
 COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
+echo "Total coverage: ${COVERAGE}%"
 if awk "BEGIN {exit !($COVERAGE < 45)}"; then
     exit 1
 fi
 ```
 
-`make check-coverage` is a stricter local check: it fails below 80% (`COVERAGE_THRESHOLD` in the `Makefile`). It reads the profile that `make test-coverage` writes with `-coverpkg=./...`, so its figure is not the same as the CI figure.
+`make check-coverage` is a stricter local check: it fails below 80% (`COVERAGE_THRESHOLD` in the `Makefile`). It needs `bc`; without `bc` it prints a warning and does not fail. It reads `coverage.out` and does not create it: run `make test-coverage` first, which writes the profile with `-coverpkg=./...`, so its figure is not the same as the CI figure. `make ci` runs this 80% check too, so it can fail when CI passes.
 
 ## Error Semantics
 

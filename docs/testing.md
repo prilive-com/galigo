@@ -603,7 +603,7 @@ go run ./cmd/galigo-testbot --run all
 
 # Run by phase
 go run ./cmd/galigo-testbot --run core        # Phase A: core messaging (S0-S5)
-go run ./cmd/galigo-testbot --run media       # Phase B: media uploads (S6-S11)
+go run ./cmd/galigo-testbot --run media       # Phase B: media (S6-S9, S11, S36, S55, S56)
 go run ./cmd/galigo-testbot --run keyboards   # Phase C: keyboards (S10)
 go run ./cmd/galigo-testbot --run chat-admin  # Phase D: chat administration (S15-S19)
 go run ./cmd/galigo-testbot --run stickers    # Phase E: sticker lifecycle (S20)
@@ -624,6 +624,7 @@ go run ./cmd/galigo-testbot --run media-groups     # S7: Albums
 go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
 go run ./cmd/galigo-testbot --run get-file             # S9: File download info
 go run ./cmd/galigo-testbot --run edit-message-media   # S11: Edit message media
+go run ./cmd/galigo-testbot --run media-file-id        # S55, S56: Album and edit by file_id
 go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + edit markup
 go run ./cmd/galigo-testbot --run chat-info            # S15: Chat info
 go run ./cmd/galigo-testbot --run chat-settings        # S16: Chat title/description
@@ -700,7 +701,7 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 | S5-ChatAction | sendChatAction | Typing indicators |
 | S37-LinkPreview | sendMessage | Link preview options (rendering hints) |
 
-#### Phase B: Media (S6-S9)
+#### Phase B: Media (S6-S11, S55-S56)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
@@ -709,6 +710,8 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 | S8-EditMedia | sendPhoto, editMessageCaption | Caption editing |
 | S9-GetFile | sendDocument, getFile | File metadata retrieval |
 | S11-EditMessageMedia | sendPhoto, editMessageMedia | Replace media content (photo → document) |
+| S55-MediaGroupByFileID | sendDocument, sendMediaGroup | Album of two documents by file_id (no upload) |
+| S56-EditMessageMediaByFileID | sendDocument, sendPhoto, editMessageMedia | Replace a photo with an earlier document by file_id |
 
 #### Phase C: Keyboards (S10+)
 
@@ -892,7 +895,7 @@ cmd/galigo-testbot/
 │   └── adapter.go       # SenderAdapter: wraps sender.Client to SenderClient interface
 ├── suites/
 │   ├── core.go        # Core scenarios (S0-S5, incl. S3 ParseMode)
-│   ├── media.go       # Media scenarios (S6-S11, S36 multipart ParseMode)
+│   ├── media.go       # Media scenarios (S6-S11, S36 multipart ParseMode, S55-S56 by file_id)
 │   ├── keyboards.go   # Phase C scenarios (S10+)
 │   ├── chat_admin.go  # Phase D scenarios (S15-S19)
 │   ├── stickers.go    # Phase E: Sticker lifecycle (S20)

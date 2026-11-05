@@ -98,6 +98,12 @@ func TestSendMediaGroupByFileIDStep(t *testing.T) {
 		assert.Equal(t, []int{31, 32}, res.MessageIDs)
 		assert.Equal(t, []string{"FA", "FB"}, res.FileIDs)
 		assert.Equal(t, []CreatedMessage{{ChatID: mediaChat, MessageID: 31}, {ChatID: mediaChat, MessageID: 32}}, rt.CreatedMessages)
+		assert.Same(t, f.groupReply[1], rt.LastMessage)
+		assert.Equal(t, map[string]any{
+			"message_count": 2,
+			"message_ids":   []int{31, 32},
+			"file_ids":      []string{"FA", "FB"},
+		}, res.Evidence)
 	})
 
 	t.Run("missing key: error, no call", func(t *testing.T) {
@@ -156,6 +162,7 @@ func TestEditMessageMediaByFileIDStep(t *testing.T) {
 		assert.Empty(t, res.MessageIDs, "the edit sends no new message")
 		assert.Empty(t, rt.CreatedMessages, "nothing new is tracked")
 		assert.Same(t, reply, rt.LastMessage)
+		assert.Equal(t, map[string]any{"message_id": 77, "media_type": "document", "file_id": "FD"}, res.Evidence)
 	})
 
 	t.Run("no last message: error, no call", func(t *testing.T) {

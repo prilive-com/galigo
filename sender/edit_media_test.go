@@ -14,11 +14,12 @@ import (
 	"github.com/prilive-com/galigo/sender"
 )
 
+// W4 (B-45): a FileID-based edit is sent as multipart/form-data, because the
+// Bot API server reads the media object only from a form field. The old
+// assertion (application/json) checked the transport of the defect.
 func TestEditMessageMedia_FileID(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/editMessageMedia", func(w http.ResponseWriter, r *http.Request) {
-		// FileID-based request should be JSON (no upload)
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		testutil.ReplyMessage(w, 42)
 	})
 
@@ -28,11 +29,21 @@ func TestEditMessageMedia_FileID(t *testing.T) {
 		ChatID:    testutil.TestChatID,
 		MessageID: 42,
 		Media: sender.NewInputMediaPhoto(sender.FromFileID("AgACAgIAAxkBAAI")).
-			WithCaption("updated caption"),
+			WithCaption("updated caption").WithParseMode("HTML"),
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, 42, msg.MessageID)
+
+	require.Equal(t, 1, server.CaptureCount())
+	mediaType, args, files := wireArgs(t, capturedRequest(server.LastCapture()))
+	assert.Equal(t, "multipart/form-data", mediaType)
+	assertArgs(t, map[string]string{
+		"chat_id":    wireChatID,
+		"message_id": "42",
+		"media":      `{"type":"photo","media":"AgACAgIAAxkBAAI","caption":"updated caption","parse_mode":"HTML"}`,
+	}, args)
+	assertFiles(t, map[string]wireFile{}, files)
 }
 
 func TestEditMessageMedia_Upload(t *testing.T) {
@@ -56,6 +67,16 @@ func TestEditMessageMedia_Upload(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 42, msg.MessageID)
+
+	// W9 (B-45): the whole upload request is unchanged.
+	require.Equal(t, 1, server.CaptureCount())
+	_, args, files := wireArgs(t, capturedRequest(server.LastCapture()))
+	assertArgs(t, map[string]string{
+		"chat_id":    wireChatID,
+		"message_id": "42",
+		"media":      `{"type":"document","media":"attach://file0","caption":"replaced via editMessageMedia"}`,
+	}, args)
+	assertFiles(t, map[string]wireFile{"file0": {FileName: "replaced.txt", Data: []byte("new file content")}}, files)
 }
 
 func TestEditMessageMedia_Error(t *testing.T) {

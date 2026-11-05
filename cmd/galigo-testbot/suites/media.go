@@ -175,6 +175,60 @@ func S36_MultipartParseMode() engine.Scenario {
 	}
 }
 
+// S55_MediaGroupByFileID sends an album of two documents by file_id (B-45).
+// The two documents are uploaded first, so their file_ids are real; the album
+// itself uploads nothing.
+func S55_MediaGroupByFileID() engine.Scenario {
+	docB := append(fixtures.DocumentBytes(), []byte("second document of the file_id album\n")...)
+	return &engine.BaseScenario{
+		ScenarioName:        "S55-MediaGroupByFileID",
+		ScenarioDescription: "Send a media group of two documents by file_id (no upload)",
+		CoveredMethods:      []string{"sendDocument", "sendMediaGroup"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendDocumentStep{
+				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "b45-a.txt", "document"),
+				Caption:  "galigo file_id album: document A",
+				StoreAs:  "doc_a",
+			},
+			&engine.SendDocumentStep{
+				Document: engine.MediaFromBytes(docB, "b45-b.txt", "document"),
+				Caption:  "galigo file_id album: document B",
+				StoreAs:  "doc_b",
+			},
+			&engine.SendMediaGroupByFileIDStep{FileKeys: []string{"doc_a", "doc_b"}, MediaType: "document"},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S56_EditMessageMediaByFileID replaces a photo with a document by file_id
+// (B-45). The edit targets the photo, a single message, not an album item.
+func S56_EditMessageMediaByFileID() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S56-EditMessageMediaByFileID",
+		ScenarioDescription: "Replace a photo with an earlier document by file_id (no upload)",
+		CoveredMethods:      []string{"sendDocument", "sendPhoto", "editMessageMedia"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendDocumentStep{
+				Document: engine.MediaFromBytes(fixtures.DocumentBytes(), "b45-c.txt", "document"),
+				Caption:  "galigo file_id edit: the document to reuse",
+			},
+			&engine.SendPhotoStep{
+				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "b45-photo.jpg", "photo"),
+				Caption: "galigo file_id edit: photo, will be replaced",
+			},
+			&engine.EditMessageMediaByFileIDStep{
+				FileKey:   "document",
+				MediaType: "document",
+				Caption:   "Replaced by file_id via editMessageMedia",
+			},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllPhaseBScenarios returns all Phase B (media) scenarios.
 func AllPhaseBScenarios() []engine.Scenario {
 	return []engine.Scenario{
@@ -184,5 +238,7 @@ func AllPhaseBScenarios() []engine.Scenario {
 		S9_GetFile(),
 		S11_EditMessageMedia(),
 		S36_MultipartParseMode(),
+		S55_MediaGroupByFileID(),
+		S56_EditMessageMediaByFileID(),
 	}
 }

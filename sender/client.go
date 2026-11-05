@@ -612,16 +612,17 @@ func (c *Client) executeRequest(ctx context.Context, method string, payload any,
 func (c *Client) doRequest(ctx context.Context, method string, payload any) (*apiResponse, error) {
 	url := fmt.Sprintf("%s/bot%s/%s", c.config.BaseURL, c.config.Token.Value(), method)
 
-	// Check if this request needs multipart encoding (has file uploads)
-	multipartReq, err := BuildMultipartRequest(payload)
+	// Multipart is needed for file uploads, and for fields (media groups,
+	// InputMedia) whose wire value only the multipart builder produces (B-45).
+	multipartReq, formOnly, err := buildMultipartRequest(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
 
 	var req *http.Request
 
-	if multipartReq.HasUploads() {
-		// Use multipart/form-data for file uploads — streamed via io.Pipe
+	if multipartReq.HasUploads() || formOnly {
+		// Use multipart/form-data — streamed via io.Pipe
 		pr, pw := io.Pipe()
 		encoder := NewMultipartEncoder(pw)
 		contentType := encoder.ContentType()
@@ -647,7 +648,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 		}
 		req.Header.Set("Content-Type", contentType)
 	} else {
-		// Use JSON for simple requests (no file uploads)
+		// Use JSON for every other request
 		jsonData, marshalErr := json.Marshal(payload)
 		if marshalErr != nil {
 			return nil, fmt.Errorf("failed to marshal request: %w", marshalErr)

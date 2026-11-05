@@ -509,6 +509,9 @@ func (s *SendPhotoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, 
 type SendDocumentStep struct {
 	Document MediaInput
 	Caption  string
+	// StoreAs, when set, also stores the captured file_id under this key
+	// (it is always stored under "document").
+	StoreAs string
 }
 
 func (s *SendDocumentStep) Name() string { return "sendDocument" }
@@ -527,6 +530,9 @@ func (s *SendDocumentStep) Execute(ctx context.Context, rt *Runtime) (*StepResul
 	if msg.Document != nil {
 		fileID = msg.Document.FileID
 		rt.CapturedFileIDs["document"] = fileID
+		if s.StoreAs != "" {
+			rt.CapturedFileIDs[s.StoreAs] = fileID
+		}
 	}
 
 	return &StepResult{
@@ -870,6 +876,129 @@ func (s *EditMessageMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepR
 			"media_type": s.Media.Type,
 		},
 	}, nil
+}
+
+// SendMediaGroupByFileIDStep sends an album whose items are files captured by
+// earlier steps, by file_id (no upload).
+type SendMediaGroupByFileIDStep struct {
+	FileKeys  []string // keys in CapturedFileIDs, one album item each
+	MediaType string   // "document", "photo", ...
+}
+
+func (s *SendMediaGroupByFileIDStep) Name() string { return "sendMediaGroup" }
+
+func (s *SendMediaGroupByFileIDStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	media := make([]MediaInput, 0, len(s.FileKeys))
+	fileIDs := make([]string, 0, len(s.FileKeys))
+	for _, key := range s.FileKeys {
+		fileID := rt.CapturedFileIDs[key]
+		if fileID == "" {
+			return nil, fmt.Errorf("no file_id captured for key %q", key)
+		}
+		m := MediaFromFileID(fileID)
+		m.Type = s.MediaType
+		media = append(media, m)
+		fileIDs = append(fileIDs, fileID)
+	}
+
+	messages, err := rt.Sender.SendMediaGroup(ctx, rt.ChatID, media)
+	if err != nil {
+		return nil, err
+	}
+
+	var msgIDs []int
+	for _, msg := range messages {
+		rt.TrackMessage(rt.ChatID, msg.MessageID)
+		msgIDs = append(msgIDs, msg.MessageID)
+	}
+	if len(messages) > 0 {
+		rt.LastMessage = messages[len(messages)-1]
+	}
+
+	if len(messages) != len(s.FileKeys) {
+		return nil, fmt.Errorf("album has %d messages, want %d", len(messages), len(s.FileKeys))
+	}
+	for i, msg := range messages {
+		if !hasMediaKind(msg, s.MediaType) {
+			return nil, fmt.Errorf("album message %d is not a %s", i+1, s.MediaType)
+		}
+	}
+
+	return &StepResult{
+		Method:     "sendMediaGroup",
+		MessageIDs: msgIDs,
+		FileIDs:    fileIDs,
+		Evidence: map[string]any{
+			"message_count": len(messages),
+			"message_ids":   msgIDs,
+			"file_ids":      fileIDs,
+		},
+	}, nil
+}
+
+// EditMessageMediaByFileIDStep replaces the media of the last message with a
+// file captured by an earlier step, by file_id (no upload).
+type EditMessageMediaByFileIDStep struct {
+	FileKey   string // key in CapturedFileIDs
+	MediaType string // "document", "photo", ...
+	Caption   string
+}
+
+func (s *EditMessageMediaByFileIDStep) Name() string { return "editMessageMedia" }
+
+func (s *EditMessageMediaByFileIDStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	if rt.LastMessage == nil {
+		return nil, fmt.Errorf("no message to edit")
+	}
+	fileID := rt.CapturedFileIDs[s.FileKey]
+	if fileID == "" {
+		return nil, fmt.Errorf("no file_id captured for key %q", s.FileKey)
+	}
+
+	media := sender.InputMedia{Type: s.MediaType, Media: sender.FromFileID(fileID), Caption: s.Caption}
+	msg, err := rt.Sender.EditMessageMedia(ctx, rt.ChatID, rt.LastMessage.MessageID, media)
+	if err != nil {
+		return nil, err
+	}
+
+	rt.LastMessage = msg
+
+	if !hasMediaKind(msg, s.MediaType) {
+		return nil, fmt.Errorf("edited message is not a %s", s.MediaType)
+	}
+	if msg.Caption != s.Caption {
+		return nil, fmt.Errorf("edited caption %q, want %q", msg.Caption, s.Caption)
+	}
+
+	return &StepResult{
+		Method:  "editMessageMedia",
+		FileIDs: []string{fileID},
+		Evidence: map[string]any{
+			"message_id": msg.MessageID,
+			"media_type": s.MediaType,
+			"file_id":    fileID,
+		},
+	}, nil
+}
+
+// hasMediaKind reports whether msg carries media of the given kind.
+func hasMediaKind(msg *tg.Message, kind string) bool {
+	if msg == nil {
+		return false
+	}
+	switch kind {
+	case "document":
+		return msg.Document != nil
+	case "photo":
+		return len(msg.Photo) > 0
+	case "video":
+		return msg.Video != nil
+	case "audio":
+		return msg.Audio != nil
+	case "animation":
+		return msg.Animation != nil
+	}
+	return false
 }
 
 // ================= Interactive Steps (require user interaction) =================

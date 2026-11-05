@@ -202,11 +202,24 @@ func (a *SenderAdapter) SendMediaGroup(ctx context.Context, chatID int64, media 
 	for i, m := range media {
 		f := mediaInputToInputFile(m)
 		f.MediaType = m.Type
+		if m.Photo != nil { // the static photo of a live photo item (10.0)
+			f = f.WithPhoto(mediaInputToInputFile(*m.Photo))
+		}
 		inputFiles[i] = f
 	}
 	return a.client.SendMediaGroup(ctx, sender.SendMediaGroupRequest{
 		ChatID: chatID,
 		Media:  inputFiles,
+	})
+}
+
+// SendLivePhoto sends a live photo (Bot API 10.0): video is its video, photo its static photo.
+func (a *SenderAdapter) SendLivePhoto(ctx context.Context, chatID int64, video, photo MediaInput, caption string) (*tg.Message, error) {
+	return a.client.SendLivePhoto(ctx, sender.SendLivePhotoRequest{
+		ChatID:    chatID,
+		LivePhoto: mediaInputToInputFile(video),
+		Photo:     mediaInputToInputFile(photo),
+		Caption:   caption,
 	})
 }
 

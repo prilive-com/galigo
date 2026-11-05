@@ -165,6 +165,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S36_MultipartParseMode()}
 	case "media-file-id":
 		scenarios = []engine.Scenario{suites.S55_MediaGroupByFileID(), suites.S56_EditMessageMediaByFileID()}
+	case "live-photos":
+		scenarios = suites.AllLivePhotoScenarios()
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()
@@ -260,7 +262,7 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	// Bot API 9.6 (S47-S50)
 	case "api96", "api-96", "9.6":
 		scenarios = suites.AllAPI96Scenarios()
-	// Bot API 10.0 (S51-S54)
+	// Bot API 10.0 (S51-S54, S57-S59)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
 	case "all":
@@ -279,7 +281,7 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, live-photos, all")
 		os.Exit(1)
 	}
 
@@ -501,7 +503,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string, updates <-chan tg.Update) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, interactive, webhook, get-updates, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, live-photos, keyboards, inline-keyboard, interactive, webhook, get-updates, all")
 		return
 	}
 
@@ -550,6 +552,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S36_MultipartParseMode()}
 	case "media-file-id":
 		scenarios = []engine.Scenario{suites.S55_MediaGroupByFileID(), suites.S56_EditMessageMediaByFileID()}
+	case "live-photos":
+		scenarios = suites.AllLivePhotoScenarios()
 	// Phase C: Keyboards
 	case "keyboards":
 		scenarios = suites.AllPhaseCScenarios()
@@ -651,7 +655,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	// Bot API 9.6 (S47-S50)
 	case "api96", "api-96", "9.6":
 		scenarios = suites.AllAPI96Scenarios()
-	// Bot API 10.0 (S51-S54)
+	// Bot API 10.0 (S51-S54, S57-S59)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
 	case "all":
@@ -784,8 +788,9 @@ Bot API 9.5 (S44-S46):
 Bot API 9.6 (S47-S50):
   api96 - All 9.6 tests (quiz correct_option_ids, poll options, reply to a poll option, prepared keyboard button)
 
-Bot API 10.0 (S51-S54):
-  api100 - All 10.0 tests (delete reactions, can_react_to_messages, admins with bots, empty draft)
+Bot API 10.0 (S51-S54, S57-S59):
+  api100      - All 10.0 tests (delete reactions, can_react_to_messages, admins with bots, empty draft, live photos)
+  live-photos - Live photos (S57-S59)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

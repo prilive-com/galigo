@@ -232,6 +232,7 @@ type SenderClient interface {
 	SendSticker(ctx context.Context, chatID int64, sticker MediaInput) (*tg.Message, error)
 	SendVideoNote(ctx context.Context, chatID int64, videoNote MediaInput) (*tg.Message, error)
 	SendMediaGroup(ctx context.Context, chatID int64, media []MediaInput) ([]*tg.Message, error)
+	SendLivePhoto(ctx context.Context, chatID int64, video, photo MediaInput, caption string) (*tg.Message, error) // 10.0
 	GetFile(ctx context.Context, fileID string) (*tg.File, error)
 	EditMessageCaption(ctx context.Context, chatID int64, messageID int, caption string) (*tg.Message, error)
 	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, markup *tg.InlineKeyboardMarkup) (*tg.Message, error)
@@ -361,6 +362,9 @@ type MediaInput struct {
 	FileID   string
 	URL      string
 	Type     string // "photo", "video", "document", etc.
+
+	// Photo is the static photo of a live photo album item (Type "live_photo", Bot API 10.0).
+	Photo *MediaInput
 }
 
 // SendOption configures message sending.

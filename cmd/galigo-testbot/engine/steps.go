@@ -997,6 +997,8 @@ func hasMediaKind(msg *tg.Message, kind string) bool {
 		return msg.Audio != nil
 	case "animation":
 		return msg.Animation != nil
+	case "live_photo": // 10.0: the video id, at least one static size, and the backward-compatible photo
+		return msg.LivePhoto != nil && msg.LivePhoto.FileID != "" && len(msg.LivePhoto.Photo) > 0 && len(msg.Photo) > 0
 	}
 	return false
 }

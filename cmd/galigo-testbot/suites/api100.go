@@ -172,7 +172,6 @@ func AllLivePhotoScenarios() []engine.Scenario {
 	return []engine.Scenario{S57_SendLivePhoto(), S58_LivePhotoAlbum(), S59_EditToLivePhoto()}
 }
 
-// AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, live photos of part b, polls of part c).
 // pollOptions100D returns two plain poll options.
 func pollOptions100D() []sender.InputPollOption {
 	return []sender.InputPollOption{{Text: "a"}, {Text: "b"}}
@@ -246,6 +245,8 @@ func S65_QuizExplanationMedia() engine.Scenario {
 	}
 }
 
+// AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, live photos of part b, polls of part c, poll
+// media of part d).
 func AllAPI100Scenarios() []engine.Scenario {
 	s := append([]engine.Scenario{
 		S51_DeleteReactions(),

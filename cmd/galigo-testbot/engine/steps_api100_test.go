@@ -1321,6 +1321,13 @@ func TestPollMediaKind(t *testing.T) {
 			assert.Equal(t, kind, k)
 		}
 	})
+	t.Run("empty", func(t *testing.T) { // C1-02 openai, round c1: a non-nil media with no kind set
+		for name, m := range map[string]*tg.PollMedia{"zero": {}, "empty_photo_slice": {Photo: []tg.PhotoSize{}}} {
+			k, err := pollMediaKind(m)
+			require.NoError(t, err, name)
+			assert.Equal(t, "", k, name)
+		}
+	})
 	t.Run("two", func(t *testing.T) {
 		_, err := pollMediaKind(&tg.PollMedia{Location: &tg.Location{}, Photo: []tg.PhotoSize{{FileID: "ph"}}})
 		assert.EqualError(t, err, "poll media with 2 kinds: location, photo")

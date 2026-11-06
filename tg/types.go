@@ -286,18 +286,36 @@ type Poll struct {
 	CloseDate           int64           `json:"close_date,omitempty"`
 	CorrectOptionIDs    []int           `json:"correct_option_ids,omitempty"`   // 9.6: quiz only, when known to the bot
 	AllowsRevoting      bool            `json:"allows_revoting"`                // 9.6
+	MembersOnly         bool            `json:"members_only"`                   // 10.0: voting only for channel members
+	CountryCodes        []string        `json:"country_codes,omitempty"`        // 10.0: two-letter country codes of allowed voters
+	ExplanationMedia    *PollMedia      `json:"explanation_media,omitempty"`    // 10.0: quiz only
+	Media               *PollMedia      `json:"media,omitempty"`                // 10.0: media of the poll description
 	Description         string          `json:"description,omitempty"`          // 9.6
 	DescriptionEntities []MessageEntity `json:"description_entities,omitempty"` // 9.6
 }
 
 // PollOption contains information about one answer option in a poll.
 type PollOption struct {
-	Text         string `json:"text"`
-	VoterCount   int    `json:"voter_count"`
-	PersistentID string `json:"persistent_id"`           // 9.6: stays the same when options are added or deleted
-	AddedByUser  *User  `json:"added_by_user,omitempty"` // 9.6
-	AddedByChat  *Chat  `json:"added_by_chat,omitempty"` // 9.6
-	AdditionDate int64  `json:"addition_date,omitempty"` // 9.6
+	Text         string     `json:"text"`
+	Media        *PollMedia `json:"media,omitempty"` // 10.0
+	VoterCount   int        `json:"voter_count"`
+	PersistentID string     `json:"persistent_id"`           // 9.6: stays the same when options are added or deleted
+	AddedByUser  *User      `json:"added_by_user,omitempty"` // 9.6
+	AddedByChat  *Chat      `json:"added_by_chat,omitempty"` // 9.6
+	AdditionDate int64      `json:"addition_date,omitempty"` // 9.6
+}
+
+// PollMedia is a media in a poll, a poll option or a quiz explanation (Bot API 10.0). At most one field is set.
+type PollMedia struct {
+	Animation *Animation  `json:"animation,omitempty"`
+	Audio     *Audio      `json:"audio,omitempty"`
+	Document  *Document   `json:"document,omitempty"`
+	LivePhoto *LivePhoto  `json:"live_photo,omitempty"`
+	Location  *Location   `json:"location,omitempty"`
+	Photo     []PhotoSize `json:"photo,omitempty"`
+	Sticker   *Sticker    `json:"sticker,omitempty"`
+	Venue     *Venue      `json:"venue,omitempty"`
+	Video     *Video      `json:"video,omitempty"`
 }
 
 // PollOptionAdded is a service message: an option was added to a poll. Added in Bot API 9.6.

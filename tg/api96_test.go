@@ -309,6 +309,8 @@ func api96Strict(t *testing.T, b []byte, v any) error {
 func TestAPI96_StrictDecode(t *testing.T) {
 	// API100 T-tg-12: supports_guest_queries is modelled since 10.0 (tg.User.SupportsGuestQueries), so it is no
 	// longer deleted before the strict decode.
+	// API100C: members_only is modelled since 10.0 part c (tg.Poll.MembersOnly), so it is no longer deleted
+	// from the poll probes below.
 	getMeUnmodelled := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled",
 		"supports_join_request_queries"}
 	rows := []struct {
@@ -317,9 +319,9 @@ func TestAPI96_StrictDecode(t *testing.T) {
 		v    any
 	}{
 		{"User getMe (probe 01)", api96Sub(t, api96Probe01, nil, getMeUnmodelled...), &tg.User{}},
-		{"Poll quiz (probe 02)", api96Sub(t, api96Probe02, []any{"poll"}, "members_only"), &tg.Poll{}},
-		{"Poll quiz multi (probe 04)", api96Sub(t, api96Probe04, []any{"poll"}, "members_only"), &tg.Poll{}},
-		{"Poll regular (probe 05)", api96Sub(t, api96Probe05, []any{"poll"}, "members_only"), &tg.Poll{}},
+		{"Poll quiz (probe 02)", api96Sub(t, api96Probe02, []any{"poll"}), &tg.Poll{}},
+		{"Poll quiz multi (probe 04)", api96Sub(t, api96Probe04, []any{"poll"}), &tg.Poll{}},
+		{"Poll regular (probe 05)", api96Sub(t, api96Probe05, []any{"poll"}), &tg.Poll{}},
 		{"PollOption (probe 02)", api96Sub(t, api96Probe02, []any{"poll", "options", 0}), &tg.PollOption{}},
 		{"PollOption added (synthetic)", api96Sub(t, api96AddedOption, nil), &tg.PollOption{}},
 		{"PollAnswer (synthetic)", api96Sub(t, api96PollAnswer, []any{"poll_answer"}), &tg.PollAnswer{}},
@@ -346,7 +348,7 @@ func TestAPI96_EncodeZeroValues(t *testing.T) {
 		want string
 	}{
 		{"Poll", tg.Poll{}, `{"id":"","question":"","options":null,"total_voter_count":0,"is_closed":false,` +
-			`"is_anonymous":false,"type":"","allows_multiple_answers":false,"allows_revoting":false}`},
+			`"is_anonymous":false,"type":"","allows_multiple_answers":false,"allows_revoting":false,"members_only":false}`},
 		{"PollOption", tg.PollOption{}, `{"text":"","voter_count":0,"persistent_id":""}`},
 		{"PollAnswer", tg.PollAnswer{}, `{"poll_id":"","option_ids":null,"option_persistent_ids":null}`},
 	}

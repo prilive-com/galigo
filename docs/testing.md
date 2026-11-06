@@ -671,7 +671,7 @@ go run ./cmd/galigo-testbot --run api95                  # All 9.5 tests
 # Bot API 9.6 scenarios (S47-S50)
 go run ./cmd/galigo-testbot --run api96                  # All 9.6 tests
 
-# Bot API 10.0 scenarios (S51-S54, S57-S62)
+# Bot API 10.0 scenarios (S51-S54, S57-S65)
 go run ./cmd/galigo-testbot --run api100                 # All 10.0 tests
 go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 
@@ -795,7 +795,7 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S49-ReplyToPollOption | sendPoll, sendMessage | Reply to a poll option with `reply_parameters.poll_option_id` |
 | S50-PreparedKeyboardButton | savePreparedKeyboardButton | Save a prepared keyboard button for the first `TESTBOT_ADMINS` user |
 
-#### Bot API 10.0 (S51-S54, S57-S62)
+#### Bot API 10.0 (S51-S54, S57-S65)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
@@ -809,6 +809,9 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S60-PollOptionCount | sendPoll | Polls with 1 and with 12 options (Bot API 10.0 allows 1-12) |
 | S61-PollMembersOnly | sendPoll | Poll with `members_only`: in the group test chat the server refuses it (channel chats only), and the step accepts that refusal as a smoke check; in a channel the reply's `members_only` is checked (the exact field on the wire is proved by mock tests) |
 | S62-PollCountryCodes | sendPoll | Poll with `country_codes` `["DE","FT"]`: the same channel-only refusal or check as S61 |
+| S63-PollMediaDescription | sendPoll | Poll with description media: a photo upload, then a location (multipart without files); the reply's `media` kind is checked |
+| S64-PollOptionMedia | sendPoll | Poll whose options have media: location (with `horizontal_accuracy`), venue, sticker upload with `emoji`, photo upload, and a plain option; each option's media kind is checked (emoji, coordinates and venue fields are proved by mock tests, the server does not echo them all) |
+| S65-QuizExplanationMedia | sendPoll | Quiz (not anonymous) with a photo option and a text document upload as `explanation_media`; the option and explanation media kinds are checked |
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -914,7 +917,7 @@ cmd/galigo-testbot/
 │   ├── api94.go       # Phase H: Bot API 9.4 (S38-S42: styled buttons, profile audios, video qualities)
 │   ├── api95.go       # Bot API 9.5 (S44-S46: date_time entity, member tags, message streaming)
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
-│   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S62: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
+│   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

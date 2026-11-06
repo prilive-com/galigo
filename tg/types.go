@@ -45,6 +45,7 @@ type Message struct {
 	Document              *Document             `json:"document,omitempty"`
 	Animation             *Animation            `json:"animation,omitempty"`
 	Video                 *Video                `json:"video,omitempty"`
+	LivePhoto             *LivePhoto            `json:"live_photo,omitempty"` // 10.0; Photo is also set (spec)
 	Audio                 *Audio                `json:"audio,omitempty"`
 	Voice                 *Voice                `json:"voice,omitempty"`
 	Sticker               *Sticker              `json:"sticker,omitempty"`
@@ -189,6 +190,19 @@ type Video struct {
 	MimeType     string         `json:"mime_type,omitempty"`
 	FileSize     int64          `json:"file_size,omitempty"`
 	Qualities    []VideoQuality `json:"qualities,omitempty"` // 9.4
+}
+
+// LivePhoto represents a live photo (Bot API 10.0): a short video with its static photo.
+// FileID and FileUniqueID identify the video; Photo holds the sizes of the static photo.
+type LivePhoto struct {
+	Photo        []PhotoSize `json:"photo,omitempty"`
+	FileID       string      `json:"file_id"`
+	FileUniqueID string      `json:"file_unique_id"`
+	Width        int         `json:"width"`
+	Height       int         `json:"height"`
+	Duration     int         `json:"duration"`
+	MimeType     string      `json:"mime_type,omitempty"`
+	FileSize     int64       `json:"file_size,omitempty"` // up to 52 bits (spec)
 }
 
 // Audio represents an audio file.

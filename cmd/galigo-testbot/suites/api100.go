@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 )
 
 // ==================== Bot API 10.0 Scenarios (part a) ====================
@@ -66,12 +67,69 @@ func S54_EmptyDraft() engine.Scenario {
 	}
 }
 
-// AllAPI100Scenarios returns the Bot API 10.0 (part a) scenarios.
+// ==================== Bot API 10.0 Scenarios (part b: live photos) ====================
+
+// S57_SendLivePhoto uploads a live photo (the fixture video and photo), then sends it again by the captured ids.
+func S57_SendLivePhoto() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S57-SendLivePhoto",
+		ScenarioDescription: "sendLivePhoto by upload and by file_id (10.0)",
+		CoveredMethods:      []string{"sendLivePhoto"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendLivePhoto100Step{},
+			&engine.SendLivePhoto100Step{ByFileID: true},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S58_LivePhotoAlbum sends an album of two live photos by upload, then by the ids captured from a single upload.
+func S58_LivePhotoAlbum() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S58-LivePhotoAlbum",
+		ScenarioDescription: "sendMediaGroup with live photo items, by upload and by file_id (10.0)",
+		CoveredMethods:      []string{"sendMediaGroup"},
+		ScenarioTimeout:     90 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendLivePhoto100Step{},
+			&engine.LivePhotoAlbum100Step{},
+			&engine.LivePhotoAlbum100Step{ByFileID: true},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S59_EditToLivePhoto edits a plain photo message into a live photo with editMessageMedia.
+func S59_EditToLivePhoto() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S59-EditToLivePhoto",
+		ScenarioDescription: "editMessageMedia from a photo into a live photo (10.0)",
+		CoveredMethods:      []string{"editMessageMedia"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendLivePhoto100Step{},
+			&engine.SendPhotoStep{
+				Photo:   engine.MediaFromBytes(fixtures.PhotoBytes(), "galigo-live-edit.jpg", "photo"),
+				Caption: "galigo 10.0 live photo: plain photo, will be replaced",
+			},
+			&engine.EditToLivePhoto100Step{},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// AllLivePhotoScenarios returns the Bot API 10.0 live photo scenarios (the live-photos sub-suite).
+func AllLivePhotoScenarios() []engine.Scenario {
+	return []engine.Scenario{S57_SendLivePhoto(), S58_LivePhotoAlbum(), S59_EditToLivePhoto()}
+}
+
+// AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, then the live photos of part b).
 func AllAPI100Scenarios() []engine.Scenario {
-	return []engine.Scenario{
+	return append([]engine.Scenario{
 		S51_DeleteReactions(),
 		S52_ChatPermissionsReact(),
 		S53_AdminsWithBots(),
 		S54_EmptyDraft(),
-	}
+	}, AllLivePhotoScenarios()...)
 }

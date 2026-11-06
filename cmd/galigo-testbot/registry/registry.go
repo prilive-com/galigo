@@ -48,6 +48,7 @@ var AllMethods = []Method{
 	{Name: "sendVoice", Category: CategoryMessaging},
 	{Name: "sendVideoNote", Category: CategoryMessaging},
 	{Name: "sendSticker", Category: CategoryMessaging},
+	{Name: "sendLivePhoto", Category: CategoryMessaging}, // 10.0
 
 	// Albums
 	{Name: "sendMediaGroup", Category: CategoryMessaging},

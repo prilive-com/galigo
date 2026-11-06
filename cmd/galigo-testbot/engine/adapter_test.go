@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -167,5 +171,63 @@ func TestSenderAdapter100(t *testing.T) {
 		require.Equal(t, 1, server.CaptureCount())
 		server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/getChatAdministrators")
 		assert.JSONEq(t, `{"chat_id":-1001234567890,"return_bots":true}`, server.LastCapture().BodyString())
+	})
+}
+
+// adapterForm decodes a captured multipart body into its form values and file parts (name -> file name, bytes).
+func adapterForm(t *testing.T, c *testutil.Capture) (map[string]string, map[string][2]string) {
+	t.Helper()
+	mediaType, params, err := mime.ParseMediaType(c.ContentType)
+	require.NoError(t, err)
+	require.Equal(t, "multipart/form-data", mediaType)
+	args, files := map[string]string{}, map[string][2]string{}
+	r := multipart.NewReader(bytes.NewReader(c.Body), params["boundary"])
+	for {
+		part, err := r.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		data, err := io.ReadAll(part)
+		require.NoError(t, err)
+		if part.FileName() != "" {
+			files[part.FormName()] = [2]string{part.FileName(), string(data)}
+		} else {
+			args[part.FormName()] = string(data)
+		}
+	}
+	return args, files
+}
+
+func TestSenderAdapter100B(t *testing.T) { // API100B T-tb-6
+	newAdapter := func(t *testing.T, path string, reply http.HandlerFunc) (*SenderAdapter, *testutil.MockTelegramServer) {
+		server := testutil.NewMockServer(t)
+		server.On("/bot"+testutil.TestToken+"/"+path, reply)
+		return NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), server
+	}
+	t.Run("SendLivePhoto upload video, photo by id, caption", func(t *testing.T) {
+		a, server := newAdapter(t, "sendLivePhoto", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyMessage(w, 5) })
+		msg, err := a.SendLivePhoto(context.Background(), -1001234567890,
+			MediaFromBytes([]byte("vid-bytes"), "v.mp4", ""), MediaFromFileID("P"), "cap")
+		require.NoError(t, err)
+		require.NotNil(t, msg)
+		require.Equal(t, 1, server.CaptureCount())
+		server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/sendLivePhoto")
+		args, files := adapterForm(t, server.LastCapture())
+		assert.Equal(t, map[string]string{"chat_id": "-1001234567890", "photo": "P", "caption": "cap"}, args)
+		assert.Equal(t, map[string][2]string{"live_photo": {"v.mp4", "vid-bytes"}}, files)
+	})
+	t.Run("SendMediaGroup live item", func(t *testing.T) {
+		a, server := newAdapter(t, "sendMediaGroup", func(w http.ResponseWriter, _ *http.Request) {
+			testutil.ReplyOK(w, []*tg.Message{testutil.TestMessage(1, "")})
+		})
+		_, err := a.SendMediaGroup(context.Background(), -1001234567890, []MediaInput{
+			{Type: "live_photo", FileID: "V", Photo: &MediaInput{FileID: "P"}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		args, files := adapterForm(t, server.LastCapture())
+		assert.Empty(t, files)
+		assert.JSONEq(t, `[{"type":"live_photo","media":"V","photo":"P"}]`, args["media"])
 	})
 }

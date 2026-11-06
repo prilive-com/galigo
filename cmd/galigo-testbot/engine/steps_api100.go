@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // ==================== Bot API 10.0 Steps ====================
@@ -149,5 +151,199 @@ func (s *EmptyDraft100Step) Execute(ctx context.Context, rt *Runtime) (*StepResu
 		return res, err
 	}
 	res.Evidence = map[string]any{"chat_id": rt.AdminUserID, "draft_id": 100}
+	return res, nil
+}
+
+// ==================== Bot API 10.0 part b: live photos ====================
+//
+// Each live photo step makes one Telegram call. A send step tracks every returned message and fills MessageIDs
+// before any check of the reply, and on a failed check returns that result with the error, so a failed run still
+// lists every sent id for cleanup (PLAN §8 P3-01). File ids are captured under these keys.
+const (
+	liveVideoKey = "live_video" // LivePhoto.FileID of the last upload
+	liveStillKey = "live_still" // the last LivePhoto.Photo size's FileID of the last upload
+)
+
+// liveCaptured returns the captured video and still ids, or an error naming a missing or empty key.
+func liveCaptured(rt *Runtime) (string, string, error) {
+	video, still := rt.CapturedFileIDs[liveVideoKey], rt.CapturedFileIDs[liveStillKey]
+	if video == "" {
+		return "", "", fmt.Errorf("no file_id captured for key %q", liveVideoKey)
+	}
+	if still == "" {
+		return "", "", fmt.Errorf("no file_id captured for key %q", liveStillKey)
+	}
+	return video, still, nil
+}
+
+// liveIDs returns the video id and the last static size's id of a live photo message.
+func liveIDs(msg *tg.Message) (string, string) {
+	sizes := msg.LivePhoto.Photo
+	return msg.LivePhoto.FileID, sizes[len(sizes)-1].FileID
+}
+
+// SendLivePhoto100Step sends a live photo: the fixture video and photo, or the ids captured by an earlier upload.
+// An upload captures the reply's ids. The reply must be a live photo and, when Caption is set, carry it.
+type SendLivePhoto100Step struct {
+	ByFileID bool
+	Caption  string
+}
+
+func (s *SendLivePhoto100Step) Name() string { return "sendLivePhoto (10.0)" }
+
+func (s *SendLivePhoto100Step) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendLivePhoto"}
+	var video, photo MediaInput
+	var fileIDs []string
+	if s.ByFileID {
+		v, p, err := liveCaptured(rt)
+		if err != nil {
+			return res, fmt.Errorf("sendLivePhoto: %w", err)
+		}
+		video, photo, fileIDs = MediaFromFileID(v), MediaFromFileID(p), []string{v, p}
+	} else {
+		video = MediaFromBytes(fixtures.VideoBytes(), "galigo-live.mp4", "")
+		photo = MediaFromBytes(fixtures.PhotoBytes(), "galigo-live.jpg", "")
+	}
+
+	msg, err := rt.Sender.SendLivePhoto(ctx, rt.ChatID, video, photo, s.Caption)
+	if err != nil {
+		return res, err
+	}
+	if msg == nil {
+		return res, errors.New("sendLivePhoto: no message in the reply")
+	}
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	rt.LastMessage = msg
+	res.MessageIDs = []int{msg.MessageID}
+
+	if !hasMediaKind(msg, "live_photo") {
+		return res, errors.New("sendLivePhoto: the reply is not a live photo")
+	}
+	if s.Caption != "" && msg.Caption != s.Caption {
+		return res, fmt.Errorf("sendLivePhoto: caption %q, want %q", msg.Caption, s.Caption)
+	}
+	if !s.ByFileID {
+		v, p := liveIDs(msg)
+		rt.CapturedFileIDs[liveVideoKey] = v
+		rt.CapturedFileIDs[liveStillKey] = p
+		fileIDs = []string{v, p}
+	}
+
+	res.FileIDs = fileIDs
+	res.Evidence = map[string]any{
+		"message_id": msg.MessageID,
+		"by_file_id": s.ByFileID,
+		"caption":    s.Caption,
+		"file_ids":   fileIDs,
+	}
+	return res, nil
+}
+
+// LivePhotoAlbum100Step sends an album of two live photos (uploads, or the captured ids) and expects exactly two
+// live photo messages back.
+type LivePhotoAlbum100Step struct {
+	ByFileID bool
+}
+
+func (s *LivePhotoAlbum100Step) Name() string { return "sendMediaGroup live photos (10.0)" }
+
+func (s *LivePhotoAlbum100Step) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendMediaGroup"}
+	var media []MediaInput
+	var sentIDs []string
+	if s.ByFileID {
+		v, p, err := liveCaptured(rt)
+		if err != nil {
+			return res, fmt.Errorf("sendMediaGroup: %w", err)
+		}
+		for range 2 {
+			media = append(media, MediaInput{FileID: v, Type: "live_photo", Photo: &MediaInput{FileID: p}})
+		}
+		sentIDs = []string{v, p}
+	} else {
+		for i := 1; i <= 2; i++ {
+			item := MediaFromBytes(fixtures.VideoBytes(), fmt.Sprintf("galigo-live-%d.mp4", i), "live_photo")
+			still := MediaFromBytes(fixtures.PhotoBytes(), fmt.Sprintf("galigo-live-%d.jpg", i), "")
+			item.Photo = &still
+			media = append(media, item)
+		}
+	}
+
+	messages, err := rt.Sender.SendMediaGroup(ctx, rt.ChatID, media)
+	if err != nil {
+		return res, err
+	}
+	for _, msg := range messages {
+		if msg == nil {
+			continue
+		}
+		rt.TrackMessage(rt.ChatID, msg.MessageID)
+		res.MessageIDs = append(res.MessageIDs, msg.MessageID)
+	}
+	if len(messages) > 0 {
+		rt.LastMessage = messages[len(messages)-1]
+	}
+
+	if len(messages) != len(media) {
+		return res, fmt.Errorf("sendMediaGroup: album has %d messages, want %d", len(messages), len(media))
+	}
+	fileIDs := sentIDs
+	for i, msg := range messages {
+		if !hasMediaKind(msg, "live_photo") {
+			return res, fmt.Errorf("sendMediaGroup: album message %d is not a live photo", i+1)
+		}
+		if !s.ByFileID {
+			v, p := liveIDs(msg)
+			fileIDs = append(fileIDs, v, p)
+		}
+	}
+
+	res.FileIDs = fileIDs
+	res.Evidence = map[string]any{
+		"message_count": len(messages),
+		"message_ids":   res.MessageIDs,
+		"by_file_id":    s.ByFileID,
+		"file_ids":      fileIDs,
+	}
+	return res, nil
+}
+
+// EditToLivePhoto100Step edits the last message (a plain photo) into a live photo with the captured ids. The
+// reply must keep the message id and be a live photo.
+type EditToLivePhoto100Step struct{}
+
+func (s *EditToLivePhoto100Step) Name() string { return "editMessageMedia live photo (10.0)" }
+
+func (s *EditToLivePhoto100Step) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "editMessageMedia"}
+	if rt.LastMessage == nil {
+		return res, errors.New("editMessageMedia: no message to edit")
+	}
+	v, p, err := liveCaptured(rt)
+	if err != nil {
+		return res, fmt.Errorf("editMessageMedia: %w", err)
+	}
+	msgID := rt.LastMessage.MessageID
+
+	media := sender.NewInputMediaLivePhoto(sender.FromFileID(v), sender.FromFileID(p))
+	msg, err := rt.Sender.EditMessageMedia(ctx, rt.ChatID, msgID, media)
+	if err != nil {
+		return res, err
+	}
+	if msg == nil {
+		return res, errors.New("editMessageMedia: no message in the reply")
+	}
+	rt.LastMessage = msg
+
+	if msg.MessageID != msgID {
+		return res, fmt.Errorf("editMessageMedia: reply message id %d, want %d", msg.MessageID, msgID)
+	}
+	if !hasMediaKind(msg, "live_photo") {
+		return res, errors.New("editMessageMedia: the edited message is not a live photo")
+	}
+
+	res.FileIDs = []string{v, p}
+	res.Evidence = map[string]any{"message_id": msgID, "file_ids": res.FileIDs}
 	return res, nil
 }

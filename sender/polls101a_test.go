@@ -18,13 +18,13 @@ import (
 
 // T-s-1: the new API has the planned types (a wrong type does not compile).
 func TestAPI101A_Shapes(t *testing.T) {
-	var _ func(string) sender.InputMedia = sender.NewInputMediaLink
+	hasType[func(string) sender.InputMedia](sender.NewInputMediaLink) // hasType: inputmedia100d_test.go
 	var m sender.InputMedia
-	var _ string = m.URL
+	hasType[string](m.URL)
 	var p tg.PollMedia
-	var _ *tg.Link = p.Link
+	hasType[*tg.Link](p.Link)
 	var l tg.Link
-	var _ string = l.URL
+	hasType[string](l.URL)
 }
 
 // T-s-2: the constructor sets the type and the link URL, and nothing else.

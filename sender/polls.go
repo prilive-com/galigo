@@ -35,6 +35,8 @@ type SendPollRequest struct {
 	ShuffleOptions         bool               `json:"shuffle_options,omitempty"`           // 9.6
 	AllowAddingOptions     bool               `json:"allow_adding_options,omitempty"`      // 9.6
 	HideResultsUntilCloses bool               `json:"hide_results_until_closes,omitempty"` // 9.6
+	MembersOnly            bool               `json:"members_only,omitempty"`              // 10.0: channel chats only
+	CountryCodes           []string           `json:"country_codes,omitempty"`             // 10.0: channel chats only
 	Description            string             `json:"description,omitempty"`               // 9.6
 	DescriptionParseMode   tg.ParseMode       `json:"description_parse_mode,omitempty"`    // 9.6
 	DescriptionEntities    []tg.MessageEntity `json:"description_entities,omitempty"`      // 9.6
@@ -56,7 +58,7 @@ type StopPollRequest struct {
 
 // ================== Poll Methods ==================
 
-// SendPollSimple sends a simple regular poll.
+// SendPollSimple sends a simple regular poll with 1-12 options (Bot API 10.0).
 func (c *Client) SendPollSimple(ctx context.Context, chatID tg.ChatID, question string, options []string, opts ...PollOption) (*tg.Message, error) {
 	if err := validateChatID(chatID); err != nil {
 		return nil, err
@@ -64,11 +66,11 @@ func (c *Client) SendPollSimple(ctx context.Context, chatID tg.ChatID, question 
 	if question == "" {
 		return nil, tg.NewValidationError("question", "cannot be empty")
 	}
-	if len(options) < 2 {
-		return nil, tg.NewValidationError("options", "must have at least 2 options")
+	if len(options) < 1 {
+		return nil, tg.NewValidationError("options", "must have at least 1 option")
 	}
-	if len(options) > 10 {
-		return nil, tg.NewValidationError("options", "cannot exceed 10 options")
+	if len(options) > 12 {
+		return nil, tg.NewValidationError("options", "cannot exceed 12 options")
 	}
 
 	inputOptions := make([]InputPollOption, len(options))

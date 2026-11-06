@@ -56,9 +56,9 @@ func TestSendPollSimple_Validation_TooFewOptions(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	client := testutil.NewTestClient(t, server.BaseURL())
 
-	_, err := client.SendPollSimple(context.Background(), int64(-100123), "Q?", []string{"A"})
+	_, err := client.SendPollSimple(context.Background(), int64(-100123), "Q?", []string{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least 2")
+	assert.Contains(t, err.Error(), "at least 1")
 	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
 }
 
@@ -67,9 +67,9 @@ func TestSendPollSimple_Validation_TooManyOptions(t *testing.T) {
 	client := testutil.NewTestClient(t, server.BaseURL())
 
 	_, err := client.SendPollSimple(context.Background(), int64(-100123), "Q?",
-		[]string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"})
+		[]string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "10")
+	assert.Contains(t, err.Error(), "cannot exceed 12")
 	assert.Equal(t, 0, server.CaptureCount(), "validation should fail before HTTP call")
 }
 

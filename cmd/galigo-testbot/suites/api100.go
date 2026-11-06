@@ -5,6 +5,7 @@ import (
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
+	"github.com/prilive-com/galigo/sender"
 )
 
 // ==================== Bot API 10.0 Scenarios (part a) ====================
@@ -119,17 +120,65 @@ func S59_EditToLivePhoto() engine.Scenario {
 	}
 }
 
+// S60_PollOptionCount sends polls with 1 and with 12 options (Bot API 10.0: 1-12 options).
+func S60_PollOptionCount() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S60-PollOptionCount",
+		ScenarioDescription: "sendPoll with 1 and with 12 options (10.0)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPollSimpleStep{Question: "galigo 10.0 poll, 1 option", Options: []string{"only"}},
+			&engine.SendPollSimpleStep{Question: "galigo 10.0 poll, 12 options", Options: []string{
+				"o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10", "o11", "o12"}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S61_PollMembersOnly sends a poll with members_only. In a group the server refuses it (channel chats only),
+// which the step accepts as a smoke check; in a channel the reply's members_only is checked.
+func S61_PollMembersOnly() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S61-PollMembersOnly",
+		ScenarioDescription: "sendPoll with members_only (10.0; channel chats only)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPoll100Step{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, members only",
+				Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}}, MembersOnly: true}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S62_PollCountryCodes sends a poll with country_codes, like S61.
+func S62_PollCountryCodes() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S62-PollCountryCodes",
+		ScenarioDescription: "sendPoll with country_codes (10.0; channel chats only)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPoll100Step{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, country codes",
+				Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}}, CountryCodes: []string{"DE", "FT"}}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllLivePhotoScenarios returns the Bot API 10.0 live photo scenarios (the live-photos sub-suite).
 func AllLivePhotoScenarios() []engine.Scenario {
 	return []engine.Scenario{S57_SendLivePhoto(), S58_LivePhotoAlbum(), S59_EditToLivePhoto()}
 }
 
-// AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, then the live photos of part b).
+// AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, live photos of part b, polls of part c).
 func AllAPI100Scenarios() []engine.Scenario {
-	return append([]engine.Scenario{
+	s := append([]engine.Scenario{
 		S51_DeleteReactions(),
 		S52_ChatPermissionsReact(),
 		S53_AdminsWithBots(),
 		S54_EmptyDraft(),
 	}, AllLivePhotoScenarios()...)
+	return append(s, S60_PollOptionCount(), S61_PollMembersOnly(), S62_PollCountryCodes())
 }

@@ -671,7 +671,7 @@ go run ./cmd/galigo-testbot --run api95                  # All 9.5 tests
 # Bot API 9.6 scenarios (S47-S50)
 go run ./cmd/galigo-testbot --run api96                  # All 9.6 tests
 
-# Bot API 10.0 scenarios (S51-S54, S57-S59)
+# Bot API 10.0 scenarios (S51-S54, S57-S62)
 go run ./cmd/galigo-testbot --run api100                 # All 10.0 tests
 go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 
@@ -795,7 +795,7 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S49-ReplyToPollOption | sendPoll, sendMessage | Reply to a poll option with `reply_parameters.poll_option_id` |
 | S50-PreparedKeyboardButton | savePreparedKeyboardButton | Save a prepared keyboard button for the first `TESTBOT_ADMINS` user |
 
-#### Bot API 10.0 (S51-S54, S57-S59)
+#### Bot API 10.0 (S51-S54, S57-S62)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
@@ -806,6 +806,9 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S57-SendLivePhoto | sendLivePhoto | Send a live photo by upload (video + still), then again by the returned `file_id`s |
 | S58-LivePhotoAlbum | sendLivePhoto, sendMediaGroup | Album of two live photos by upload, then by `file_id` |
 | S59-EditToLivePhoto | sendLivePhoto, sendPhoto, editMessageMedia | Replace a plain photo with a live photo through `editMessageMedia` |
+| S60-PollOptionCount | sendPoll | Polls with 1 and with 12 options (Bot API 10.0 allows 1-12) |
+| S61-PollMembersOnly | sendPoll | Poll with `members_only`: in the group test chat the server refuses it (channel chats only), and the step accepts that refusal as a smoke check; in a channel the reply's `members_only` is checked (the exact field on the wire is proved by mock tests) |
+| S62-PollCountryCodes | sendPoll | Poll with `country_codes` `["DE","FT"]`: the same channel-only refusal or check as S61 |
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -891,7 +894,7 @@ cmd/galigo-testbot/
 │   ├── steps_api94.go         # Bot API 9.4 steps (styled buttons, profile audios, video qualities)
 │   ├── steps_api95.go         # Bot API 9.5 steps (date_time entity, member tags, message streaming)
 │   ├── steps_api96.go         # Bot API 9.6 steps (polls, quizzes, poll option replies, prepared buttons)
-│   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos)
+│   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -911,7 +914,7 @@ cmd/galigo-testbot/
 │   ├── api94.go       # Phase H: Bot API 9.4 (S38-S42: styled buttons, profile audios, video qualities)
 │   ├── api95.go       # Bot API 9.5 (S44-S46: date_time entity, member tags, message streaming)
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
-│   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S59: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos)
+│   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S62: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

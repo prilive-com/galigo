@@ -668,4 +668,21 @@ func TestPolls100D_TypedNilInAny(t *testing.T) {
 		assert.NotContains(t, args, "media")
 		assert.NotContains(t, args, "explanation_media")
 	})
+	// C2-01 openai, round c2: the nil value's "no multipart" answer comes after an option with media; the earlier
+	// answer must stay (formOnly = formOnly || needsForm). No upload, so only that answer makes the request multipart.
+	t.Run("option_media_then_nil", func(t *testing.T) {
+		photo := sender.NewInputMediaPhoto(sender.FromFileID("P"))
+		mediaType, args, files, err := polls100dSend(t, sender.SendPollRequest{
+			Options:     []sender.InputPollOption{{Text: "a", Media: &photo}, {Text: "b"}},
+			ReplyMarkup: nilMedia,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "multipart/form-data", mediaType)
+		assert.Empty(t, files)
+		assert.Equal(t, map[string]any{
+			"chat_id":  args["chat_id"],
+			"question": "Q",
+			"options":  pj(t, `[{"text":"a","media":{"type":"photo","media":"P"}},{"text":"b"}]`),
+		}, args)
+	})
 }

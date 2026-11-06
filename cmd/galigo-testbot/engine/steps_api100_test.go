@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"testing"
 	"time"
@@ -964,4 +965,247 @@ func TestAPI100B_HasMediaKindLive(t *testing.T) { // API100B T-tb-7
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) { assert.Equal(t, r.want, hasMediaKind(r.msg, r.kind)) })
 	}
+}
+
+// ==================== Bot API 10.0 part c (B-25 slice 2c, TEST-PLAN §4, T-tb-1 … T-tb-8) ====================
+
+// fakePoll100 is a SenderClient for the poll steps: it embeds the interface (any other method panics), records
+// every SendPoll / SendPollSimple request whole, and answers with one scripted reply or error.
+type fakePoll100 struct {
+	SenderClient
+	polls   []sender.SendPollRequest
+	simples []fakePoll100Simple
+	msg     *tg.Message
+	err     error
+}
+
+type fakePoll100Simple struct {
+	chatID   int64
+	question string
+	options  []string
+}
+
+func (f *fakePoll100) SendPoll(_ context.Context, req sender.SendPollRequest) (*tg.Message, error) {
+	f.polls = append(f.polls, req)
+	return f.msg, f.err
+}
+
+func (f *fakePoll100) SendPollSimple(_ context.Context, chatID int64, question string, options []string) (*tg.Message, error) {
+	f.simples = append(f.simples, fakePoll100Simple{chatID, question, options})
+	return f.msg, f.err
+}
+
+const poll100MsgID = 5151 // ≠ any id the step could invent (chat 123456789, admin 987654321, last message 4242)
+
+// poll100Reply is a sendPoll reply with n options and the given restriction fields.
+func poll100Reply(n int, members bool, codes []string) *tg.Message {
+	opts := make([]tg.PollOption, n)
+	for i := range opts {
+		opts[i] = tg.PollOption{Text: string(rune('a' + i)), PersistentID: string(rune('0' + i))}
+	}
+	return &tg.Message{MessageID: poll100MsgID, Chat: &tg.Chat{ID: testutil.TestChatID},
+		Poll: &tg.Poll{ID: "p", Question: "Q", Options: opts, Type: "regular", MembersOnly: members, CountryCodes: codes}}
+}
+
+func poll100Req(members bool, codes []string) sender.SendPollRequest {
+	return sender.SendPollRequest{Question: "Q", Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}},
+		MembersOnly: members, CountryCodes: codes}
+}
+
+func poll100Run(t *testing.T, req sender.SendPollRequest, msg *tg.Message, err error) (*fakePoll100, *Runtime, *StepResult, error) {
+	t.Helper()
+	f := &fakePoll100{msg: msg, err: err}
+	rt := api100Runtime(nil)
+	rt.Sender = f
+	res, stepErr := (&SendPoll100Step{Req: req}).Execute(context.Background(), rt)
+	return f, rt, res, stepErr
+}
+
+func poll100Channel() *tg.APIError {
+	return &tg.APIError{Code: 400, Description: "Bad Request: poll voters can be restricted only in channel chats"}
+}
+
+// T-tb-1: a success with each restriction echoed (T1-05, T1-10).
+func TestSendPoll100Step_Echo(t *testing.T) {
+	rows := []struct {
+		name    string
+		members bool
+		codes   []string
+	}{{"members", true, nil}, {"countries", false, []string{"DE", "FT"}}}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			req := poll100Req(r.members, r.codes)
+			reply := poll100Reply(2, r.members, r.codes)
+			f, rt, res, err := poll100Run(t, req, reply, nil)
+			require.NoError(t, err)
+			require.Len(t, f.polls, 1)
+			want := req
+			want.ChatID = testutil.TestChatID
+			assert.Equal(t, want, f.polls[0])
+			assert.Same(t, reply, rt.LastMessage)
+			assert.Equal(t, []int{poll100MsgID}, liveTracked(rt))
+			require.NotNil(t, res)
+			assert.Equal(t, []int{poll100MsgID}, res.MessageIDs)
+			assert.Equal(t, "sendPoll", res.Method)
+			assert.Equal(t, map[string]any{"message_id": poll100MsgID, "options_reply": 2,
+				"members_only": r.members, "country_codes": r.codes}, res.Evidence)
+		})
+	}
+}
+
+// T-tb-2: a reply that does not echo the request fails, keeps the message tracked and the id in the result
+// (T1-05, T2-02).
+func TestSendPoll100Step_BadEcho(t *testing.T) {
+	rows := []struct {
+		name  string
+		req   sender.SendPollRequest
+		reply *tg.Message
+	}{
+		{"members false for true", poll100Req(true, nil), poll100Reply(2, false, nil)},
+		{"members true for false", poll100Req(false, []string{"DE", "FT"}), poll100Reply(2, true, []string{"DE", "FT"})},
+		{"countries shorter", poll100Req(false, []string{"DE", "FT"}), poll100Reply(2, false, []string{"DE"})},
+		{"countries duplicate", poll100Req(false, []string{"DE", "FT"}), poll100Reply(2, false, []string{"DE", "DE"})},
+		{"countries other", poll100Req(false, []string{"DE", "FT"}), poll100Reply(2, false, []string{"DE", "US"})},
+		{"countries for none", poll100Req(true, nil), poll100Reply(2, true, []string{"DE"})},
+		{"option count", poll100Req(true, nil), poll100Reply(1, true, nil)},
+		{"no poll", poll100Req(true, nil), &tg.Message{MessageID: poll100MsgID, Chat: &tg.Chat{ID: testutil.TestChatID}}},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			f, rt, res, err := poll100Run(t, r.req, r.reply, nil)
+			require.Error(t, err)
+			assert.Len(t, f.polls, 1)
+			assert.Equal(t, []int{poll100MsgID}, liveTracked(rt))
+			require.NotNil(t, res)
+			assert.Equal(t, []int{poll100MsgID}, res.MessageIDs)
+		})
+	}
+}
+
+// T-tb-3: nil and empty country lists are equal, and the order of the codes does not matter: the API does not
+// promise to return them in request order (c1 C1-02).
+func TestSendPoll100Step_NilEmpty(t *testing.T) {
+	for name, c := range map[string][2][]string{"nil wanted": {nil, {}}, "empty wanted": {{}, nil},
+		"reordered": {{"DE", "FT"}, {"FT", "DE"}}} {
+		t.Run(name, func(t *testing.T) {
+			f, _, _, err := poll100Run(t, poll100Req(true, c[0]), poll100Reply(2, true, c[1]), nil)
+			require.NoError(t, err)
+			assert.Len(t, f.polls, 1)
+		})
+	}
+}
+
+// T-tb-4: the channel-only refusal passes when a restriction was asked for (T1-04).
+func TestSendPoll100Step_Refused(t *testing.T) {
+	suffix := poll100Channel()
+	suffix.Description += ", x"
+	rows := []struct {
+		name string
+		req  sender.SendPollRequest
+		err  error
+	}{
+		{"members", poll100Req(true, nil), poll100Channel()},
+		{"countries", poll100Req(false, []string{"DE", "FT"}), poll100Channel()},
+		{"wrapped", poll100Req(true, nil), fmt.Errorf("send: %w", poll100Channel())},
+		{"suffix", poll100Req(true, nil), suffix},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			f, rt, res, err := poll100Run(t, r.req, nil, r.err)
+			require.NoError(t, err)
+			assert.Len(t, f.polls, 1)
+			require.NotNil(t, res)
+			assert.Equal(t, map[string]any{"refused": "channel only"}, res.Evidence)
+			assert.Empty(t, res.MessageIDs)
+			assert.Empty(t, rt.CreatedMessages)
+		})
+	}
+}
+
+// T-tb-5: the same refusal fails when no restriction was asked for (T1-04).
+func TestSendPoll100Step_RefusedUnset(t *testing.T) {
+	for name, req := range map[string]sender.SendPollRequest{
+		"neither": poll100Req(false, nil), "empty countries": poll100Req(false, []string{}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, _, _, err := poll100Run(t, req, nil, poll100Channel())
+			require.Error(t, err)
+			assert.Len(t, f.polls, 1)
+		})
+	}
+}
+
+// T-tb-6: any other error fails (T1-04).
+func TestSendPoll100Step_OtherErrors(t *testing.T) {
+	rows := map[string]error{
+		"other 400":        &tg.APIError{Code: 400, Description: "Bad Request: chat not found"},
+		"short prefix":     &tg.APIError{Code: 400, Description: "Bad Request: poll voters can be restricted"},
+		"403":              &tg.APIError{Code: 403, Description: poll100Channel().Description},
+		"500":              &tg.APIError{Code: 500, Description: "Internal Server Error"},
+		"not an API error": errors.New("Bad Request: poll voters can be restricted only in channel chats"),
+	}
+	for name, e := range rows {
+		t.Run(name, func(t *testing.T) {
+			f, _, _, err := poll100Run(t, poll100Req(true, nil), nil, e)
+			require.Error(t, err)
+			assert.Len(t, f.polls, 1)
+		})
+	}
+}
+
+func simple100Run(t *testing.T, options []string, msg *tg.Message) (*fakePoll100, *Runtime, *StepResult, error) {
+	t.Helper()
+	f := &fakePoll100{msg: msg}
+	rt := api100Runtime(nil)
+	rt.Sender = f
+	res, err := (&SendPollSimpleStep{Question: "Q", Options: options}).Execute(context.Background(), rt)
+	return f, rt, res, err
+}
+
+// T-tb-7: SendPollSimpleStep checks the reply's option count and records both counts (T1-10, T2-03).
+func TestSendPollSimpleStep_Check(t *testing.T) {
+	twelve := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
+	for _, r := range []struct {
+		name    string
+		options []string
+	}{{"1", []string{"only"}}, {"12", twelve}} {
+		t.Run(r.name+" ok", func(t *testing.T) {
+			f, rt, res, err := simple100Run(t, r.options, poll100Reply(len(r.options), false, nil))
+			require.NoError(t, err)
+			require.Len(t, f.simples, 1)
+			assert.Equal(t, fakePoll100Simple{testutil.TestChatID, "Q", r.options}, f.simples[0])
+			assert.Equal(t, []int{poll100MsgID}, liveTracked(rt))
+			assert.Equal(t, map[string]any{"message_id": poll100MsgID, "question": "Q", "type": "regular",
+				"options_sent": len(r.options), "options_reply": len(r.options)}, res.Evidence)
+		})
+	}
+	t.Run("wrong count", func(t *testing.T) {
+		_, rt, res, err := simple100Run(t, []string{"only"}, poll100Reply(2, false, nil))
+		require.Error(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, []int{poll100MsgID}, res.MessageIDs)
+		assert.Equal(t, []int{poll100MsgID}, liveTracked(rt))
+		ev, ok := res.Evidence.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, ev["options_sent"])
+		assert.Equal(t, 2, ev["options_reply"])
+	})
+	t.Run("no poll", func(t *testing.T) {
+		_, rt, res, err := simple100Run(t, []string{"only"},
+			&tg.Message{MessageID: poll100MsgID, Chat: &tg.Chat{ID: testutil.TestChatID}})
+		require.Error(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, []int{poll100MsgID}, res.MessageIDs)
+		assert.Equal(t, []int{poll100MsgID}, liveTracked(rt))
+		ev, ok := res.Evidence.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, ev["options_sent"])
+		assert.NotContains(t, ev, "options_reply")
+	})
+}
+
+// T-tb-8: S18's step (3 options) still passes.
+func TestSendPollSimpleStep_S18(t *testing.T) {
+	_, _, _, err := simple100Run(t, []string{"Red", "Green", "Blue"}, poll100Reply(3, false, nil))
+	require.NoError(t, err)
 }

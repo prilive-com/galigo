@@ -243,15 +243,22 @@ func (s *SendPollSimpleStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 	rt.LastMessage = msg
 	rt.TrackMessage(rt.ChatID, msg.MessageID)
 
-	return &StepResult{
-		Method:     "sendPoll",
-		MessageIDs: []int{msg.MessageID},
-		Evidence: map[string]any{
-			"message_id": msg.MessageID,
-			"question":   s.Question,
-			"type":       "regular",
-		},
-	}, nil
+	evidence := map[string]any{
+		"message_id":   msg.MessageID,
+		"question":     s.Question,
+		"type":         "regular",
+		"options_sent": len(s.Options),
+	}
+	res := &StepResult{Method: "sendPoll", MessageIDs: []int{msg.MessageID}, Evidence: evidence}
+	// 10.0c: the reply must carry a poll with the options sent (1-12 since Bot API 10.0).
+	if msg.Poll == nil {
+		return res, errors.New("sendPoll: the reply has no poll")
+	}
+	evidence["options_reply"] = len(msg.Poll.Options)
+	if len(msg.Poll.Options) != len(s.Options) {
+		return res, fmt.Errorf("sendPoll: %d options in the reply, want %d", len(msg.Poll.Options), len(s.Options))
+	}
+	return res, nil
 }
 
 // SendQuizStep sends a quiz poll.

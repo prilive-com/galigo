@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/sender"
@@ -345,5 +347,58 @@ func (s *EditToLivePhoto100Step) Execute(ctx context.Context, rt *Runtime) (*Ste
 
 	res.FileIDs = []string{v, p}
 	res.Evidence = map[string]any{"message_id": msgID, "file_ids": res.FileIDs}
+	return res, nil
+}
+
+// pollRefusal100 is the error text of a voter restriction (members_only or country_codes) outside a channel, as
+// the server sent it on 2026-11-06 (E10/lookups/probe100c/10, 11).
+const pollRefusal100 = "poll voters can be restricted only in channel chats"
+
+// SendPoll100Step sends Req to rt.ChatID with sendPoll and checks that the reply echoes the option count,
+// members_only and country_codes (nil and empty lists are equal; the order of the codes does not matter, because
+// the API does not promise it). In a group or supergroup the server refuses a voter restriction with a 400
+// "poll voters can be restricted only in channel chats"; when Req asks for one, that refusal passes with evidence
+// {"refused":"channel only"}: a smoke check that a restriction reached the server, not which one. Any other error
+// fails.
+type SendPoll100Step struct {
+	Req sender.SendPollRequest
+}
+
+func (s *SendPoll100Step) Name() string { return "sendPoll (10.0)" }
+
+func (s *SendPoll100Step) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendPoll"}
+	req := s.Req
+	req.ChatID = rt.ChatID
+	msg, err := rt.Sender.SendPoll(ctx, req)
+	if err != nil {
+		var apiErr *tg.APIError
+		if (req.MembersOnly || len(req.CountryCodes) > 0) && errors.As(err, &apiErr) && apiErr.Code == 400 &&
+			strings.Contains(apiErr.Description, pollRefusal100) {
+			res.Evidence = map[string]any{"refused": "channel only"}
+			return res, nil
+		}
+		return res, err
+	}
+	if msg == nil {
+		return res, errors.New("sendPoll: no message in the reply")
+	}
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	rt.LastMessage = msg
+	res.MessageIDs = []int{msg.MessageID}
+	p := msg.Poll
+	if p == nil {
+		return res, errors.New("sendPoll: the reply has no poll")
+	}
+	res.Evidence = map[string]any{"message_id": msg.MessageID, "options_reply": len(p.Options),
+		"members_only": p.MembersOnly, "country_codes": p.CountryCodes}
+	switch {
+	case len(p.Options) != len(req.Options):
+		return res, fmt.Errorf("sendPoll: %d options in the reply, want %d", len(p.Options), len(req.Options))
+	case p.MembersOnly != req.MembersOnly:
+		return res, fmt.Errorf("sendPoll: members_only %v in the reply, want %v", p.MembersOnly, req.MembersOnly)
+	case !slices.Equal(slices.Sorted(slices.Values(p.CountryCodes)), slices.Sorted(slices.Values(req.CountryCodes))):
+		return res, fmt.Errorf("sendPoll: country_codes %v in the reply, want %v", p.CountryCodes, req.CountryCodes)
+	}
 	return res, nil
 }

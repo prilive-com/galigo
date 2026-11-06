@@ -13,6 +13,7 @@ import (
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/registry"
 	"github.com/prilive-com/galigo/internal/testutil"
+	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -56,6 +57,23 @@ func TestAPI100Scenarios(t *testing.T) {
 				Caption: "galigo 10.0 live photo: plain photo, will be replaced",
 			},
 			&engine.EditToLivePhoto100Step{},
+			&engine.CleanupStep{},
+		}},
+		// API100C T-tb-9: the 10.0c poll scenarios.
+		{"S60-PollOptionCount", []string{"sendPoll"}, []engine.Step{
+			&engine.SendPollSimpleStep{Question: "galigo 10.0 poll, 1 option", Options: []string{"only"}},
+			&engine.SendPollSimpleStep{Question: "galigo 10.0 poll, 12 options", Options: []string{
+				"o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10", "o11", "o12"}},
+			&engine.CleanupStep{},
+		}},
+		{"S61-PollMembersOnly", []string{"sendPoll"}, []engine.Step{
+			&engine.SendPoll100Step{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, members only",
+				Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}}, MembersOnly: true}},
+			&engine.CleanupStep{},
+		}},
+		{"S62-PollCountryCodes", []string{"sendPoll"}, []engine.Step{
+			&engine.SendPoll100Step{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, country codes",
+				Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}}, CountryCodes: []string{"DE", "FT"}}},
 			&engine.CleanupStep{},
 		}},
 	}

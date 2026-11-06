@@ -647,3 +647,25 @@ func TestPolls100D_AttachOrderMixed(t *testing.T) {
 		"file2": {FileName: "e.txt", Data: []byte("d100-e")}, "file3": {FileName: "d.jpg", Data: []byte("d100-d")},
 	}, files)
 }
+
+// T-s-17 (C1-01 openai, round c1): a nil *InputMedia held in an `any` field is not removed by the zero-value skip
+// (the interface is not nil). It is written like a nil *InputFile: no argument, no file, no multipart, no panic.
+func TestPolls100D_TypedNilInAny(t *testing.T) {
+	var nilMedia *sender.InputMedia
+	t.Run("builder", func(t *testing.T) {
+		got, err := sender.BuildMultipartRequest(struct {
+			Media any `json:"media,omitempty"`
+		}{Media: nilMedia})
+		require.NoError(t, err)
+		assert.Empty(t, got.Params)
+		assert.Empty(t, got.Files)
+	})
+	t.Run("send_poll_reply_markup", func(t *testing.T) {
+		mediaType, args, files, err := polls100dSend(t, sender.SendPollRequest{Options: plainOptions(), ReplyMarkup: nilMedia})
+		require.NoError(t, err)
+		assert.Equal(t, "application/json", mediaType)
+		assert.Empty(t, files)
+		assert.NotContains(t, args, "media")
+		assert.NotContains(t, args, "explanation_media")
+	})
+}

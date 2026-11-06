@@ -203,6 +203,9 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 func handlePollField(req *MultipartRequest, fieldName string, v any, attachIdx *int) (bool, error) {
 	switch v := v.(type) {
 	case *InputMedia:
+		if v == nil { // a nil pointer held in an `any` field: written like a nil *InputFile (nothing)
+			return false, nil
+		}
 		return true, handleInputMedia(req, fieldName, *v, attachIdx)
 	case []InputPollOption:
 		hasMedia := slices.ContainsFunc(v, func(o InputPollOption) bool { return o.Media != nil })

@@ -49,10 +49,11 @@ type InputFile struct {
 	ParseMode string
 
 	// Photo is the static photo of a live photo item (Bot API 10.0): it is sent as
-	// the item's "photo" value in sendMediaGroup and editMessageMedia. Use a file id
-	// or an upload; the spec says a URL is not supported. Only those two item
-	// encoders read it: single-file fields (such as SendPhotoRequest.Photo) and
-	// MarshalJSON ignore it, and Photo.Photo is never read. Set it with WithPhoto.
+	// the item's "photo" value in sendMediaGroup, editMessageMedia and the poll
+	// media of sendPoll (media, explanation_media, an option's media). Use a file id
+	// or an upload; the spec says a URL is not supported. Only those item encoders
+	// read it: single-file fields (such as SendPhotoRequest.Photo) and MarshalJSON
+	// ignore it, and Photo.Photo is never read. Set it with WithPhoto.
 	Photo *InputFile
 }
 

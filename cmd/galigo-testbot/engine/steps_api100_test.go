@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -1208,4 +1211,284 @@ func TestSendPollSimpleStep_Check(t *testing.T) {
 func TestSendPollSimpleStep_S18(t *testing.T) {
 	_, _, _, err := simple100Run(t, []string{"Red", "Green", "Blue"}, poll100Reply(3, false, nil))
 	require.NoError(t, err)
+}
+
+// ==================== Bot API 10.0 part d (B-25 slice 2d, TEST-PLAN §4.1, T-tb-1 … T-tb-5) ====================
+
+// pollFileView is an InputFile with its upload bytes read, so two requests can be compared (a func field is never
+// equal to another func).
+type pollFileView struct {
+	FileID, URL, FileName, MediaType string
+	Data                             []byte
+	Photo                            *pollFileView
+}
+
+func viewPollFile(f sender.InputFile) pollFileView {
+	v := pollFileView{FileID: f.FileID, URL: f.URL, FileName: f.FileName, MediaType: f.MediaType}
+	if r := f.OpenReader(); r != nil {
+		v.Data, _ = io.ReadAll(r)
+	}
+	if f.Photo != nil {
+		p := viewPollFile(*f.Photo)
+		v.Photo = &p
+	}
+	return v
+}
+
+func viewPollMedia(m *sender.InputMedia) any {
+	if m == nil {
+		return nil
+	}
+	c := *m
+	f := viewPollFile(c.Media)
+	c.Media = sender.InputFile{}
+	return struct {
+		M    sender.InputMedia
+		File pollFileView
+	}{c, f}
+}
+
+// viewPollRequest returns a comparable form of a sendPoll request: every InputMedia with its upload bytes read.
+func viewPollRequest(r sender.SendPollRequest) any {
+	media, expl := viewPollMedia(r.Media), viewPollMedia(r.ExplanationMedia)
+	r.Media, r.ExplanationMedia = nil, nil
+	opts := make([]any, len(r.Options))
+	plain := make([]sender.InputPollOption, len(r.Options))
+	for i, o := range r.Options {
+		opts[i] = viewPollMedia(o.Media)
+		o.Media = nil
+		plain[i] = o
+	}
+	r.Options = plain
+	return struct {
+		Req         sender.SendPollRequest
+		Media, Expl any
+		Opts        []any
+	}{r, media, expl, opts}
+}
+
+// pollMediaMsgID is the reply id of the sendPoll media fakes (TEST-PLAN T-tb-3: 9001+).
+const pollMediaMsgID = 9001
+
+// pollKindMedia returns a tg.PollMedia with only the field of kind set ("" → nil).
+func pollKindMedia(kind string) *tg.PollMedia {
+	switch kind {
+	case "":
+		return nil
+	case "animation":
+		return &tg.PollMedia{Animation: &tg.Animation{FileID: "an"}}
+	case "audio":
+		return &tg.PollMedia{Audio: &tg.Audio{FileID: "au"}}
+	case "document":
+		return &tg.PollMedia{Document: &tg.Document{FileID: "do"}}
+	case "live_photo":
+		return &tg.PollMedia{LivePhoto: &tg.LivePhoto{}}
+	case "location":
+		return &tg.PollMedia{Location: &tg.Location{Latitude: 52.52, Longitude: 13.405}}
+	case "photo":
+		return &tg.PollMedia{Photo: []tg.PhotoSize{{FileID: "ph"}}}
+	case "sticker":
+		return &tg.PollMedia{Sticker: &tg.Sticker{FileID: "st"}}
+	case "venue":
+		return &tg.PollMedia{Venue: &tg.Venue{Title: "T"}}
+	case "video":
+		return &tg.PollMedia{Video: &tg.Video{FileID: "vi"}}
+	}
+	panic("unknown kind " + kind)
+}
+
+// pollMediaReply is a sendPoll reply whose poll has the given description, explanation and option media kinds.
+func pollMediaReply(media, expl string, opts []string) *tg.Message {
+	p := &tg.Poll{ID: "p", Question: "Q", Type: "regular", Media: pollKindMedia(media), ExplanationMedia: pollKindMedia(expl)}
+	for i, k := range opts {
+		p.Options = append(p.Options, tg.PollOption{Text: string(rune('a' + i)), PersistentID: string(rune('0' + i)),
+			Media: pollKindMedia(k)})
+	}
+	return &tg.Message{MessageID: pollMediaMsgID, Chat: &tg.Chat{ID: testutil.TestChatID}, Poll: p}
+}
+
+// T-tb-1: the kind of a poll media is the JSON name of its one set field.
+func TestPollMediaKind(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		k, err := pollMediaKind(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "", k)
+	})
+	t.Run("each", func(t *testing.T) {
+		for _, kind := range []string{"animation", "audio", "document", "live_photo", "location", "photo", "sticker", "venue", "video"} {
+			k, err := pollMediaKind(pollKindMedia(kind))
+			require.NoError(t, err, kind)
+			assert.Equal(t, kind, k)
+		}
+	})
+	t.Run("empty", func(t *testing.T) { // C1-02 openai, round c1: a non-nil media with no kind set
+		for name, m := range map[string]*tg.PollMedia{"zero": {}, "empty_photo_slice": {Photo: []tg.PhotoSize{}}} {
+			k, err := pollMediaKind(m)
+			require.NoError(t, err, name)
+			assert.Equal(t, "", k, name)
+		}
+	})
+	t.Run("two", func(t *testing.T) {
+		_, err := pollMediaKind(&tg.PollMedia{Location: &tg.Location{}, Photo: []tg.PhotoSize{{FileID: "ph"}}})
+		assert.EqualError(t, err, "poll media with 2 kinds: location, photo")
+	})
+}
+
+// T-tb-2: every field of tg.PollMedia, set alone, gives its JSON tag name (a new field fails until the helper knows
+// it) (T1-08, T2-02 openai).
+func TestPollMediaKind_AllFields(t *testing.T) {
+	rt := reflect.TypeOf(tg.PollMedia{})
+	assert.Equal(t, 9, rt.NumField(), "the T-tb-1 rows cover 9 fields")
+	for i := range rt.NumField() {
+		field := rt.Field(i)
+		var m tg.PollMedia
+		fv := reflect.ValueOf(&m).Elem().Field(i)
+		switch field.Type.Kind() {
+		case reflect.Pointer:
+			fv.Set(reflect.New(field.Type.Elem()))
+		case reflect.Slice:
+			fv.Set(reflect.MakeSlice(field.Type, 1, 1))
+		default:
+			t.Fatalf("PollMedia.%s: kind %s not handled", field.Name, field.Type.Kind())
+		}
+		k, err := pollMediaKind(&m)
+		require.NoError(t, err, field.Name)
+		assert.Equal(t, strings.Split(field.Tag.Get("json"), ",")[0], k, field.Name)
+	}
+}
+
+// pollMediaSteps are the four steps of S63-S65 (plan §8 T), as literals: package engine cannot import suites, and
+// T-tb-7 (suites) checks that the suite holds the same values.
+func pollMediaSteps() map[string]*SendPollMediaStep {
+	plain := func() []sender.InputPollOption { return []sender.InputPollOption{{Text: "a"}, {Text: "b"}} }
+	photo := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	loc := sender.NewInputMediaLocation(52.52, 13.405)
+	optLoc := sender.NewInputMediaLocation(52.52, 13.405)
+	optLoc.HorizontalAccuracy = 50
+	venue := sender.NewInputMediaVenue(48.8584, 2.2945, "Eiffel Tower", "Paris")
+	sticker := sender.NewInputMediaSticker(sender.FromBytes(fixtures.StickerBytes(), "sticker.png"))
+	sticker.Emoji = "👍"
+	optPhoto := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	quizPhoto := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	doc := sender.NewInputMediaDocument(sender.FromBytes(fixtures.DocumentBytes(), "document.txt"))
+	notAnon := false
+	return map[string]*SendPollMediaStep{
+		"desc_photo": {Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description photo", Options: plain(),
+			Description: "d", Media: &photo}, WantMedia: "photo", WantOptions: []string{"", ""}},
+		"desc_location": {Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description location", Options: plain(),
+			Media: &loc}, WantMedia: "location", WantOptions: []string{"", ""}},
+		"options": {Req: sender.SendPollRequest{Question: "galigo 10.0 poll, option media", Options: []sender.InputPollOption{
+			{Text: "location", Media: &optLoc}, {Text: "venue", Media: &venue}, {Text: "sticker", Media: &sticker},
+			{Text: "photo", Media: &optPhoto}, {Text: "plain"}}},
+			WantOptions: []string{"location", "venue", "sticker", "photo", ""}},
+		"quiz": {Req: sender.SendPollRequest{Question: "galigo 10.0 quiz, explanation media", Type: "quiz",
+			IsAnonymous: &notAnon, Options: []sender.InputPollOption{{Text: "photo", Media: &quizPhoto}, {Text: "plain"}},
+			CorrectOptionIDs: []int{0}, Explanation: "e", ExplanationMedia: &doc},
+			WantOptions: []string{"photo", ""}, WantExplanation: "document"},
+	}
+}
+
+func pollMediaRun(t *testing.T, step *SendPollMediaStep, msg *tg.Message, err error) (*fakePoll100, *Runtime, *StepResult, error) {
+	t.Helper()
+	f := &fakePoll100{msg: msg, err: err}
+	rt := api100Runtime(nil)
+	rt.Sender = f
+	res, stepErr := step.Execute(context.Background(), rt)
+	return f, rt, res, stepErr
+}
+
+// T-tb-3: each S63-S65 step passes on a reply with the wanted kinds (T1-01 google, T1-06 openai).
+func TestSendPollMediaStep_Pass(t *testing.T) {
+	steps := pollMediaSteps()
+	for _, name := range []string{"desc_photo", "desc_location", "options", "quiz"} {
+		t.Run(name, func(t *testing.T) {
+			step := steps[name]
+			reply := pollMediaReply(step.WantMedia, step.WantExplanation, step.WantOptions)
+			f, rt, res, err := pollMediaRun(t, step, reply, nil)
+			require.NoError(t, err)
+			require.Len(t, f.polls, 1)
+			want := step.Req
+			want.ChatID = testutil.TestChatID
+			assert.Equal(t, viewPollRequest(want), viewPollRequest(f.polls[0]))
+			assert.Same(t, reply, rt.LastMessage)
+			assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
+			require.NotNil(t, res)
+			assert.Equal(t, "sendPoll", res.Method)
+			assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
+			assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": step.WantMedia,
+				"explanation_media": step.WantExplanation, "option_media": step.WantOptions}, res.Evidence)
+		})
+	}
+}
+
+// T-tb-4: a reply with a different kind or count fails, and keeps the message tracked and the id in the result
+// (T1-06, T2-05 openai).
+func TestSendPollMediaStep_Fail(t *testing.T) {
+	s := pollMediaSteps()
+	twoKinds := pollMediaReply("", "", s["options"].WantOptions)
+	twoKinds.Poll.Options[0].Media.Photo = []tg.PhotoSize{{FileID: "ph"}}
+	noPoll := pollMediaReply("", "", nil)
+	noPoll.Poll = nil
+	quizPlain := &SendPollMediaStep{Req: s["quiz"].Req, WantOptions: []string{"photo", ""}}
+	// T3-04 openai: a two-kind description or explanation while nothing is wanted there.
+	ambDesc := pollMediaReply("", "", s["options"].WantOptions)
+	ambDesc.Poll.Media = &tg.PollMedia{Photo: []tg.PhotoSize{{FileID: "ph"}}, Location: &tg.Location{}}
+	ambExpl := pollMediaReply("", "", []string{"photo", ""})
+	ambExpl.Poll.ExplanationMedia = &tg.PollMedia{Photo: []tg.PhotoSize{{FileID: "ph"}}, Location: &tg.Location{}}
+	rows := []struct {
+		name string
+		step *SendPollMediaStep
+		msg  *tg.Message
+		err  string
+	}{
+		{"description_kind", s["desc_photo"], pollMediaReply("location", "", []string{"", ""}), `sendPoll: media "location" in the reply, want "photo"`},
+		{"description_missing", s["desc_photo"], pollMediaReply("", "", []string{"", ""}), `sendPoll: media "" in the reply, want "photo"`},
+		{"explanation_kind", s["quiz"], pollMediaReply("", "photo", []string{"photo", ""}), `sendPoll: explanation_media "photo" in the reply, want "document"`},
+		{"options_swapped", s["options"], pollMediaReply("", "", []string{"venue", "location", "sticker", "photo", ""}), `sendPoll: option 0 media "venue" in the reply, want "location"`},
+		{"too_few_options", s["options"], pollMediaReply("", "", []string{"location", "venue", "sticker", "photo"}), `sendPoll: 4 options in the reply, want 5`},
+		{"too_many_options", s["options"], pollMediaReply("", "", []string{"location", "venue", "sticker", "photo", "", ""}), `sendPoll: 6 options in the reply, want 5`},
+		{"two_kinds", s["options"], twoKinds, `sendPoll: option 0: poll media with 2 kinds: location, photo`},
+		{"no_poll", s["options"], noPoll, `sendPoll: the reply has no poll`},
+		{"unexpected_description", s["options"], pollMediaReply("photo", "", s["options"].WantOptions), `sendPoll: media "photo" in the reply, want ""`},
+		{"unexpected_explanation", quizPlain, pollMediaReply("", "document", []string{"photo", ""}), `sendPoll: explanation_media "document" in the reply, want ""`},
+		{"unexpected_plain_option", s["quiz"], pollMediaReply("", "document", []string{"photo", "location"}), `sendPoll: option 1 media "location" in the reply, want ""`},
+		{"ambiguous_description", s["options"], ambDesc, `sendPoll: media: poll media with 2 kinds: location, photo`},
+		{"ambiguous_explanation", quizPlain, ambExpl, `sendPoll: explanation_media: poll media with 2 kinds: location, photo`},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			f, rt, res, err := pollMediaRun(t, r.step, r.msg, nil)
+			require.EqualError(t, err, r.err)
+			require.Len(t, f.polls, 1)
+			assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
+			require.NotNil(t, res)
+			assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
+		})
+	}
+	t.Run("no_message", func(t *testing.T) {
+		f, rt, _, err := pollMediaRun(t, s["options"], nil, nil)
+		require.EqualError(t, err, "sendPoll: no message in the reply")
+		require.Len(t, f.polls, 1)
+		assert.Empty(t, liveTracked(rt))
+	})
+}
+
+// T-tb-5: a send error fails the step, with one request (no retry) and nothing tracked.
+func TestSendPollMediaStep_SendError(t *testing.T) {
+	rows := []struct {
+		name string
+		err  error
+	}{
+		{"400", &tg.APIError{Code: 400, Description: "Bad Request: failed to parse InputPollMedia"}},
+		{"500", &tg.APIError{Code: 500, Description: "Internal Server Error"}},
+		{"other", errors.New("network down")},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			f, rt, _, err := pollMediaRun(t, pollMediaSteps()["options"], nil, r.err)
+			require.ErrorIs(t, err, r.err)
+			require.Len(t, f.polls, 1)
+			assert.Empty(t, liveTracked(rt))
+		})
+	}
 }

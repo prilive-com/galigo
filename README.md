@@ -92,7 +92,7 @@ func main() {
 | Component | Version | Notes |
 |-----------|---------|-------|
 | **Go** | 1.25+ | Uses generics, iter.Seq, log/slog |
-| **Telegram Bot API** | 8.0–9.6 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming, Managed Bots |
+| **Telegram Bot API** | 8.0–10.0 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming, Managed Bots, Live Photos, Poll Media |
 | **Platforms** | Linux, macOS, Windows | Pure Go, no CGO |
 
 ### Supported API Methods
@@ -105,6 +105,7 @@ galigo implements **150+ methods** covering:
 - Member tags and date/time entities (Bot API 9.5)
 - Message streaming via drafts (Bot API 9.5)
 - Managed bots, prepared keyboard buttons and quizzes with several correct answers (Bot API 9.6)
+- Guest mode, reaction deletion, live photos and polls with media (Bot API 10.0)
 - Forum topics and permissions
 - Stickers and custom emoji
 - Payments, Stars, and Gifts
@@ -112,6 +113,12 @@ galigo implements **150+ methods** covering:
 - Webhooks and long polling
 
 For the complete method list, see the [API Reference](https://pkg.go.dev/github.com/prilive-com/galigo/sender).
+
+`galigo.Bot` has convenience methods for the most common calls only. Every other method is on its sender client, `bot.Sender()`:
+
+```go
+msg, err := bot.Sender().SendPoll(ctx, sender.SendPollRequest{ChatID: chatID, Question: "Lunch?", Options: []sender.InputPollOption{{Text: "Yes"}, {Text: "No"}}})
+```
 
 ## Thread Safety
 

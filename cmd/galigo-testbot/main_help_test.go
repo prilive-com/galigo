@@ -30,7 +30,8 @@ func TestHandleHelp_Text(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(server.LastCapture().Body, &body))
 	lines := strings.Split(body.Text, "\n")
-	assert.Contains(t, lines, "Bot API 10.0 (S51-S54, S57-S62):")
+	assert.Contains(t, lines, "Bot API 10.0 (S51-S54, S57-S65):") // API100D T-tb-9
+	assert.NotContains(t, body.Text, "S57-S62")
 	assert.Contains(t, lines, "  live-photos - Live photos (S57-S59)")
 	var api100 []string
 	for _, l := range lines {

@@ -675,6 +675,9 @@ go run ./cmd/galigo-testbot --run api96                  # All 9.6 tests
 go run ./cmd/galigo-testbot --run api100                 # All 10.0 tests
 go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 
+# Bot API 10.1 scenarios (S66)
+go run ./cmd/galigo-testbot --run api101                 # All 10.1 tests
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -813,6 +816,12 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S64-PollOptionMedia | sendPoll | Poll whose options have media: location (with `horizontal_accuracy`), venue, sticker upload with `emoji`, photo upload, and a plain option; each option's media kind is checked (emoji, coordinates and venue fields are proved by mock tests, the server does not echo them all) |
 | S65-QuizExplanationMedia | sendPoll | Quiz (not anonymous) with a photo option and a text document upload as `explanation_media`; the option and explanation media kinds are checked |
 
+#### Bot API 10.1 (S66)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S66-PollOptionLink | sendPoll | Poll whose options have links (`InputMediaLink`, multipart without files), then a poll with a link and a photo upload; each option's media kind and link URL is checked |
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -918,6 +927,7 @@ cmd/galigo-testbot/
 │   ├── api95.go       # Bot API 9.5 (S44-S46: date_time entity, member tags, message streaming)
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
 │   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
+│   ├── api101.go      # Bot API 10.1 (S66: poll option links)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

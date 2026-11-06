@@ -417,6 +417,7 @@ func pollMediaKind(m *tg.PollMedia) (string, error) {
 		{"animation", m.Animation != nil},
 		{"audio", m.Audio != nil},
 		{"document", m.Document != nil},
+		{"link", m.Link != nil},
 		{"live_photo", m.LivePhoto != nil},
 		{"location", m.Location != nil},
 		{"photo", len(m.Photo) > 0},
@@ -444,6 +445,9 @@ type SendPollMediaStep struct {
 	WantMedia       string
 	WantExplanation string
 	WantOptions     []string
+	// WantLinks (10.1) are the wanted link URLs of the options, "" for an option without a link; nil checks
+	// nothing. Evidence option_links always has the reply's URLs.
+	WantLinks []string
 }
 
 func (s *SendPollMediaStep) Name() string { return "sendPoll (media)" }
@@ -478,13 +482,17 @@ func (s *SendPollMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 		return res, fmt.Errorf("sendPoll: %d options in the reply, want %d", len(p.Options), len(s.WantOptions))
 	}
 	opts := make([]string, len(p.Options))
+	links := make([]string, len(p.Options))
 	for i, o := range p.Options {
 		if opts[i], err = pollMediaKind(o.Media); err != nil {
 			return res, fmt.Errorf("sendPoll: option %d: %w", i, err)
 		}
+		if o.Media != nil && o.Media.Link != nil {
+			links[i] = o.Media.Link.URL
+		}
 	}
 	res.Evidence = map[string]any{"message_id": msg.MessageID, "media": media, "explanation_media": expl,
-		"option_media": opts}
+		"option_media": opts, "option_links": links}
 	if media != s.WantMedia {
 		return res, fmt.Errorf("sendPoll: media %q in the reply, want %q", media, s.WantMedia)
 	}
@@ -494,6 +502,17 @@ func (s *SendPollMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	for i, k := range opts {
 		if k != s.WantOptions[i] {
 			return res, fmt.Errorf("sendPoll: option %d media %q in the reply, want %q", i, k, s.WantOptions[i])
+		}
+	}
+	if s.WantLinks == nil {
+		return res, nil
+	}
+	if len(links) != len(s.WantLinks) {
+		return res, fmt.Errorf("sendPoll: %d options in the reply, want %d links", len(links), len(s.WantLinks))
+	}
+	for i, u := range links {
+		if u != s.WantLinks[i] {
+			return res, fmt.Errorf("sendPoll: option %d link %q in the reply, want %q", i, u, s.WantLinks[i])
 		}
 	}
 	return res, nil

@@ -7,7 +7,7 @@ package sender
 type InputMedia struct {
 	// Type is the media type: "photo", "video", "document", "audio",
 	// "animation", "live_photo"; for poll media also "sticker", "location",
-	// "venue" (Bot API 10.0).
+	// "venue" (Bot API 10.0); for poll option media also "link" (Bot API 10.1).
 	Type string
 
 	// Media is the file to send (FileID, URL, or Reader upload).
@@ -41,6 +41,10 @@ type InputMedia struct {
 	FoursquareType  string
 	GooglePlaceID   string
 	GooglePlaceType string
+
+	// URL is the HTTP URL of a link (link only; always sent; Bot API 10.1). It
+	// is not a file: a file by URL goes in Media (FromURL).
+	URL string
 }
 
 // NewInputMediaSticker creates an InputMedia of type "sticker" (Bot API 10.0,
@@ -61,6 +65,12 @@ func NewInputMediaLocation(latitude, longitude float64) InputMedia {
 // HorizontalAccuracy fields on the result if needed.
 func NewInputMediaVenue(latitude, longitude float64, title, address string) InputMedia {
 	return InputMedia{Type: "venue", Latitude: latitude, Longitude: longitude, Title: title, Address: address}
+}
+
+// NewInputMediaLink creates an InputMedia of type "link" (Bot API 10.1, poll
+// option media). It has no file.
+func NewInputMediaLink(url string) InputMedia {
+	return InputMedia{Type: "link", URL: url}
 }
 
 // NewInputMediaPhoto creates an InputMedia of type "photo".

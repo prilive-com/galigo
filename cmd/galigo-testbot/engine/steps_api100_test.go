@@ -1281,6 +1281,8 @@ func pollKindMedia(kind string) *tg.PollMedia {
 		return &tg.PollMedia{Audio: &tg.Audio{FileID: "au"}}
 	case "document":
 		return &tg.PollMedia{Document: &tg.Document{FileID: "do"}}
+	case "link": // API101A T-tb-1
+		return &tg.PollMedia{Link: &tg.Link{URL: "u"}}
 	case "live_photo":
 		return &tg.PollMedia{LivePhoto: &tg.LivePhoto{}}
 	case "location":
@@ -1315,7 +1317,7 @@ func TestPollMediaKind(t *testing.T) {
 		assert.Equal(t, "", k)
 	})
 	t.Run("each", func(t *testing.T) {
-		for _, kind := range []string{"animation", "audio", "document", "live_photo", "location", "photo", "sticker", "venue", "video"} {
+		for _, kind := range []string{"animation", "audio", "document", "link", "live_photo", "location", "photo", "sticker", "venue", "video"} {
 			k, err := pollMediaKind(pollKindMedia(kind))
 			require.NoError(t, err, kind)
 			assert.Equal(t, kind, k)
@@ -1332,13 +1334,17 @@ func TestPollMediaKind(t *testing.T) {
 		_, err := pollMediaKind(&tg.PollMedia{Location: &tg.Location{}, Photo: []tg.PhotoSize{{FileID: "ph"}}})
 		assert.EqualError(t, err, "poll media with 2 kinds: location, photo")
 	})
+	t.Run("two_with_link", func(t *testing.T) { // API101A T-tb-3
+		_, err := pollMediaKind(&tg.PollMedia{Link: &tg.Link{URL: "u"}, Photo: []tg.PhotoSize{{FileID: "ph"}}})
+		assert.EqualError(t, err, "poll media with 2 kinds: link, photo")
+	})
 }
 
 // T-tb-2: every field of tg.PollMedia, set alone, gives its JSON tag name (a new field fails until the helper knows
 // it) (T1-08, T2-02 openai).
 func TestPollMediaKind_AllFields(t *testing.T) {
 	rt := reflect.TypeOf(tg.PollMedia{})
-	assert.Equal(t, 9, rt.NumField(), "the T-tb-1 rows cover 9 fields")
+	assert.Equal(t, 10, rt.NumField(), "the T-tb-1 rows cover 10 fields") // API101A T-tb-2: link (10.1)
 	for i := range rt.NumField() {
 		field := rt.Field(i)
 		var m tg.PollMedia
@@ -1357,8 +1363,8 @@ func TestPollMediaKind_AllFields(t *testing.T) {
 	}
 }
 
-// pollMediaSteps are the four steps of S63-S65 (plan §8 T), as literals: package engine cannot import suites, and
-// T-tb-7 (suites) checks that the suite holds the same values.
+// pollMediaSteps are the four steps of S63-S65 (plan §8 T) and the two of S66 (10.1a), as literals: package engine
+// cannot import suites, and T-tb-7 (suites) checks that the suite holds the same values.
 func pollMediaSteps() map[string]*SendPollMediaStep {
 	plain := func() []sender.InputPollOption { return []sender.InputPollOption{{Text: "a"}, {Text: "b"}} }
 	photo := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
@@ -1372,7 +1378,17 @@ func pollMediaSteps() map[string]*SendPollMediaStep {
 	quizPhoto := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
 	doc := sender.NewInputMediaDocument(sender.FromBytes(fixtures.DocumentBytes(), "document.txt"))
 	notAnon := false
+	link1, link2, linkL := sender.NewInputMediaLink("https://example.com/1"), sender.NewInputMediaLink("https://example.com/2"),
+		sender.NewInputMediaLink("https://example.com/l")
+	linkPhoto := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
 	return map[string]*SendPollMediaStep{
+		"link_no_file": {Req: sender.SendPollRequest{Question: "galigo 10.1 poll, option links", Options: []sender.InputPollOption{
+			{Text: "link 1", Media: &link1}, {Text: "link 2", Media: &link2}, {Text: "plain"}}},
+			WantOptions: []string{"link", "link", ""},
+			WantLinks:   []string{"https://example.com/1", "https://example.com/2", ""}},
+		"link_upload": {Req: sender.SendPollRequest{Question: "galigo 10.1 poll, link and upload", Options: []sender.InputPollOption{
+			{Text: "link", Media: &linkL}, {Text: "photo", Media: &linkPhoto}}},
+			WantOptions: []string{"link", "photo"}, WantLinks: []string{"https://example.com/l", ""}},
 		"desc_photo": {Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description photo", Options: plain(),
 			Description: "d", Media: &photo}, WantMedia: "photo", WantOptions: []string{"", ""}},
 		"desc_location": {Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description location", Options: plain(),
@@ -1400,10 +1416,15 @@ func pollMediaRun(t *testing.T, step *SendPollMediaStep, msg *tg.Message, err er
 // T-tb-3: each S63-S65 step passes on a reply with the wanted kinds (T1-01 google, T1-06 openai).
 func TestSendPollMediaStep_Pass(t *testing.T) {
 	steps := pollMediaSteps()
-	for _, name := range []string{"desc_photo", "desc_location", "options", "quiz"} {
+	for _, name := range []string{"desc_photo", "desc_location", "options", "quiz", "link_no_file", "link_upload"} {
 		t.Run(name, func(t *testing.T) {
 			step := steps[name]
 			reply := pollMediaReply(step.WantMedia, step.WantExplanation, step.WantOptions)
+			links := step.WantLinks
+			if links == nil { // the 10.0 steps: no link anywhere
+				links = make([]string, len(step.WantOptions))
+			}
+			setReplyLinks(reply, links)
 			f, rt, res, err := pollMediaRun(t, step, reply, nil)
 			require.NoError(t, err)
 			require.Len(t, f.polls, 1)
@@ -1416,9 +1437,106 @@ func TestSendPollMediaStep_Pass(t *testing.T) {
 			assert.Equal(t, "sendPoll", res.Method)
 			assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
 			assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": step.WantMedia,
-				"explanation_media": step.WantExplanation, "option_media": step.WantOptions}, res.Evidence)
+				"explanation_media": step.WantExplanation, "option_media": step.WantOptions, "option_links": links},
+				res.Evidence) // API101A T-tb-4: option_links
 		})
 	}
+}
+
+// setReplyLinks sets the URL of each option link of the reply (an option without a link keeps none).
+func setReplyLinks(msg *tg.Message, urls []string) {
+	for i, u := range urls {
+		if m := msg.Poll.Options[i].Media; m != nil && m.Link != nil {
+			m.Link.URL = u
+		}
+	}
+}
+
+// T-tb-5 (10.1a): WantLinks compares each option's link URL exactly; its length must equal the option count; nil
+// checks nothing. A failure keeps the message tracked, the id in the result and the evidence.
+func TestSendPollMediaStep_Links(t *testing.T) {
+	s := pollMediaSteps()
+	step1 := s["link_no_file"]
+	reply := func(urls ...string) *tg.Message {
+		m := pollMediaReply("", "", step1.WantOptions)
+		setReplyLinks(m, urls)
+		return m
+	}
+	with := func(want ...string) *SendPollMediaStep { c := *step1; c.WantLinks = want; return &c }
+	ok3 := []string{"https://example.com/1", "https://example.com/2", ""}
+	rows := []struct {
+		name string
+		step *SendPollMediaStep
+		urls []string // the reply's link URLs (a plain option has none)
+		err  string
+	}{
+		{"wrong_url", step1, []string{"https://example.com/1/", "https://example.com/2", ""}, `sendPoll: option 0 link "https://example.com/1/" in the reply, want "https://example.com/1"`},
+		{"swapped_urls", step1, []string{"https://example.com/2", "https://example.com/1", ""}, `sendPoll: option 0 link "https://example.com/2" in the reply, want "https://example.com/1"`},
+		{"second_wrong", step1, []string{"https://example.com/1", "https://example.com/3", ""}, `sendPoll: option 1 link "https://example.com/3" in the reply, want "https://example.com/2"`},
+		{"empty_url_in_reply", step1, []string{"", "https://example.com/2", ""}, `sendPoll: option 0 link "" in the reply, want "https://example.com/1"`},
+		{"short_want", with("https://example.com/1", "https://example.com/2"), ok3, `sendPoll: 3 options in the reply, want 2 links`},
+		{"long_want", with("https://example.com/1", "https://example.com/2", "", ""), ok3, `sendPoll: 3 options in the reply, want 4 links`},
+		{"empty_want", with([]string{}...), ok3, `sendPoll: 3 options in the reply, want 0 links`},                                                                     // T1-04 openai: only nil checks nothing
+		{"plain_slot_wanted", with("https://example.com/1", "https://example.com/2", "unexpected"), ok3, `sendPoll: option 2 link "" in the reply, want "unexpected"`}, // T1-05 openai
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			f, rt, res, err := pollMediaRun(t, r.step, reply(r.urls...), nil)
+			require.EqualError(t, err, r.err)
+			require.Len(t, f.polls, 1)
+			assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
+			require.NotNil(t, res)
+			assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
+			// T1-06 openai: the whole evidence, with the reply's URLs (not the wanted ones).
+			assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": "", "explanation_media": "",
+				"option_media": step1.WantOptions, "option_links": r.urls}, res.Evidence)
+		})
+	}
+	// T2-07 openai: a link after a non-link media option is still compared (a loop that stops at the first
+	// non-link media option passes the rows above).
+	t.Run("photo_then_link_wrong", func(t *testing.T) {
+		c := *s["link_upload"]
+		up := c.Req.Options
+		c.Req.Options = []sender.InputPollOption{up[1], up[0]}
+		c.WantOptions = []string{"photo", "link"}
+		c.WantLinks = []string{"", "https://example.com/l"}
+		m := pollMediaReply("", "", c.WantOptions)
+		setReplyLinks(m, []string{"", "https://example.com/9"})
+		f, rt, res, err := pollMediaRun(t, &c, m, nil)
+		require.EqualError(t, err, `sendPoll: option 1 link "https://example.com/9" in the reply, want "https://example.com/l"`)
+		require.Len(t, f.polls, 1)
+		assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
+		require.NotNil(t, res)
+		assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
+		assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": "", "explanation_media": "",
+			"option_media": []string{"photo", "link"}, "option_links": []string{"", "https://example.com/9"}}, res.Evidence)
+	})
+	// T3-07 openai: a link after a plain option whose (empty) URL matches is still compared (a loop that stops at
+	// a matching plain option passes the rows above).
+	t.Run("plain_then_link_wrong", func(t *testing.T) {
+		c := *step1
+		o := c.Req.Options
+		c.Req.Options = []sender.InputPollOption{o[2], o[0], o[1]}
+		c.WantOptions = []string{"", "link", "link"}
+		c.WantLinks = []string{"", "https://example.com/1", "https://example.com/2"}
+		m := pollMediaReply("", "", c.WantOptions)
+		setReplyLinks(m, []string{"", "https://example.com/1", "https://example.com/9"})
+		f, rt, res, err := pollMediaRun(t, &c, m, nil)
+		require.EqualError(t, err, `sendPoll: option 2 link "https://example.com/9" in the reply, want "https://example.com/2"`)
+		require.Len(t, f.polls, 1)
+		assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
+		require.NotNil(t, res)
+		assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
+		assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": "", "explanation_media": "",
+			"option_media": []string{"", "link", "link"}, "option_links": []string{"", "https://example.com/1", "https://example.com/9"}}, res.Evidence)
+	})
+	t.Run("nil_want", func(t *testing.T) {
+		nilWant := *step1
+		nilWant.WantLinks = nil
+		_, _, res, err := pollMediaRun(t, &nilWant, reply("https://x.example/a", "", ""), nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"https://x.example/a", "", ""}, res.Evidence.(map[string]any)["option_links"])
+	})
 }
 
 // T-tb-4: a reply with a different kind or count fails, and keeps the message tracked and the id in the result

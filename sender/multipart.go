@@ -270,17 +270,22 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 }
 
 // inputMediaItem builds the JSON item of one InputMedia and adds its upload
-// parts to req. A location or venue (Bot API 10.0) has no file: a file on it is
-// an error, so it is not dropped without a word.
+// parts to req. A location or venue (Bot API 10.0) or a link (Bot API 10.1) has
+// no file: a file on it is an error, so it is not dropped without a word.
 func inputMediaItem(req *MultipartRequest, media InputMedia, attachIdx *int) (map[string]any, error) {
 	item := map[string]any{
 		"type": media.Type,
 	}
 
-	if media.Type == "location" || media.Type == "venue" {
+	switch media.Type {
+	case "location", "venue", "link":
 		f := media.Media
 		if f.FileID != "" || f.URL != "" || f.Reader != nil || f.Source != nil || f.Photo != nil {
 			return nil, fmt.Errorf("InputMedia: %s has no media file", media.Type)
+		}
+		if media.Type == "link" {
+			item["url"] = media.URL
+			return item, nil
 		}
 		item["latitude"] = media.Latitude
 		item["longitude"] = media.Longitude

@@ -31,13 +31,15 @@ func TestAPI101A_Shapes(t *testing.T) {
 func TestPolls101A_Constructor(t *testing.T) {
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/l"}, sender.NewInputMediaLink("https://e.x/l"))
 	assert.Equal(t, sender.InputMedia{Type: "link"}, sender.NewInputMediaLink(""))
-	// T2-14, C1-04, C2-04 openai: no client normalisation (plan §4): query, fragment, letter case, percent escapes,
-	// '+' and a missing scheme stay as given.
+	// T2-14, C1-04, C2-04, C3-03 openai: no client normalisation (plan §4): query (its order and escapes too),
+	// fragment, letter case, percent escapes, '+' and a missing scheme stay as given.
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/a?b=1#c"}, sender.NewInputMediaLink("https://e.x/a?b=1#c"))
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://E.x/Path?Key=Value#Frag"},
 		sender.NewInputMediaLink("https://E.x/Path?Key=Value#Frag"))
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/a%2Fb?key=A%2BB+Value"},
 		sender.NewInputMediaLink("https://e.x/a%2Fb?key=A%2BB+Value"))
+	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/a%2fb?z=2&a=A%20B&plus=%2b#F"},
+		sender.NewInputMediaLink("https://e.x/a%2fb?z=2&a=A%20B&plus=%2b#F"))
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "example.com/x"}, sender.NewInputMediaLink("example.com/x"))
 }
 
@@ -79,15 +81,17 @@ func TestPolls101A_LinkOptions(t *testing.T) {
 				"file1": {FileName: "2.jpg", Data: []byte("d101-2")}}},
 		{"empty_url", []sender.InputPollOption{{Text: "l", Media: link("")}, {Text: "b"}},
 			`[{"text":"l","media":{"type":"link","url":""}},{"text":"b"}]`, map[string]wireFile{}},
-		// T2-14, C1-04, C2-04 openai: the URL is sent byte for byte (no fragment or query cut, no scheme added, no
-		// case change, no percent or '+' decoding; plan §4).
+		// T2-14, C1-04, C2-04, C3-03 openai: the URL is sent byte for byte (no fragment or query cut, no scheme added, no
+		// case change, no percent or '+' decoding, no query re-encoding; plan §4).
 		{"url_as_given", []sender.InputPollOption{{Text: "f", Media: link("https://e.x/a?b=1#c")},
 			{Text: "s", Media: link("example.com/x")}, {Text: "m", Media: link("https://E.x/Path?Key=Value#Frag")},
-			{Text: "p", Media: link("https://e.x/a%2Fb?key=A%2BB+Value")}},
+			{Text: "p", Media: link("https://e.x/a%2Fb?key=A%2BB+Value")},
+			{Text: "q", Media: link("https://e.x/a%2fb?z=2&a=A%20B&plus=%2b#F")}},
 			`[{"text":"f","media":{"type":"link","url":"https://e.x/a?b=1#c"}},` +
 				`{"text":"s","media":{"type":"link","url":"example.com/x"}},` +
 				`{"text":"m","media":{"type":"link","url":"https://E.x/Path?Key=Value#Frag"}},` +
-				`{"text":"p","media":{"type":"link","url":"https://e.x/a%2Fb?key=A%2BB+Value"}}]`, map[string]wireFile{}},
+				`{"text":"p","media":{"type":"link","url":"https://e.x/a%2Fb?key=A%2BB+Value"}},` +
+				`{"text":"q","media":{"type":"link","url":"https://e.x/a%2fb?z=2&a=A%20B&plus=%2b#F"}}]`, map[string]wireFile{}},
 		{"other_fields_set", []sender.InputPollOption{{Text: "l", Media: &full}, {Text: "b"}},
 			`[{"text":"l","media":{"type":"link","url":"https://e.x/f"}},{"text":"b"}]`, map[string]wireFile{}},
 	}

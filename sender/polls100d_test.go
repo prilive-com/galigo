@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"testing"
 
@@ -685,4 +686,31 @@ func TestPolls100D_TypedNilInAny(t *testing.T) {
 			"options":  pj(t, `[{"text":"a","media":{"type":"photo","media":"P"}},{"text":"b"}]`),
 		}, args)
 	})
+}
+
+// T-s-18 (C3-01 openai, round c3): a value json.Marshal cannot encode (a NaN coordinate) is a build error with its
+// field and step named, before any request; in an option and in the description media.
+func TestPolls100D_UnencodableNumber(t *testing.T) {
+	nan := sender.NewInputMediaLocation(math.NaN(), 2)
+	for _, row := range []struct {
+		name, prefix string
+		req          sender.SendPollRequest
+	}{
+		{"option", "failed to build request: field options: JSON marshal poll options: ",
+			sender.SendPollRequest{Options: []sender.InputPollOption{{Text: "a", Media: &nan}, {Text: "b"}}}},
+		{"media", "failed to build request: field media: JSON marshal InputMedia: ",
+			sender.SendPollRequest{Options: plainOptions(), Media: &nan}},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			client := testutil.NewTestClient(t, server.BaseURL())
+			row.req.ChatID, row.req.Question = testutil.TestChatID, "Q"
+			_, err := client.SendPoll(context.Background(), row.req)
+			require.Error(t, err)
+			assert.True(t, strings.HasPrefix(err.Error(), row.prefix), err.Error())
+			var uv *json.UnsupportedValueError
+			assert.ErrorAs(t, err, &uv)
+			assert.Equal(t, 0, server.CaptureCount())
+		})
+	}
 }

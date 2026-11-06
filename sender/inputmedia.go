@@ -1,8 +1,8 @@
 package sender
 
-// InputMedia represents media content for editMessageMedia, sendMediaGroup
-// and, since Bot API 10.0, poll media (SendPollRequest.Media and
-// .ExplanationMedia, InputPollOption.Media).
+// InputMedia represents media content for editMessageMedia and, since Bot
+// API 10.0, poll media (SendPollRequest.Media and .ExplanationMedia,
+// InputPollOption.Media). Albums (sendMediaGroup) use []InputFile instead.
 // Use one of the constructors: NewInputMediaPhoto, NewInputMediaDocument, etc.
 type InputMedia struct {
 	// Type is the media type: "photo", "video", "document", "audio",

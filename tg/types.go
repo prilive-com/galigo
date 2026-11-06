@@ -305,17 +305,24 @@ type PollOption struct {
 	AdditionDate int64      `json:"addition_date,omitempty"` // 9.6
 }
 
-// PollMedia is a media in a poll, a poll option or a quiz explanation (Bot API 10.0). At most one field is set.
+// PollMedia is a media in a poll, a poll option or a quiz explanation (Bot API 10.0; link 10.1). At most one
+// field is set.
 type PollMedia struct {
 	Animation *Animation  `json:"animation,omitempty"`
 	Audio     *Audio      `json:"audio,omitempty"`
 	Document  *Document   `json:"document,omitempty"`
+	Link      *Link       `json:"link,omitempty"` // 10.1: poll options only
 	LivePhoto *LivePhoto  `json:"live_photo,omitempty"`
 	Location  *Location   `json:"location,omitempty"`
 	Photo     []PhotoSize `json:"photo,omitempty"`
 	Sticker   *Sticker    `json:"sticker,omitempty"`
 	Venue     *Venue      `json:"venue,omitempty"`
 	Video     *Video      `json:"video,omitempty"`
+}
+
+// Link is an HTTP link (Bot API 10.1), the media of a poll option.
+type Link struct {
+	URL string `json:"url"`
 }
 
 // PollOptionAdded is a service message: an option was added to a poll. Added in Bot API 9.6.

@@ -64,7 +64,8 @@ func viewStep(s engine.Step) any {
 			OptionMedia         []any
 			WantMedia, WantExpl string
 			WantOptions         []string
-		}{"SendPollMediaStep", r, media, expl, opts, st.WantMedia, st.WantExplanation, st.WantOptions}
+			WantLinks           []string // API101A T-tb-6
+		}{"SendPollMediaStep", r, media, expl, opts, st.WantMedia, st.WantExplanation, st.WantOptions, st.WantLinks}
 	default:
 		return s // a pointer: compared by the value it points to
 	}

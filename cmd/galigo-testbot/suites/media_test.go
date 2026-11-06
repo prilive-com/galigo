@@ -2,6 +2,7 @@ package suites
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
+	"github.com/prilive-com/galigo/sender"
 )
 
 // mediaView is a MediaInput with its bytes read, so two inputs can be compared
@@ -45,9 +47,60 @@ func viewStep(s engine.Step) any {
 			Photo   mediaView
 			Caption string
 		}{"SendPhotoStep", viewMedia(st.Photo), st.Caption}
+	case *engine.SendPollMediaStep: // API100D T-tb-6: every InputFile of the request, with its bytes read
+		r := st.Req
+		media, expl := viewPollMedia(r.Media), viewPollMedia(r.ExplanationMedia)
+		r.Media, r.ExplanationMedia = nil, nil
+		opts := make([]any, len(r.Options))
+		r.Options = append([]sender.InputPollOption(nil), r.Options...)
+		for i := range r.Options {
+			opts[i] = viewPollMedia(r.Options[i].Media)
+			r.Options[i].Media = nil
+		}
+		return struct {
+			Kind                string
+			Req                 sender.SendPollRequest
+			Media, Explanation  any
+			OptionMedia         []any
+			WantMedia, WantExpl string
+			WantOptions         []string
+		}{"SendPollMediaStep", r, media, expl, opts, st.WantMedia, st.WantExplanation, st.WantOptions}
 	default:
 		return s // a pointer: compared by the value it points to
 	}
+}
+
+// inputFileView is a sender.InputFile with its upload bytes read (API100D T-tb-6).
+type inputFileView struct {
+	Data                             []byte
+	FileName, FileID, URL, MediaType string
+	Photo                            *inputFileView
+}
+
+func viewInputFile(f sender.InputFile) inputFileView {
+	v := inputFileView{FileName: f.FileName, FileID: f.FileID, URL: f.URL, MediaType: f.MediaType}
+	if r := f.OpenReader(); r != nil {
+		v.Data, _ = io.ReadAll(r)
+	}
+	if f.Photo != nil {
+		p := viewInputFile(*f.Photo)
+		v.Photo = &p
+	}
+	return v
+}
+
+// viewPollMedia is an InputMedia with its file replaced by its view (nil stays nil).
+func viewPollMedia(m *sender.InputMedia) any {
+	if m == nil {
+		return nil
+	}
+	c := *m
+	f := viewInputFile(c.Media)
+	c.Media = sender.InputFile{}
+	return struct {
+		M    sender.InputMedia
+		File inputFileView
+	}{c, f}
 }
 
 func viewSteps(steps []engine.Step) []any {

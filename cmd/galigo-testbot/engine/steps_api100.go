@@ -402,3 +402,99 @@ func (s *SendPoll100Step) Execute(ctx context.Context, rt *Runtime) (*StepResult
 	}
 	return res, nil
 }
+
+// pollMediaKind returns the kind of a poll media (Bot API 10.0): "" for nil, else the JSON name of its one set
+// field. More than one set field is an error.
+func pollMediaKind(m *tg.PollMedia) (string, error) {
+	if m == nil {
+		return "", nil
+	}
+	var kinds []string
+	for _, k := range []struct {
+		name string
+		set  bool
+	}{
+		{"animation", m.Animation != nil},
+		{"audio", m.Audio != nil},
+		{"document", m.Document != nil},
+		{"live_photo", m.LivePhoto != nil},
+		{"location", m.Location != nil},
+		{"photo", len(m.Photo) > 0},
+		{"sticker", m.Sticker != nil},
+		{"venue", m.Venue != nil},
+		{"video", m.Video != nil},
+	} {
+		if k.set {
+			kinds = append(kinds, k.name)
+		}
+	}
+	if len(kinds) > 1 {
+		return "", fmt.Errorf("poll media with %d kinds: %s", len(kinds), strings.Join(kinds, ", "))
+	}
+	if len(kinds) == 0 {
+		return "", nil
+	}
+	return kinds[0], nil
+}
+
+// SendPollMediaStep sends a poll with media (Bot API 10.0: description, explanation and option media) and checks
+// the media kinds of the poll in the reply. An empty wanted kind means no media there.
+type SendPollMediaStep struct {
+	Req             sender.SendPollRequest
+	WantMedia       string
+	WantExplanation string
+	WantOptions     []string
+}
+
+func (s *SendPollMediaStep) Name() string { return "sendPoll (media)" }
+
+func (s *SendPollMediaStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendPoll"}
+	req := s.Req
+	req.ChatID = rt.ChatID
+	msg, err := rt.Sender.SendPoll(ctx, req)
+	if err != nil {
+		return res, err
+	}
+	if msg == nil {
+		return res, errors.New("sendPoll: no message in the reply")
+	}
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	rt.LastMessage = msg
+	res.MessageIDs = []int{msg.MessageID}
+	p := msg.Poll
+	if p == nil {
+		return res, errors.New("sendPoll: the reply has no poll")
+	}
+	media, err := pollMediaKind(p.Media)
+	if err != nil {
+		return res, fmt.Errorf("sendPoll: media: %w", err)
+	}
+	expl, err := pollMediaKind(p.ExplanationMedia)
+	if err != nil {
+		return res, fmt.Errorf("sendPoll: explanation_media: %w", err)
+	}
+	if len(p.Options) != len(s.WantOptions) {
+		return res, fmt.Errorf("sendPoll: %d options in the reply, want %d", len(p.Options), len(s.WantOptions))
+	}
+	opts := make([]string, len(p.Options))
+	for i, o := range p.Options {
+		if opts[i], err = pollMediaKind(o.Media); err != nil {
+			return res, fmt.Errorf("sendPoll: option %d: %w", i, err)
+		}
+	}
+	res.Evidence = map[string]any{"message_id": msg.MessageID, "media": media, "explanation_media": expl,
+		"option_media": opts}
+	if media != s.WantMedia {
+		return res, fmt.Errorf("sendPoll: media %q in the reply, want %q", media, s.WantMedia)
+	}
+	if expl != s.WantExplanation {
+		return res, fmt.Errorf("sendPoll: explanation_media %q in the reply, want %q", expl, s.WantExplanation)
+	}
+	for i, k := range opts {
+		if k != s.WantOptions[i] {
+			return res, fmt.Errorf("sendPoll: option %d media %q in the reply, want %q", i, k, s.WantOptions[i])
+		}
+	}
+	return res, nil
+}

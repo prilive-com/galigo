@@ -1,6 +1,7 @@
 package suites
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -76,6 +77,28 @@ func TestAPI100Scenarios(t *testing.T) {
 				Options: []sender.InputPollOption{{Text: "a"}, {Text: "b"}}, CountryCodes: []string{"DE", "FT"}}},
 			&engine.CleanupStep{},
 		}},
+		// API100D T-tb-7: the 10.0d poll media scenarios (plan §8 T).
+		{"S63-PollMediaDescription", []string{"sendPoll"}, []engine.Step{
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description photo",
+				Options: plain(), Description: "d", Media: ptr(sender.NewInputMediaPhoto(
+					sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg")))},
+				WantMedia: "photo", WantOptions: []string{"", ""}},
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description location",
+				Options: plain(), Media: ptr(sender.NewInputMediaLocation(52.52, 13.405))},
+				WantMedia: "location", WantOptions: []string{"", ""}},
+			&engine.CleanupStep{},
+		}},
+		{"S64-PollOptionMedia", []string{"sendPoll"}, []engine.Step{s64Step(fixtures.StickerBytes()), &engine.CleanupStep{}}},
+		{"S65-QuizExplanationMedia", []string{"sendPoll"}, []engine.Step{
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 quiz, explanation media",
+				Type: "quiz", IsAnonymous: ptr(false), Options: []sender.InputPollOption{
+					{Text: "photo", Media: ptr(sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg")))},
+					{Text: "plain"}},
+				CorrectOptionIDs: []int{0}, Explanation: "e",
+				ExplanationMedia: ptr(sender.NewInputMediaDocument(sender.FromBytes(fixtures.DocumentBytes(), "document.txt")))},
+				WantOptions: []string{"photo", ""}, WantExplanation: "document"},
+			&engine.CleanupStep{},
+		}},
 	}
 
 	got := AllAPI100Scenarios()
@@ -113,6 +136,64 @@ func TestAPI100Scenarios(t *testing.T) {
 			"getManagedBotAccessSettings", "setManagedBotAccessSettings", "getUserPersonalChatMessages"} {
 			assert.Contains(t, names, m)
 		}
+	})
+}
+
+func ptr[T any](v T) *T { return &v }
+
+func plain() []sender.InputPollOption { return []sender.InputPollOption{{Text: "a"}, {Text: "b"}} }
+
+// s64Step is S64's poll step with the given sticker bytes (API100D T-tb-7, T-tb-8).
+func s64Step(sticker []byte) *engine.SendPollMediaStep {
+	loc := sender.NewInputMediaLocation(52.52, 13.405)
+	loc.HorizontalAccuracy = 50
+	st := sender.NewInputMediaSticker(sender.FromBytes(sticker, "sticker.png"))
+	st.Emoji = "👍"
+	return &engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, option media",
+		Options: []sender.InputPollOption{
+			{Text: "location", Media: &loc},
+			{Text: "venue", Media: ptr(sender.NewInputMediaVenue(48.8584, 2.2945, "Eiffel Tower", "Paris"))},
+			{Text: "sticker", Media: &st},
+			{Text: "photo", Media: ptr(sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg")))},
+			{Text: "plain"}}},
+		WantOptions: []string{"location", "venue", "sticker", "photo", ""}}
+}
+
+// api100Scenario returns the scenario of AllAPI100Scenarios with this name, or fails.
+func api100Scenario(t *testing.T, name string) engine.Scenario {
+	t.Helper()
+	for _, s := range AllAPI100Scenarios() {
+		if s.Name() == name {
+			return s
+		}
+	}
+	t.Fatalf("scenario %s not found", name)
+	return nil
+}
+
+// T-tb-8 (API100D, T1-02 google): the T-tb-6 view reads the bytes of every upload, top level, option and nested
+// live-photo still, so a changed byte makes it unequal and two fresh builds are equal.
+func TestAPI100D_ViewSeesBytes(t *testing.T) {
+	t.Run("S64", func(t *testing.T) {
+		a := api100Scenario(t, "S64-PollOptionMedia").Steps()[0]
+		b := api100Scenario(t, "S64-PollOptionMedia").Steps()[0]
+		assert.Equal(t, viewStep(a), viewStep(b))
+		changed := bytes.Clone(fixtures.StickerBytes())
+		changed[len(changed)-1] ^= 1
+		assert.Equal(t, viewStep(a), viewStep(s64Step(fixtures.StickerBytes())))
+		assert.NotEqual(t, viewStep(a), viewStep(s64Step(changed)))
+	})
+	t.Run("live_photo_still", func(t *testing.T) {
+		v, p := []byte("video bytes"), []byte("still bytes")
+		build := func(v, p []byte) engine.Step {
+			lp := sender.NewInputMediaLivePhoto(sender.FromBytes(v, "v.mp4"), sender.FromBytes(p, "p.jpg"))
+			return &engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "Q",
+				Options: []sender.InputPollOption{{Text: "a", Media: &lp}, {Text: "b"}}}}
+		}
+		assert.Equal(t, viewStep(build(bytes.Clone(v), bytes.Clone(p))), viewStep(build(bytes.Clone(v), bytes.Clone(p))))
+		p2 := bytes.Clone(p)
+		p2[0] ^= 1
+		assert.NotEqual(t, viewStep(build(bytes.Clone(v), bytes.Clone(p))), viewStep(build(bytes.Clone(v), p2)))
 	})
 }
 

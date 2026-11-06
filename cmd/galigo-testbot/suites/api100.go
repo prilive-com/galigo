@@ -173,6 +173,79 @@ func AllLivePhotoScenarios() []engine.Scenario {
 }
 
 // AllAPI100Scenarios returns the Bot API 10.0 scenarios (part a, live photos of part b, polls of part c).
+// pollOptions100D returns two plain poll options.
+func pollOptions100D() []sender.InputPollOption {
+	return []sender.InputPollOption{{Text: "a"}, {Text: "b"}}
+}
+
+// S63_PollMediaDescription sends a poll with description media: a photo upload, then a location (no file, so the
+// request is multipart without files).
+func S63_PollMediaDescription() engine.Scenario {
+	photo := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	loc := sender.NewInputMediaLocation(52.52, 13.405)
+	return &engine.BaseScenario{
+		ScenarioName:        "S63-PollMediaDescription",
+		ScenarioDescription: "sendPoll with description media: photo upload, location (10.0)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description photo",
+				Options: pollOptions100D(), Description: "d", Media: &photo},
+				WantMedia: "photo", WantOptions: []string{"", ""}},
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, description location",
+				Options: pollOptions100D(), Media: &loc},
+				WantMedia: "location", WantOptions: []string{"", ""}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S64_PollOptionMedia sends a poll whose options have media: location, venue, sticker upload with emoji, photo
+// upload, and one plain option.
+func S64_PollOptionMedia() engine.Scenario {
+	loc := sender.NewInputMediaLocation(52.52, 13.405)
+	loc.HorizontalAccuracy = 50
+	venue := sender.NewInputMediaVenue(48.8584, 2.2945, "Eiffel Tower", "Paris")
+	sticker := sender.NewInputMediaSticker(sender.FromBytes(fixtures.StickerBytes(), "sticker.png"))
+	sticker.Emoji = "👍"
+	photo := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	return &engine.BaseScenario{
+		ScenarioName:        "S64-PollOptionMedia",
+		ScenarioDescription: "sendPoll with option media: location, venue, sticker upload, photo upload (10.0)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 poll, option media",
+				Options: []sender.InputPollOption{
+					{Text: "location", Media: &loc}, {Text: "venue", Media: &venue}, {Text: "sticker", Media: &sticker},
+					{Text: "photo", Media: &photo}, {Text: "plain"}}},
+				WantOptions: []string{"location", "venue", "sticker", "photo", ""}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// S65_QuizExplanationMedia sends a quiz with a photo option and a document upload as explanation media.
+func S65_QuizExplanationMedia() engine.Scenario {
+	photo := sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "photo.jpg"))
+	doc := sender.NewInputMediaDocument(sender.FromBytes(fixtures.DocumentBytes(), "document.txt"))
+	notAnonymous := false
+	return &engine.BaseScenario{
+		ScenarioName:        "S65-QuizExplanationMedia",
+		ScenarioDescription: "sendPoll quiz with option media and explanation media (10.0)",
+		CoveredMethods:      []string{"sendPoll"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPollMediaStep{Req: sender.SendPollRequest{Question: "galigo 10.0 quiz, explanation media",
+				Type: "quiz", IsAnonymous: &notAnonymous,
+				Options:          []sender.InputPollOption{{Text: "photo", Media: &photo}, {Text: "plain"}},
+				CorrectOptionIDs: []int{0}, Explanation: "e", ExplanationMedia: &doc},
+				WantOptions: []string{"photo", ""}, WantExplanation: "document"},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 func AllAPI100Scenarios() []engine.Scenario {
 	s := append([]engine.Scenario{
 		S51_DeleteReactions(),
@@ -180,5 +253,6 @@ func AllAPI100Scenarios() []engine.Scenario {
 		S53_AdminsWithBots(),
 		S54_EmptyDraft(),
 	}, AllLivePhotoScenarios()...)
-	return append(s, S60_PollOptionCount(), S61_PollMembersOnly(), S62_PollCountryCodes())
+	return append(s, S60_PollOptionCount(), S61_PollMembersOnly(), S62_PollCountryCodes(),
+		S63_PollMediaDescription(), S64_PollOptionMedia(), S65_QuizExplanationMedia())
 }

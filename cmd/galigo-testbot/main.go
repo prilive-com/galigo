@@ -262,7 +262,7 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	// Bot API 9.6 (S47-S50)
 	case "api96", "api-96", "9.6":
 		scenarios = suites.AllAPI96Scenarios()
-	// Bot API 10.0 (S51-S54, S57-S62)
+	// Bot API 10.0 (S51-S54, S57-S65)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
 	case "all":
@@ -655,7 +655,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	// Bot API 9.6 (S47-S50)
 	case "api96", "api-96", "9.6":
 		scenarios = suites.AllAPI96Scenarios()
-	// Bot API 10.0 (S51-S54, S57-S62)
+	// Bot API 10.0 (S51-S54, S57-S65)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
 	case "all":
@@ -788,7 +788,7 @@ Bot API 9.5 (S44-S46):
 Bot API 9.6 (S47-S50):
   api96 - All 9.6 tests (quiz correct_option_ids, poll options, reply to a poll option, prepared keyboard button)
 
-Bot API 10.0 (S51-S54, S57-S62):
+Bot API 10.0 (S51-S54, S57-S65):
   api100      - All 10.0 tests (delete reactions, can_react_to_messages, admins with bots, empty draft, live photos, polls)
   live-photos - Live photos (S57-S59)
 

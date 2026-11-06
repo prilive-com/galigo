@@ -40,6 +40,11 @@ type SendPollRequest struct {
 	Description            string             `json:"description,omitempty"`               // 9.6
 	DescriptionParseMode   tg.ParseMode       `json:"description_parse_mode,omitempty"`    // 9.6
 	DescriptionEntities    []tg.MessageEntity `json:"description_entities,omitempty"`      // 9.6
+	// ExplanationMedia and Media (Bot API 10.0): media of the quiz explanation
+	// and of the poll description. A request with media in any place is sent
+	// as multipart/form-data.
+	ExplanationMedia *InputMedia `json:"explanation_media,omitempty"` // 10.0
+	Media            *InputMedia `json:"media,omitempty"`             // 10.0
 }
 
 // InputPollOption represents a poll option.
@@ -47,6 +52,7 @@ type InputPollOption struct {
 	Text          string             `json:"text"`
 	TextParseMode tg.ParseMode       `json:"text_parse_mode,omitempty"`
 	TextEntities  []tg.MessageEntity `json:"text_entities,omitempty"`
+	Media         *InputMedia        `json:"media,omitempty"` // 10.0; sent as multipart/form-data
 }
 
 // StopPollRequest represents a stopPoll request.

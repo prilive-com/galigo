@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -147,6 +148,13 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
+		case *InputMedia, []InputPollOption: // poll media (Bot API 10.0); nil is skipped above
+			needsForm, err := handlePollField(&result, fieldName, v, &attachIdx)
+			if err != nil {
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
+			}
+			formOnly = formOnly || needsForm
+
 		case string:
 			result.Params[fieldName] = v
 
@@ -188,6 +196,48 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 	return result, formOnly, nil
 }
 
+// handlePollField writes a poll media field (Bot API 10.0) and reports whether
+// it needs multipart/form-data: a *InputMedia always does; the options only
+// when an option has media (without option media the text is the same JSON as
+// before, so the request is sent as JSON unless another field needs multipart).
+func handlePollField(req *MultipartRequest, fieldName string, v any, attachIdx *int) (bool, error) {
+	switch v := v.(type) {
+	case *InputMedia:
+		return true, handleInputMedia(req, fieldName, *v, attachIdx)
+	case []InputPollOption:
+		hasMedia := slices.ContainsFunc(v, func(o InputPollOption) bool { return o.Media != nil })
+		return hasMedia, handlePollOptions(req, fieldName, v, attachIdx)
+	}
+	return false, fmt.Errorf("unexpected poll field type %T", v)
+}
+
+// handlePollOptions writes the options of a poll (Bot API 10.0 option media):
+// each option keeps its own JSON fields, and its media is the item
+// inputMediaItem builds (uploads take the next attach names).
+func handlePollOptions(req *MultipartRequest, fieldName string, options []InputPollOption, attachIdx *int) error {
+	type wireOption struct {
+		InputPollOption
+		Media map[string]any `json:"media,omitempty"` // hides the embedded Media
+	}
+	out := make([]wireOption, len(options))
+	for i, o := range options {
+		out[i].InputPollOption = o
+		if o.Media != nil {
+			item, err := inputMediaItem(req, *o.Media, attachIdx)
+			if err != nil {
+				return fmt.Errorf("option %d: %w", i, err)
+			}
+			out[i].Media = item
+		}
+	}
+	data, err := json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("JSON marshal poll options: %w", err)
+	}
+	req.Params[fieldName] = string(data)
+	return nil
+}
+
 // formValue returns the form text of a JSON-encoded value. A JSON string (a
 // named string in an any field, a json.RawMessage holding a string) is sent
 // as its decoded text: the Bot API server reads a JSON body's string value the
@@ -203,8 +253,52 @@ func formValue(data []byte) string {
 }
 
 func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia, attachIdx *int) error {
+	item, err := inputMediaItem(req, media, attachIdx)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(item)
+	if err != nil {
+		return fmt.Errorf("JSON marshal InputMedia: %w", err)
+	}
+	req.Params[fieldName] = string(data)
+
+	return nil
+}
+
+// inputMediaItem builds the JSON item of one InputMedia and adds its upload
+// parts to req. A location or venue (Bot API 10.0) has no file: a file on it is
+// an error, so it is not dropped without a word.
+func inputMediaItem(req *MultipartRequest, media InputMedia, attachIdx *int) (map[string]any, error) {
 	item := map[string]any{
 		"type": media.Type,
+	}
+
+	if media.Type == "location" || media.Type == "venue" {
+		f := media.Media
+		if f.FileID != "" || f.URL != "" || f.Reader != nil || f.Source != nil || f.Photo != nil {
+			return nil, fmt.Errorf("InputMedia: %s has no media file", media.Type)
+		}
+		item["latitude"] = media.Latitude
+		item["longitude"] = media.Longitude
+		if media.HorizontalAccuracy != 0 {
+			item["horizontal_accuracy"] = media.HorizontalAccuracy
+		}
+		if media.Type == "venue" {
+			item["title"] = media.Title
+			item["address"] = media.Address
+			for key, val := range map[string]string{
+				"foursquare_id":     media.FoursquareID,
+				"foursquare_type":   media.FoursquareType,
+				"google_place_id":   media.GooglePlaceID,
+				"google_place_type": media.GooglePlaceType,
+			} {
+				if val != "" {
+					item[key] = val
+				}
+			}
+		}
+		return item, nil
 	}
 
 	switch {
@@ -226,19 +320,22 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 		})
 
 	default:
-		return fmt.Errorf("InputMedia.Media must have FileID, URL, or Reader set")
+		return nil, fmt.Errorf("InputMedia.Media must have FileID, URL, or Reader set")
 	}
 
 	if media.Media.Photo != nil {
 		ref, err := attachRef(req, *media.Media.Photo, attachIdx)
 		if err != nil {
-			return fmt.Errorf("InputMedia.Media.Photo: %w", err)
+			return nil, fmt.Errorf("InputMedia.Media.Photo: %w", err)
 		}
 		item["photo"] = ref
 	} else if media.Type == "live_photo" {
-		return fmt.Errorf("InputMedia: live_photo requires Media.Photo")
+		return nil, fmt.Errorf("InputMedia: live_photo requires Media.Photo")
 	}
 
+	if media.Emoji != "" {
+		item["emoji"] = media.Emoji
+	}
 	if media.Caption != "" {
 		item["caption"] = media.Caption
 	}
@@ -246,13 +343,7 @@ func handleInputMedia(req *MultipartRequest, fieldName string, media InputMedia,
 		item["parse_mode"] = media.ParseMode
 	}
 
-	data, err := json.Marshal(item)
-	if err != nil {
-		return fmt.Errorf("JSON marshal InputMedia: %w", err)
-	}
-	req.Params[fieldName] = string(data)
-
-	return nil
+	return item, nil
 }
 
 func handleInputFile(req *MultipartRequest, fieldName string, file InputFile, attachIdx *int) error {

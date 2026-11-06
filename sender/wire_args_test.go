@@ -563,6 +563,10 @@ func fileCalls() []fileCall {
 	}}
 	liveEdit := sender.EditMessageMediaRequest{ChatID: id, MessageID: 42,
 		Media: sender.NewInputMediaLivePhoto(sender.FromFileID("A"), sender.FromFileID("B"))}
+	// API100D T-s-14: sendPoll with description media and option media by file id.
+	pollPhoto, optionPhoto := sender.NewInputMediaPhoto(sender.FromFileID("A")), sender.NewInputMediaPhoto(sender.FromFileID("B"))
+	poll := sender.SendPollRequest{ChatID: id, Question: "Q", Media: &pollPhoto,
+		Options: []sender.InputPollOption{{Text: "a", Media: &optionPhoto}, {Text: "b"}}}
 
 	msg := func(f func() (*tg.Message, error)) error { _, err := f(); return err }
 	return []fileCall{
@@ -596,6 +600,9 @@ func fileCalls() []fileCall {
 		}},
 		{"editMessageMedia", "editMessageMedia", edit, mp, func(ctx context.Context, c *sender.Client) error {
 			return msg(func() (*tg.Message, error) { return c.EditMessageMedia(ctx, edit) })
+		}},
+		{"sendPoll", "sendPoll", poll, mp, func(ctx context.Context, c *sender.Client) error { // API100D T-s-14
+			return msg(func() (*tg.Message, error) { return c.SendPoll(ctx, poll) })
 		}},
 		{"sendLivePhoto", "sendLivePhoto", live, js, func(ctx context.Context, c *sender.Client) error {
 			return msg(func() (*tg.Message, error) { return c.SendLivePhoto(ctx, live) })
@@ -670,12 +677,12 @@ func TestWire_W7_Routing(t *testing.T) {
 			assertFiles(t, map[string]wireFile{}, files)
 		})
 	}
-	assert.Equal(t, 17, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows
+	assert.Equal(t, 18, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll
 }
 
 func TestWire_W8_ContentType(t *testing.T) {
 	calls := fileCalls()
-	require.Len(t, calls, 23) // API100B T-s-19: 20 + 3 live-photo rows
+	require.Len(t, calls, 24) // API100B T-s-19: 20 + 3 live-photo rows; API100D T-s-14: + sendPoll
 	for _, fc := range calls {
 		t.Run(fc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
@@ -702,6 +709,7 @@ var guardPartA = []string{
 	"SendMediaGroupRequest", "EditMessageMediaRequest", "SetChatPhotoRequest",
 	"SetMyProfilePhotoRequest", "UploadStickerFileRequest", "SetStickerSetThumbnailRequest",
 	"SendLivePhotoRequest", // API100B T-s-19
+	"SendPollRequest",      // API100D T-s-14
 }
 
 var guardPartB = []string{
@@ -709,7 +717,8 @@ var guardPartB = []string{
 	"PostStoryRequest", "EditStoryRequest", "SetBusinessAccountProfilePhotoRequest",
 	"InputMedia", "InputSticker", "InputProfilePhotoStatic", "InputProfilePhotoAnimated",
 	"InputStoryContentPhoto", "InputStoryContentVideo",
-	"InputFile", // API100B T-s-19: InputFile.Photo is a nested *InputFile
+	"InputFile",       // API100B T-s-19: InputFile.Photo is a nested *InputFile
+	"InputPollOption", // API100D T-s-14: InputPollOption.Media is a nested *InputMedia
 }
 
 // guardTypes returns the union of set 1 (exported structs with a field of a
@@ -805,7 +814,7 @@ func senderSources(t *testing.T) map[string]string {
 func TestWire_W7_Guard(t *testing.T) {
 	want := append(append([]string{}, guardPartA...), guardPartB...)
 	sort.Strings(want)
-	require.Len(t, want, 28) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile
+	require.Len(t, want, 30) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile; API100D T-s-14: + SendPollRequest + InputPollOption
 
 	assert.Equal(t, want, guardTypes(t, senderSources(t)))
 

@@ -653,7 +653,9 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 		})
 	}
 	// Each method WAITS on the chat's limiter (C2-01): with 1 call per 100 s and burst 1, a second call on the same
-	// chat with a 50 ms deadline fails in the limiter and sends no request.
+	// chat with a 5 s deadline fails in the limiter at once and sends no request. The deadline is far below the 100 s
+	// refill, so the limiter refuses the reservation; a short deadline could expire first on a slow runner and give
+	// ctx.Err() instead (C3-03).
 	waits := []struct {
 		method, result string
 		call           func(ctx context.Context, c *sender.Client) error
@@ -680,7 +682,30 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = client.Close() })
 			require.NoError(t, r.call(context.Background(), client))
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err = r.call(ctx, client)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "would exceed context deadline")
+			assert.Equal(t, 1, server.CaptureCount())
+		})
+	}
+	// Each method uses the SAME chat limiter as the other methods (C3-01): after a SendMessage to the chat, a call of
+	// the method on that chat fails in the limiter and sends no request. A method keyed on another string for the
+	// same chat would get its own limiter and pass the rows above.
+	for _, r := range waits {
+		t.Run("shares "+r.method, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			api101dOnResult(server, "sendMessage", api101dReply)
+			api101dOnResult(server, r.method, r.result)
+			client, err := sender.New(testutil.TestToken, sender.WithBaseURL(server.BaseURL()),
+				sender.WithCircuitBreakerSettings(testutil.CircuitBreakerNeverTrip()), sender.WithRetries(0),
+				sender.WithPerChatRateLimit(0.01, 1))
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = client.Close() })
+			_, err = client.SendMessage(context.Background(), sender.SendMessageRequest{ChatID: api101dChat, Text: "x"})
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err = r.call(ctx, client)
 			require.Error(t, err)

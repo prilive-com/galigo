@@ -240,7 +240,7 @@ func TestSenderAdapter101D(t *testing.T) {
 		server.On("/bot"+testutil.TestToken+"/"+path, reply)
 		return NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), server
 	}
-	rm := tg.InputRichMessage{Markdown: "**m**", SkipEntityDetection: true}
+	rm := tg.InputRichMessage{Markdown: "**m**", IsRTL: true, SkipEntityDetection: true} // both flags reach the body (C3-02)
 	rows := []struct {
 		path string
 		call func(a *SenderAdapter) error
@@ -252,17 +252,17 @@ func TestSenderAdapter101D(t *testing.T) {
 				return errors.New("no message")
 			}
 			return err
-		}, `{"chat_id":-1001234567890,"rich_message":{"markdown":"**m**","skip_entity_detection":true}}`},
+		}, `{"chat_id":-1001234567890,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
 		{"editMessageText", func(a *SenderAdapter) error {
 			msg, err := a.EditMessageRich(context.Background(), -1001234567890, 77, rm)
 			if err == nil && msg == nil {
 				return errors.New("no message")
 			}
 			return err
-		}, `{"chat_id":-1001234567890,"message_id":77,"rich_message":{"markdown":"**m**","skip_entity_detection":true}}`},
+		}, `{"chat_id":-1001234567890,"message_id":77,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
 		{"sendRichMessageDraft", func(a *SenderAdapter) error {
 			return a.SendRichMessageDraft(context.Background(), 555000111, 9, rm)
-		}, `{"chat_id":555000111,"draft_id":9,"rich_message":{"markdown":"**m**","skip_entity_detection":true}}`},
+		}, `{"chat_id":555000111,"draft_id":9,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
 	}
 	for _, r := range rows {
 		t.Run(r.path, func(t *testing.T) {

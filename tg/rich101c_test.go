@@ -360,6 +360,7 @@ func TestAPI101C_RichTextDirect(t *testing.T) {
 			tg.RichText{Node: tg.RichTextBold{Type: "bold", Text: tg.RichText{Plain: "x"}}}},
 		{"stale node", tg.RichText{Node: tg.RichTextBold{Type: "bold"}}, `"s"`, tg.RichText{Plain: "s"}},
 		{"stale parts", tg.RichText{Parts: []tg.RichText{{Plain: "p"}}}, `null`, tg.RichText{}},
+		{"stale plain to parts", tg.RichText{Plain: "stale"}, `["x"]`, tg.RichText{Parts: []tg.RichText{{Plain: "x"}}}}, // C3-01
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

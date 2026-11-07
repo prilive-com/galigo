@@ -640,6 +640,13 @@ func TestAPI101C_RichBlocksForms(t *testing.T) {
 			tg.RichBlockUnknown{Type: "DIVIDER", Raw: json.RawMessage(`{"type":"DIVIDER"}`)},
 		}, decode(t, `[{"type":" paragraph","text":"a"},{"type":"DIVIDER"}]`))
 	})
+	t.Run("null element", func(t *testing.T) { // C2-01: a null element keeps its position
+		b := decode(t, `[{"type":"divider"},null]`)
+		assert.Equal(t, tg.RichBlocks{tg.RichBlockDivider{Type: "divider"}, tg.RichBlockUnknown{Raw: json.RawMessage(`null`)}}, b)
+		out, err := json.Marshal(rich101cBlocksHolder{B: b})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"b":[{"type":"divider"},null]}`, string(out))
+	})
 }
 
 // T-rb-3

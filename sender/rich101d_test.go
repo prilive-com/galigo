@@ -39,6 +39,9 @@ const (
 	api101dTextZero     = "galigo: chat_id cannot be zero"
 	api101dTextEmpty    = "galigo: chat_id cannot be empty string"
 	api101dDraftInteger = "must be integer for sendRichMessageDraft (private chats only)"
+	// api101dHTMLMixed is valid HTML with mixed case, an entity, quotes and non-ASCII text: a sender that changes the
+	// HTML after validation changes it (C1-07).
+	api101dHTMLMixed = `<p>Hello <B>World</B> &amp; "Ünï" ✓</p>`
 )
 
 func api101dPath(method string) string { return "/bot" + testutil.TestToken + "/" + method }
@@ -102,10 +105,11 @@ func TestAPI101D_SendRichMessageMinimal(t *testing.T) {
 	api101dOnResult(server, "sendRichMessage", api101dReply)
 	client := testutil.NewTestClient(t, server.BaseURL())
 	_, err := client.SendRichMessage(context.Background(), sender.SendRichMessageRequest{
-		ChatID: api101dChat, RichMessage: tg.InputRichMessage{HTML: "<p>h</p>"}})
+		ChatID: api101dChat, RichMessage: tg.InputRichMessage{HTML: api101dHTMLMixed}})
 	require.NoError(t, err)
 	require.Equal(t, 1, server.CaptureCount())
-	assert.JSONEq(t, `{"chat_id":123456789,"rich_message":{"html":"<p>h</p>"}}`, server.LastCapture().BodyString())
+	assert.JSONEq(t, `{"chat_id":123456789,"rich_message":{"html":"<p>Hello <B>World</B> &amp; \"Ünï\" ✓</p>"}}`,
+		server.LastCapture().BodyString())
 }
 
 // T-srm-3
@@ -214,9 +218,10 @@ func TestAPI101D_SendRichMessageDraftBody(t *testing.T) {
 
 	server.ResetCaptures()
 	require.NoError(t, client.SendRichMessageDraft(context.Background(), sender.SendRichMessageDraftRequest{
-		ChatID: api101dChat, DraftID: 3, RichMessage: tg.InputRichMessage{HTML: "<p>h</p>"}}))
+		ChatID: api101dChat, DraftID: 3, RichMessage: tg.InputRichMessage{HTML: api101dHTMLMixed}}))
 	require.Equal(t, 1, server.CaptureCount())
-	assert.JSONEq(t, `{"chat_id":123456789,"draft_id":3,"rich_message":{"html":"<p>h</p>"}}`, server.LastCapture().BodyString())
+	assert.JSONEq(t, `{"chat_id":123456789,"draft_id":3,"rich_message":{"html":"<p>Hello <B>World</B> &amp; \"Ünï\" ✓</p>"}}`,
+		server.LastCapture().BodyString())
 }
 
 // api101dDraftRow calls SendRichMessageDraft on a fresh server; field/msg "" = a valid request whose body chat_id and
@@ -252,6 +257,7 @@ func TestAPI101D_SendRichMessageDraftChatID(t *testing.T) {
 		{"nil", nil, "chat_id", "required", ""},
 		{"string", "@x", "chat_id", api101dDraftInteger, ""},
 		{"int32", int32(5), "chat_id", api101dDraftInteger, ""},
+		{"uint", uint(5), "chat_id", api101dDraftInteger, ""}, // C1-04
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
@@ -324,6 +330,14 @@ func TestAPI101D_EditMessageTextRich(t *testing.T) {
 	assert.JSONEq(t, `{"chat_id":123456789,"message_id":9,"rich_message":{"markdown":"m"}}`, server.LastCapture().BodyString())
 	require.NotNil(t, msg)
 	assert.NotNil(t, msg.RichMessage)
+
+	// C1-07: HTML is sent as given.
+	server, _, err = api101dEdit(t, sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9,
+		RichMessage: &tg.InputRichMessage{HTML: api101dHTMLMixed}}, api101dReplyRich)
+	require.NoError(t, err)
+	require.Equal(t, 1, server.CaptureCount())
+	assert.JSONEq(t, `{"chat_id":123456789,"message_id":9,"rich_message":{"html":"<p>Hello <B>World</B> &amp; \"Ünï\" ✓</p>"}}`,
+		server.LastCapture().BodyString())
 }
 
 // T-emt-2: the bytes of a text edit are the base encoding (struct field order), not only JSON-equal.
@@ -637,11 +651,30 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 			assert.Equal(t, 3, server.CaptureCount())
 		})
 	}
-	t.Run("refused", func(t *testing.T) {
-		client, server := newClient(t, "sendRichMessage", api101dReply)
-		_, err := client.SendRichMessage(context.Background(), sender.SendRichMessageRequest{ChatID: api101dChat})
-		require.Error(t, err)
-		assert.Equal(t, 0, client.ChatLimiterCount())
-		assert.Equal(t, 0, server.CaptureCount())
-	})
+	// A refused call (bad rich message) of each method, on a fresh client: no limiter, no request (C1-06).
+	refused := []struct {
+		method, result string
+		call           func(c *sender.Client) error
+	}{
+		{"sendRichMessage", api101dReply, func(c *sender.Client) error {
+			_, err := c.SendRichMessage(context.Background(), sender.SendRichMessageRequest{ChatID: api101dChat})
+			return err
+		}},
+		{"sendRichMessageDraft", "true", func(c *sender.Client) error {
+			return c.SendRichMessageDraft(context.Background(), sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1})
+		}},
+		{"editMessageText", api101dReply, func(c *sender.Client) error {
+			_, err := c.EditMessageText(context.Background(), sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9,
+				RichMessage: &tg.InputRichMessage{}})
+			return err
+		}},
+	}
+	for _, r := range refused {
+		t.Run("refused "+r.method, func(t *testing.T) {
+			client, server := newClient(t, r.method, r.result)
+			require.Error(t, r.call(client))
+			assert.Equal(t, 0, client.ChatLimiterCount())
+			assert.Equal(t, 0, server.CaptureCount())
+		})
+	}
 }

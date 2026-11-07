@@ -160,6 +160,34 @@ func TestAPI101D_EditMessageRichStep(t *testing.T) {
 			assert.Same(t, last, rt.LastMessage)
 		})
 	}
+
+	// C1-05: the adapter error, a last message with no chat, and a nil reply.
+	t.Run("adapter error", func(t *testing.T) {
+		boom := errors.New("boom")
+		f := &fake101d{err: boom}
+		rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
+		rt.LastMessage = last
+		_, err := step.Execute(context.Background(), rt)
+		assert.ErrorIs(t, err, boom)
+		assert.Same(t, last, rt.LastMessage)
+	})
+	t.Run("last message without chat", func(t *testing.T) {
+		f := &fake101d{}
+		rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
+		rt.LastMessage = &tg.Message{MessageID: api101dEditMsg}
+		_, err := step.Execute(context.Background(), rt)
+		require.EqualError(t, err, "editMessageText: no message to edit")
+		assert.Empty(t, f.calls)
+	})
+	t.Run("nil reply", func(t *testing.T) {
+		f := &fake101d{}
+		rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
+		rt.LastMessage = last
+		var err error
+		require.NotPanics(t, func() { _, err = step.Execute(context.Background(), rt) })
+		require.EqualError(t, err, "editMessageText: the reply has no rich_message")
+		assert.Same(t, last, rt.LastMessage)
+	})
 }
 
 // T-tb-3

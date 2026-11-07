@@ -93,6 +93,8 @@ func TestAPI101D_InputRichMessageContent(t *testing.T) {
 // T-irc-2: the content in each tg result type that holds an InputMessageContent.
 func TestAPI101D_InputRichMessageContentInResults(t *testing.T) {
 	var c tg.InputMessageContent = tg.InputRichMessageContent{RichMessage: tg.InputRichMessage{HTML: "<p>x</p>"}}
+	_, open := any(struct{}{}).(tg.InputMessageContent)
+	assert.False(t, open, "InputMessageContent stays a closed union (C1-03)")
 	results := map[string]any{
 		"article":  &tg.InlineQueryResultArticle{Type: "article", ID: "1", Title: "t", InputMessageContent: c},
 		"photo":    &tg.InlineQueryResultPhoto{Type: "photo", ID: "2", InputMessageContent: c},

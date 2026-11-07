@@ -394,6 +394,15 @@ func TestAPI101B_RequestShapes(t *testing.T) {
 			assert.Equal(t, 0, reflect.PointerTo(r.rt).NumMethod(), "no method on the pointer type")
 		})
 	}
+
+	// C1-01 openai: the two methods have exactly the planned signatures (an extra variadic parameter would still
+	// compile at every call site)
+	assert.Equal(t,
+		reflect.TypeFor[func(*sender.Client, context.Context, sender.AnswerChatJoinRequestQueryRequest) error]().String(),
+		reflect.TypeOf((*sender.Client).AnswerChatJoinRequestQuery).String())
+	assert.Equal(t,
+		reflect.TypeFor[func(*sender.Client, context.Context, sender.SendChatJoinRequestWebAppRequest) error]().String(),
+		reflect.TypeOf((*sender.Client).SendChatJoinRequestWebApp).String())
 }
 
 // T-s-12: a context cancelled before the call stops it before a request is sent.

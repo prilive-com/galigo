@@ -821,7 +821,7 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | Scenario | Methods | Description |
 |----------|---------|-------------|
 | S66-PollOptionLink | sendPoll | Poll whose options have links (`InputMediaLink`, multipart without files), then a poll with a link and a photo upload; each option's media kind and link URL is checked |
-| S67-RichMessage | sendRichMessage, editMessageText, sendRichMessageDraft | Rich message from markdown (the reply has a rich message and no text), edited to HTML rich content with `editMessageText`, then a rich draft; the draft works in private chats only, so in a group the step is skipped |
+| S67-RichMessage | sendRichMessage, editMessageText, sendRichMessageDraft | Rich message from markdown (the reply has a rich message and no text), edited to HTML rich content with `editMessageText`, cleaned up, then a rich draft; the draft works in private chats only, so in a group the step is skipped |
 
 #### Interactive (opt-in, excluded from `--run all`)
 

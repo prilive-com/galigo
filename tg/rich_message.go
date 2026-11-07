@@ -677,8 +677,9 @@ func (RichBlockThinking) richBlock()               {}
 
 // ================== Send side (Bot API 10.1) ==================
 
-// InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of HTML and Markdown; galigo
-// refuses a request that sets both or neither (the server picks one silently when both are set).
+// InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of HTML and Markdown.
+// SendRichMessage, SendRichMessageDraft and EditMessageText refuse a value that sets both or neither (the server
+// picks one silently when both are set); InputRichMessageContent in an inline result is sent unchecked.
 type InputRichMessage struct {
 	HTML                string `json:"html,omitempty"`
 	Markdown            string `json:"markdown,omitempty"`

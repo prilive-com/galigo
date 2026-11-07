@@ -55,8 +55,9 @@ func S67_RichMessage() engine.Scenario {
 				WantBlocks: []string{"paragraph"}},
 			&engine.EditMessageRichStep{RichMessage: tg.InputRichMessage{HTML: "<p>edited <b>rich</b></p>"},
 				WantBlocks: []string{"paragraph"}},
-			&engine.SendRichMessageDraftStep{DraftID: 1, RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 draft"}},
+			// Cleanup runs before the draft: in a group the draft is skipped, and a Skip ends the scenario.
 			&engine.CleanupStep{},
+			&engine.SendRichMessageDraftStep{DraftID: 1, RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 draft"}},
 		},
 	}
 }

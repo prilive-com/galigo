@@ -674,3 +674,13 @@ func (RichBlockPhoto) richBlock()                  {}
 func (RichBlockVideo) richBlock()                  {}
 func (RichBlockVoiceNote) richBlock()              {}
 func (RichBlockThinking) richBlock()               {}
+
+// ================== Send side (Bot API 10.1) ==================
+
+// InputRichMessage describes a rich message to send (Bot API 10.1). STUB (B-25 10.1d red record): no JSON tags yet.
+type InputRichMessage struct {
+	HTML                string
+	Markdown            string
+	IsRTL               bool
+	SkipEntityDetection bool
+}

@@ -757,6 +757,21 @@ func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draf
 	})
 }
 
+// SendRichMessage STUB (B-25 10.1d red record).
+func (a *SenderAdapter) SendRichMessage(ctx context.Context, chatID int64, rm tg.InputRichMessage) (*tg.Message, error) {
+	return nil, nil
+}
+
+// EditMessageRich STUB (B-25 10.1d red record).
+func (a *SenderAdapter) EditMessageRich(ctx context.Context, chatID int64, messageID int, rm tg.InputRichMessage) (*tg.Message, error) {
+	return nil, nil
+}
+
+// SendRichMessageDraft STUB (B-25 10.1d red record).
+func (a *SenderAdapter) SendRichMessageDraft(ctx context.Context, chatID int64, draftID int, rm tg.InputRichMessage) error {
+	return nil
+}
+
 // DeleteMessageReaction removes a user's or a chat's reaction from a message (Bot API 10.0).
 func (a *SenderAdapter) DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error {
 	return a.client.DeleteMessageReaction(ctx, req)

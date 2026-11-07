@@ -41,6 +41,7 @@ type EditMessageTextRequest struct {
 	Text               string                 `json:"text"`
 	ParseMode          tg.ParseMode           `json:"parse_mode,omitempty"`
 	LinkPreviewOptions *tg.LinkPreviewOptions `json:"link_preview_options,omitempty"`
+	RichMessage        *tg.InputRichMessage   // STUB (B-25 10.1d red record): no JSON tag yet
 	ReplyMarkup        any                    `json:"reply_markup,omitempty"`
 
 	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.

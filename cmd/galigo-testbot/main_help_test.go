@@ -41,12 +41,12 @@ func TestHandleHelp_Text(t *testing.T) {
 	}
 	require.Len(t, api100, 1)
 	assert.Contains(t, api100[0], "polls")
-	assert.Contains(t, lines, "Bot API 10.1 (S66):") // API101A T-tb-9
-	var api101 []string                              // T1-08 openai: exactly one api101 line
+	assert.Contains(t, lines, "Bot API 10.1 (S66, S67):") // API101A T-tb-9, API101D T-tb-6
+	var api101 []string                                   // T1-08 openai: exactly one api101 line
 	for _, l := range lines {
 		if strings.HasPrefix(l, "  api101 ") {
 			api101 = append(api101, l)
 		}
 	}
-	assert.Equal(t, []string{"  api101 - All 10.1 tests (poll option links)"}, api101) // API101A T-tb-9
+	assert.Equal(t, []string{"  api101 - All 10.1 tests (poll option links, rich messages)"}, api101) // API101A T-tb-9, API101D T-tb-6
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/registry"
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // s66Steps are S66's steps (B-25 10.1a, TEST-PLAN T-tb-7) with the given first URL and second wanted link.
@@ -30,14 +31,26 @@ func s66Steps(url1, wantLink2 string) []engine.Step {
 	}
 }
 
-// T-tb-7, T-tb-8: the 10.1 suite is exactly S66, with these steps (whole values through viewSteps); the view sees a
-// changed URL and a changed wanted link.
+// T-tb-7, T-tb-8: the 10.1 suite is S66 then S67 (B-25 10.1d T-tb-5), with these steps (whole values through
+// viewSteps); the view sees a changed URL and a changed wanted link.
 func TestAPI101Scenarios(t *testing.T) {
 	got := AllAPI101Scenarios()
-	require.Len(t, got, 1)
+	require.Len(t, got, 2)
 	assert.Equal(t, "S66-PollOptionLink", got[0].Name())
 	assert.Equal(t, []string{"sendPoll"}, got[0].Covers())
 	assert.Equal(t, viewSteps(s66Steps("https://example.com/1", "https://example.com/2")), viewSteps(got[0].Steps()))
+
+	// B-25 10.1d T-tb-5: S67, its covered methods and its exact steps.
+	assert.Equal(t, "S67-RichMessage", got[1].Name())
+	assert.Equal(t, []string{"sendRichMessage", "editMessageText", "sendRichMessageDraft"}, got[1].Covers())
+	assert.Equal(t, viewSteps([]engine.Step{
+		&engine.SendRichMessageStep{RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 **rich** message"},
+			WantBlocks: []string{"paragraph"}},
+		&engine.EditMessageRichStep{RichMessage: tg.InputRichMessage{HTML: "<p>edited <b>rich</b></p>"},
+			WantBlocks: []string{"paragraph"}},
+		&engine.SendRichMessageDraftStep{DraftID: 1, RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 draft"}},
+		&engine.CleanupStep{},
+	}), viewSteps(got[1].Steps()))
 
 	t.Run("view_sees_links", func(t *testing.T) {
 		base := viewSteps(s66Steps("https://example.com/1", "https://example.com/2"))

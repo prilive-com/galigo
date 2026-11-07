@@ -311,8 +311,9 @@ func TestAPI96_StrictDecode(t *testing.T) {
 	// longer deleted before the strict decode.
 	// API100C: members_only is modelled since 10.0 part c (tg.Poll.MembersOnly), so it is no longer deleted
 	// from the poll probes below.
-	getMeUnmodelled := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled",
-		"supports_join_request_queries"}
+	// API101B T-tg-2: supports_join_request_queries is modelled since 10.1 part b
+	// (tg.User.SupportsJoinRequestQueries), so it is no longer deleted before the strict decode.
+	getMeUnmodelled := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled"}
 	rows := []struct {
 		name string
 		b    []byte

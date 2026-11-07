@@ -50,7 +50,7 @@ func (r *RichText) UnmarshalJSON(data []byte) error {
 		var raws []json.RawMessage
 		if err := json.Unmarshal(data, &raws); err != nil {
 			*r = RichText{Node: RichTextUnknown{Raw: copyRaw(data)}}
-			return nil
+			return nil //nolint:nilerr // Intentional: a value that does not decode is kept as RichTextUnknown
 		}
 		r.Parts = make([]RichText, len(raws))
 		for i, raw := range raws {
@@ -110,7 +110,7 @@ func (b *RichBlocks) UnmarshalJSON(data []byte) error {
 	var raws []json.RawMessage
 	if err := json.Unmarshal(data, &raws); err != nil {
 		*b = RichBlocks{RichBlockUnknown{Raw: copyRaw(data)}}
-		return nil
+		return nil //nolint:nilerr // Intentional: a value that is no array is kept as one RichBlockUnknown
 	}
 	if raws == nil {
 		*b = nil

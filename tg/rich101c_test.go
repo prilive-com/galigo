@@ -854,7 +854,7 @@ func TestAPI101C_Shapes(t *testing.T) {
 		rt, ok := rich101cTypes[name]
 		require.True(t, ok, name)
 		var got []rich101cShape
-		for i := 0; i < rt.NumField(); i++ {
+		for i := range rt.NumField() {
 			f := rt.Field(i)
 			if f.IsExported() {
 				got = append(got, rich101cShape{name, f.Name, rich101cTypeString(f.Type), f.Tag.Get("json")})

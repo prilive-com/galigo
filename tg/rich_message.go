@@ -674,3 +674,15 @@ func (RichBlockPhoto) richBlock()                  {}
 func (RichBlockVideo) richBlock()                  {}
 func (RichBlockVoiceNote) richBlock()              {}
 func (RichBlockThinking) richBlock()               {}
+
+// ================== Send side (Bot API 10.1) ==================
+
+// InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of HTML and Markdown.
+// SendRichMessage, SendRichMessageDraft and EditMessageText refuse a value that sets both or neither (the server
+// picks one silently when both are set); InputRichMessageContent in an inline result is sent unchecked.
+type InputRichMessage struct {
+	HTML                string `json:"html,omitempty"`
+	Markdown            string `json:"markdown,omitempty"`
+	IsRTL               bool   `json:"is_rtl,omitempty"`
+	SkipEntityDetection bool   `json:"skip_entity_detection,omitempty"`
+}

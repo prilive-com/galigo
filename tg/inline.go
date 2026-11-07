@@ -100,6 +100,14 @@ type InputTextMessageContent struct {
 
 func (InputTextMessageContent) inputMessageContentTag() {}
 
+// InputRichMessageContent represents the content of a rich message to be sent as the result of an inline query
+// (Bot API 10.1). Only previously uploaded files may be used in the message.
+type InputRichMessageContent struct {
+	RichMessage InputRichMessage `json:"rich_message"`
+}
+
+func (InputRichMessageContent) inputMessageContentTag() {}
+
 // InputLocationMessageContent represents location content for an inline query result.
 type InputLocationMessageContent struct {
 	Latitude             float64 `json:"latitude"`

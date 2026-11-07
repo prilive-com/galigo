@@ -231,3 +231,52 @@ func TestSenderAdapter100B(t *testing.T) { // API100B T-tb-6
 		assert.JSONEq(t, `[{"type":"live_photo","media":"V","photo":"P"}]`, args["media"])
 	})
 }
+
+// B-25 10.1d T-tb-4: the three rich message adapter methods send these paths and bodies (chat id, message id and draft
+// id are distinct, so a swapped argument fails).
+func TestSenderAdapter101D(t *testing.T) {
+	newAdapter := func(t *testing.T, path string, reply http.HandlerFunc) (*SenderAdapter, *testutil.MockTelegramServer) {
+		server := testutil.NewMockServer(t)
+		server.On("/bot"+testutil.TestToken+"/"+path, reply)
+		return NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), server
+	}
+	rm := tg.InputRichMessage{Markdown: "**m**", IsRTL: true, SkipEntityDetection: true} // both flags reach the body (C3-02)
+	rows := []struct {
+		path string
+		call func(a *SenderAdapter) error
+		want string
+	}{
+		{"sendRichMessage", func(a *SenderAdapter) error {
+			msg, err := a.SendRichMessage(context.Background(), -1001234567890, rm)
+			if err == nil && msg == nil {
+				return errors.New("no message")
+			}
+			return err
+		}, `{"chat_id":-1001234567890,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
+		{"editMessageText", func(a *SenderAdapter) error {
+			msg, err := a.EditMessageRich(context.Background(), -1001234567890, 77, rm)
+			if err == nil && msg == nil {
+				return errors.New("no message")
+			}
+			return err
+		}, `{"chat_id":-1001234567890,"message_id":77,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
+		{"sendRichMessageDraft", func(a *SenderAdapter) error {
+			return a.SendRichMessageDraft(context.Background(), 555000111, 9, rm)
+		}, `{"chat_id":555000111,"draft_id":9,"rich_message":{"markdown":"**m**","is_rtl":true,"skip_entity_detection":true}}`},
+	}
+	for _, r := range rows {
+		t.Run(r.path, func(t *testing.T) {
+			a, server := newAdapter(t, r.path, func(w http.ResponseWriter, _ *http.Request) {
+				if r.path == "sendRichMessageDraft" {
+					testutil.ReplyBool(w, true)
+					return
+				}
+				testutil.ReplyMessage(w, 5)
+			})
+			require.NoError(t, r.call(a))
+			require.Equal(t, 1, server.CaptureCount())
+			server.LastCapture().AssertPath(t, "/bot"+testutil.TestToken+"/"+r.path)
+			assert.JSONEq(t, r.want, server.LastCapture().BodyString())
+		})
+	}
+}

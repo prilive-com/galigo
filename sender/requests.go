@@ -38,9 +38,10 @@ type EditMessageTextRequest struct {
 	ChatID             tg.ChatID              `json:"chat_id,omitempty"`
 	MessageID          int                    `json:"message_id,omitempty"`
 	InlineMessageID    string                 `json:"inline_message_id,omitempty"`
-	Text               string                 `json:"text"`
+	Text               string                 `json:"text,omitempty"`
 	ParseMode          tg.ParseMode           `json:"parse_mode,omitempty"`
 	LinkPreviewOptions *tg.LinkPreviewOptions `json:"link_preview_options,omitempty"`
+	RichMessage        *tg.InputRichMessage   `json:"rich_message,omitempty"`
 	ReplyMarkup        any                    `json:"reply_markup,omitempty"`
 
 	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.

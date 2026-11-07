@@ -337,6 +337,11 @@ type SenderClient interface {
 	// Message streaming (9.3+9.5)
 	SendMessageDraft(ctx context.Context, chatID int64, draftID int, text string) error
 
+	// Rich messages (10.1)
+	SendRichMessage(ctx context.Context, chatID int64, rm tg.InputRichMessage) (*tg.Message, error)
+	EditMessageRich(ctx context.Context, chatID int64, messageID int, rm tg.InputRichMessage) (*tg.Message, error)
+	SendRichMessageDraft(ctx context.Context, chatID int64, draftID int, rm tg.InputRichMessage) error
+
 	// Polls and prepared keyboard buttons (9.6)
 	SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error)
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)

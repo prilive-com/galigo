@@ -757,6 +757,21 @@ func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draf
 	})
 }
 
+// SendRichMessage sends a rich message (Bot API 10.1).
+func (a *SenderAdapter) SendRichMessage(ctx context.Context, chatID int64, rm tg.InputRichMessage) (*tg.Message, error) {
+	return a.client.SendRichMessage(ctx, sender.SendRichMessageRequest{ChatID: chatID, RichMessage: rm})
+}
+
+// EditMessageRich edits a message to rich content with editMessageText's rich_message (Bot API 10.1).
+func (a *SenderAdapter) EditMessageRich(ctx context.Context, chatID int64, messageID int, rm tg.InputRichMessage) (*tg.Message, error) {
+	return a.client.EditMessageText(ctx, sender.EditMessageTextRequest{ChatID: chatID, MessageID: messageID, RichMessage: &rm})
+}
+
+// SendRichMessageDraft streams a rich draft (Bot API 10.1).
+func (a *SenderAdapter) SendRichMessageDraft(ctx context.Context, chatID int64, draftID int, rm tg.InputRichMessage) error {
+	return a.client.SendRichMessageDraft(ctx, sender.SendRichMessageDraftRequest{ChatID: chatID, DraftID: draftID, RichMessage: rm})
+}
+
 // DeleteMessageReaction removes a user's or a chat's reaction from a message (Bot API 10.0).
 func (a *SenderAdapter) DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error {
 	return a.client.DeleteMessageReaction(ctx, req)

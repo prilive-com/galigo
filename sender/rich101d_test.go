@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -651,6 +652,43 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 			assert.Equal(t, 3, server.CaptureCount())
 		})
 	}
+	// Each method WAITS on the chat's limiter (C2-01): with 1 call per 100 s and burst 1, a second call on the same
+	// chat with a 50 ms deadline fails in the limiter and sends no request.
+	waits := []struct {
+		method, result string
+		call           func(ctx context.Context, c *sender.Client) error
+	}{
+		{"sendRichMessage", api101dReply, func(ctx context.Context, c *sender.Client) error {
+			_, err := c.SendRichMessage(ctx, sender.SendRichMessageRequest{ChatID: api101dChat, RichMessage: rich})
+			return err
+		}},
+		{"sendRichMessageDraft", "true", func(ctx context.Context, c *sender.Client) error {
+			return c.SendRichMessageDraft(ctx, sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1, RichMessage: rich})
+		}},
+		{"editMessageText", api101dReply, func(ctx context.Context, c *sender.Client) error {
+			_, err := c.EditMessageText(ctx, sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9, RichMessage: &rich})
+			return err
+		}},
+	}
+	for _, r := range waits {
+		t.Run("waits "+r.method, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			api101dOnResult(server, r.method, r.result)
+			client, err := sender.New(testutil.TestToken, sender.WithBaseURL(server.BaseURL()),
+				sender.WithCircuitBreakerSettings(testutil.CircuitBreakerNeverTrip()), sender.WithRetries(0),
+				sender.WithPerChatRateLimit(0.01, 1))
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = client.Close() })
+			require.NoError(t, r.call(context.Background(), client))
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			err = r.call(ctx, client)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "would exceed context deadline")
+			assert.Equal(t, 1, server.CaptureCount())
+		})
+	}
+
 	// A refused call (bad rich message) of each method, on a fresh client: no limiter, no request (C1-06).
 	refused := []struct {
 		method, result string

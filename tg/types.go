@@ -39,6 +39,7 @@ type Message struct {
 	AuthorSignature       string                `json:"author_signature,omitempty"`
 	Text                  string                `json:"text,omitempty"`
 	Entities              []MessageEntity       `json:"entities,omitempty"`
+	RichMessage           *RichMessage          `json:"rich_message,omitempty"` // 10.1
 	Caption               string                `json:"caption,omitempty"`
 	CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`
 	Photo                 []PhotoSize           `json:"photo,omitempty"`

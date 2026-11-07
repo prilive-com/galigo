@@ -245,8 +245,9 @@ func TestAPI100_BotAccessSettings(t *testing.T) {
 
 func TestAPI100_StrictDecode(t *testing.T) {
 	// API100 T-tg-10: every 10.0a object decodes strictly, so a JSON name without a struct field fails
-	getMeOther := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled",
-		"supports_join_request_queries"}
+	// API101B T-tg-2: supports_join_request_queries is modelled since 10.1 part b
+	// (tg.User.SupportsJoinRequestQueries), so it is no longer deleted before the strict decode.
+	getMeOther := []string{"can_connect_to_business", "has_main_web_app", "has_topics_enabled"}
 	rows := []struct {
 		name string
 		b    []byte

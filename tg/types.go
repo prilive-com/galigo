@@ -95,20 +95,21 @@ var _ Editable = (*Message)(nil)
 
 // User represents a Telegram user or bot.
 type User struct {
-	ID                        int64  `json:"id"`
-	IsBot                     bool   `json:"is_bot"`
-	FirstName                 string `json:"first_name"`
-	LastName                  string `json:"last_name,omitempty"`
-	Username                  string `json:"username,omitempty"`
-	LanguageCode              string `json:"language_code,omitempty"`
-	IsPremium                 bool   `json:"is_premium,omitempty"`
-	AddedToAttachmentMenu     bool   `json:"added_to_attachment_menu,omitempty"`
-	CanJoinGroups             bool   `json:"can_join_groups,omitempty"`
-	CanReadAllGroupMessages   bool   `json:"can_read_all_group_messages,omitempty"`
-	SupportsInlineQueries     bool   `json:"supports_inline_queries,omitempty"`
-	AllowsUsersToCreateTopics bool   `json:"allows_users_to_create_topics,omitempty"` // 9.4
-	CanManageBots             bool   `json:"can_manage_bots,omitempty"`               // 9.6: getMe only
-	SupportsGuestQueries      bool   `json:"supports_guest_queries,omitempty"`        // 10.0: getMe only
+	ID                         int64  `json:"id"`
+	IsBot                      bool   `json:"is_bot"`
+	FirstName                  string `json:"first_name"`
+	LastName                   string `json:"last_name,omitempty"`
+	Username                   string `json:"username,omitempty"`
+	LanguageCode               string `json:"language_code,omitempty"`
+	IsPremium                  bool   `json:"is_premium,omitempty"`
+	AddedToAttachmentMenu      bool   `json:"added_to_attachment_menu,omitempty"`
+	CanJoinGroups              bool   `json:"can_join_groups,omitempty"`
+	CanReadAllGroupMessages    bool   `json:"can_read_all_group_messages,omitempty"`
+	SupportsInlineQueries      bool   `json:"supports_inline_queries,omitempty"`
+	AllowsUsersToCreateTopics  bool   `json:"allows_users_to_create_topics,omitempty"` // 9.4
+	CanManageBots              bool   `json:"can_manage_bots,omitempty"`               // 9.6: getMe only
+	SupportsGuestQueries       bool   `json:"supports_guest_queries,omitempty"`        // 10.0: getMe only
+	SupportsJoinRequestQueries bool   `json:"supports_join_request_queries,omitempty"` // 10.1: getMe only
 }
 
 // Chat represents a Telegram chat.

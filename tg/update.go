@@ -187,4 +187,8 @@ type ChatJoinRequest struct {
 	Date       int64           `json:"date"`
 	Bio        string          `json:"bio,omitempty"`
 	InviteLink *ChatInviteLink `json:"invite_link,omitempty"`
+	// QueryID is the join request query id (Bot API 10.1). It is set only for a bot assigned to process join
+	// requests; then the bot must call Client.SendChatJoinRequestWebApp or Client.AnswerChatJoinRequestQuery
+	// (package sender) within 10 seconds.
+	QueryID string `json:"query_id,omitempty"`
 }

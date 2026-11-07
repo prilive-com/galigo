@@ -8,6 +8,7 @@ import (
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/registry"
 	"github.com/prilive-com/galigo/sender"
 )
 
@@ -43,5 +44,21 @@ func TestAPI101Scenarios(t *testing.T) {
 		assert.Equal(t, base, viewSteps(S66_PollOptionLink().Steps()), "two fresh builds are equal")
 		assert.NotEqual(t, base, viewSteps(s66Steps("https://example.com/9", "https://example.com/2")))
 		assert.NotEqual(t, base, viewSteps(s66Steps("https://example.com/1", "https://example.com/9")))
+	})
+
+	// B-25 10.1b T-tb-1: the two join request query methods are in the registry, once each, with no scenario
+	// (they need a guard bot).
+	t.Run("registry_join_request_queries", func(t *testing.T) {
+		for _, name := range []string{"answerChatJoinRequestQuery", "sendChatJoinRequestWebApp"} {
+			var found []registry.Method
+			for _, m := range registry.AllMethods {
+				if m.Name == name {
+					found = append(found, m)
+				}
+			}
+			require.Len(t, found, 1, name)
+			assert.Equal(t, registry.Method{Name: name, Category: registry.CategoryChatAdmin,
+				Notes: "needs a join request query (guard bot)"}, found[0])
+		}
 	})
 }

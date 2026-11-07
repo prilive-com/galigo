@@ -158,6 +158,10 @@ var AllMethods = []Method{
 	{Name: "setManagedBotAccessSettings", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},
 	{Name: "getUserPersonalChatMessages", Category: CategoryExtended, Notes: "needs a user with a personal channel"},
 
+	// === Bot API 10.1 ===
+	{Name: "answerChatJoinRequestQuery", Category: CategoryChatAdmin, Notes: "needs a join request query (guard bot)"},
+	{Name: "sendChatJoinRequestWebApp", Category: CategoryChatAdmin, Notes: "needs a join request query (guard bot)"},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

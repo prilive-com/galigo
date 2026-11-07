@@ -10,6 +10,10 @@ import (
 
 // ==================== Bot API 10.1 Scenarios ====================
 
+// answerChatJoinRequestQuery and sendChatJoinRequestWebApp (10.1) have no scenario: they need a join request
+// query, which only a bot assigned as a chat's guard bot receives. Mock tests cover them
+// (sender/joinreq101b_test.go).
+
 // S66_PollOptionLink sends a poll whose options have links (no file, multipart without files), then a poll with a
 // link and a photo upload; each option's media kind and link URL in the reply is checked. The URLs have a path and
 // no fragment, so the server keeps them as sent.

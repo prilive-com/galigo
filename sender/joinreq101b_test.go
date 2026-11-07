@@ -3,6 +3,7 @@ package sender_test
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"reflect"
 	"sync/atomic"
@@ -305,6 +306,45 @@ func TestAPI101B_NoRetry(t *testing.T) {
 			assert.GreaterOrEqual(t, sleeper.CallCount(), 1, "the sleeper is wired")
 		})
 	}
+}
+
+// api101bTimeout is a network timeout; the shared retry code retries it (sender/client.go isRetryable).
+type api101bTimeout struct{}
+
+func (api101bTimeout) Error() string   { return "synthetic network timeout" }
+func (api101bTimeout) Timeout() bool   { return true }
+func (api101bTimeout) Temporary() bool { return true }
+
+// api101bFailTransport fails every round trip with a network timeout and counts the calls (no network is used).
+type api101bFailTransport struct{ n atomic.Int32 }
+
+func (rt *api101bFailTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	rt.n.Add(1)
+	return nil, api101bTimeout{}
+}
+
+// T-s-8 (C2-01 openai): neither method retries a network error, not even a timeout; SendMessage, which retries a
+// timeout, is the control.
+func TestAPI101B_NoRetryNetworkError(t *testing.T) {
+	rt := &api101bFailTransport{}
+	sleeper := &testutil.FakeSleeper{}
+	client := testutil.NewRetryTestClient(t, "http://galigo.invalid", sleeper, sender.WithHTTPClient(&http.Client{Transport: rt}),
+		sender.WithRateLimit(1000, 100), sender.WithGroupRateLimit(1000, 100), sender.WithPerChatRateLimit(1000, 100))
+	for _, m := range api101bMethods {
+		rt.n.Store(0)
+		err := m.call(context.Background(), client)
+		require.Error(t, err, m.method)
+		var ne net.Error
+		require.True(t, errors.As(err, &ne) && ne.Timeout(), "%s: error %v", m.method, err)
+		assert.Equal(t, int32(1), rt.n.Load(), "%s: exactly one round trip", m.method)
+	}
+	assert.Equal(t, 0, sleeper.CallCount(), "no backoff sleep before the control")
+
+	// control, last: SendMessage retries a network timeout
+	rt.n.Store(0)
+	_, err := client.SendMessage(context.Background(), sender.SendMessageRequest{ChatID: api100Chat, Text: "hi"})
+	require.Error(t, err)
+	assert.GreaterOrEqual(t, rt.n.Load(), int32(2), "the control call is retried")
 }
 
 // T-s-9: a chat-less call waits on no limiter (plan AC6; pins today's behaviour, B-51 would change this row).

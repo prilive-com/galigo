@@ -323,6 +323,7 @@ func TestAPI101C_RichTextForms(t *testing.T) {
 		{`{"type":"italic","text":["p",{"type":"code","text":"q"}]}`, tg.RichText{Node: tg.RichTextItalic{Type: "italic",
 			Text: tg.RichText{Parts: []tg.RichText{{Plain: "p"}, {Node: tg.RichTextCode{Type: "code", Text: tg.RichText{Plain: "q"}}}}}}}, ""},
 		{`null`, tg.RichText{}, `""`},
+		{`["a",null,"b"]`, tg.RichText{Parts: []tg.RichText{{Plain: "a"}, {}, {Plain: "b"}}}, `["a","","b"]`}, // C1-01
 		{`123`, tg.RichText{Node: tg.RichTextUnknown{Raw: json.RawMessage(`123`)}}, ""},
 		{`true`, tg.RichText{Node: tg.RichTextUnknown{Raw: json.RawMessage(`true`)}}, ""},
 		{`"%2f +x "`, tg.RichText{Plain: "%2f +x "}, ""},

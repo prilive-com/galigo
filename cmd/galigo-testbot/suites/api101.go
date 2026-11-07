@@ -6,6 +6,7 @@ import (
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/sender"
+	"github.com/prilive-com/galigo/tg"
 )
 
 // ==================== Bot API 10.1 Scenarios ====================
@@ -41,7 +42,26 @@ func S66_PollOptionLink() engine.Scenario {
 	}
 }
 
+// S67_RichMessage sends a rich message (markdown), edits it to rich content (html) with editMessageText, and streams a
+// rich draft. The draft works in private chats only: in a group the server refuses it and the step is skipped.
+func S67_RichMessage() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S67-RichMessage",
+		ScenarioDescription: "sendRichMessage, editMessageText with rich_message, sendRichMessageDraft (10.1)",
+		CoveredMethods:      []string{"sendRichMessage", "editMessageText", "sendRichMessageDraft"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendRichMessageStep{RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 **rich** message"},
+				WantBlocks: []string{"paragraph"}},
+			&engine.EditMessageRichStep{RichMessage: tg.InputRichMessage{HTML: "<p>edited <b>rich</b></p>"},
+				WantBlocks: []string{"paragraph"}},
+			&engine.SendRichMessageDraftStep{DraftID: 1, RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 draft"}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllAPI101Scenarios returns the Bot API 10.1 scenarios.
 func AllAPI101Scenarios() []engine.Scenario {
-	return []engine.Scenario{S66_PollOptionLink()}
+	return []engine.Scenario{S66_PollOptionLink(), S67_RichMessage()}
 }

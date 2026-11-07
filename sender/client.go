@@ -419,6 +419,11 @@ func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest
 	if err := req.LinkPreviewOptions.Validate(); err != nil {
 		return nil, err
 	}
+	if req.RichMessage != nil {
+		if err := validateInputRichMessage(*req.RichMessage); err != nil {
+			return nil, err
+		}
+	}
 	resp, err := c.executeRequest(ctx, "editMessageText", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err

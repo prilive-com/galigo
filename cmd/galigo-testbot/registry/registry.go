@@ -144,6 +144,8 @@ var AllMethods = []Method{
 	// === Bot API 9.5 ===
 	{Name: "setChatMemberTag", Category: CategoryChatAdmin},
 	{Name: "sendMessageDraft", Category: CategoryMessaging},
+	{Name: "sendRichMessage", Category: CategoryMessaging},      // 10.1
+	{Name: "sendRichMessageDraft", Category: CategoryMessaging}, // 10.1
 
 	// === Bot API 9.6 ===
 	{Name: "getManagedBotToken", Category: CategoryExtended, Notes: "needs a managed bot (can_manage_bots)"},

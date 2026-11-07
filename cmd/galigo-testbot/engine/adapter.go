@@ -757,19 +757,19 @@ func (a *SenderAdapter) SendMessageDraft(ctx context.Context, chatID int64, draf
 	})
 }
 
-// SendRichMessage STUB (B-25 10.1d red record).
+// SendRichMessage sends a rich message (Bot API 10.1).
 func (a *SenderAdapter) SendRichMessage(ctx context.Context, chatID int64, rm tg.InputRichMessage) (*tg.Message, error) {
-	return nil, nil
+	return a.client.SendRichMessage(ctx, sender.SendRichMessageRequest{ChatID: chatID, RichMessage: rm})
 }
 
-// EditMessageRich STUB (B-25 10.1d red record).
+// EditMessageRich edits a message to rich content with editMessageText's rich_message (Bot API 10.1).
 func (a *SenderAdapter) EditMessageRich(ctx context.Context, chatID int64, messageID int, rm tg.InputRichMessage) (*tg.Message, error) {
-	return nil, nil
+	return a.client.EditMessageText(ctx, sender.EditMessageTextRequest{ChatID: chatID, MessageID: messageID, RichMessage: &rm})
 }
 
-// SendRichMessageDraft STUB (B-25 10.1d red record).
+// SendRichMessageDraft streams a rich draft (Bot API 10.1).
 func (a *SenderAdapter) SendRichMessageDraft(ctx context.Context, chatID int64, draftID int, rm tg.InputRichMessage) error {
-	return nil
+	return a.client.SendRichMessageDraft(ctx, sender.SendRichMessageDraftRequest{ChatID: chatID, DraftID: draftID, RichMessage: rm})
 }
 
 // DeleteMessageReaction removes a user's or a chat's reaction from a message (Bot API 10.0).

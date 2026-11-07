@@ -266,7 +266,7 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	// Bot API 10.0 (S51-S54, S57-S65)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
-	// Bot API 10.1 (S66)
+	// Bot API 10.1 (S66, S67)
 	case "api101", "api-101", "10.1":
 		scenarios = suites.AllAPI101Scenarios()
 	case "all":
@@ -663,7 +663,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	// Bot API 10.0 (S51-S54, S57-S65)
 	case "api100", "api-100", "10.0":
 		scenarios = suites.AllAPI100Scenarios()
-	// Bot API 10.1 (S66)
+	// Bot API 10.1 (S66, S67)
 	case "api101", "api-101", "10.1":
 		scenarios = suites.AllAPI101Scenarios()
 	case "all":
@@ -802,8 +802,8 @@ Bot API 10.0 (S51-S54, S57-S65):
   api100      - All 10.0 tests (delete reactions, can_react_to_messages, admins with bots, empty draft, live photos, polls)
   live-photos - Live photos (S57-S59)
 
-Bot API 10.1 (S66):
-  api101 - All 10.1 tests (poll option links)
+Bot API 10.1 (S66, S67):
+  api101 - All 10.1 tests (poll option links, rich messages)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

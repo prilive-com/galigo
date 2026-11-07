@@ -100,10 +100,10 @@ type InputTextMessageContent struct {
 
 func (InputTextMessageContent) inputMessageContentTag() {}
 
-// InputRichMessageContent is the content of a rich message sent as an inline query result (Bot API 10.1). STUB (B-25
-// 10.1d red record): no JSON tag yet.
+// InputRichMessageContent represents the content of a rich message to be sent as the result of an inline query
+// (Bot API 10.1). Only previously uploaded files may be used in the message.
 type InputRichMessageContent struct {
-	RichMessage InputRichMessage
+	RichMessage InputRichMessage `json:"rich_message"`
 }
 
 func (InputRichMessageContent) inputMessageContentTag() {}

@@ -72,6 +72,8 @@ type Message struct {
 	ReplyToPollOptionID   string                `json:"reply_to_poll_option_id,omitempty"` // 9.6: persistent id of the option replied to
 	GuestBotCallerUser    *User                 `json:"guest_bot_caller_user,omitempty"`   // 10.0: guest mode, the user who summoned the bot
 	GuestBotCallerChat    *Chat                 `json:"guest_bot_caller_chat,omitempty"`   // 10.0: guest mode, the chat that summoned the bot
+	CommunityChatAdded    *CommunityChatAdded   `json:"community_chat_added,omitempty"`    // 10.2
+	CommunityChatRemoved  *CommunityChatRemoved `json:"community_chat_removed,omitempty"`  // 10.2
 	ReplyMarkup           *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 	// GuestQueryID (Bot API 10.0) is set when the message belongs to the chat where this bot was summoned as a
 	// guest. That chat may not coincide with other bot chats that share the same id. Answer it with

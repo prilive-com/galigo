@@ -27,7 +27,8 @@ type Update struct {
 	// not coincide with other bot chats that share the same id. Answer it with Client.AnswerGuestQuery and
 	// Message.GuestQueryID; do not use its chat id as a normal chat, and do not edit it through Editable or
 	// MessageSig.
-	GuestMessage *Message `json:"guest_message,omitempty"`
+	GuestMessage *Message                `json:"guest_message,omitempty"`
+	Subscription *BotSubscriptionUpdated `json:"-"` // 10.2
 }
 
 // CallbackQuery represents an incoming callback query from an inline keyboard.

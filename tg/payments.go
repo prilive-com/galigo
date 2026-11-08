@@ -29,6 +29,15 @@ type SuccessfulPayment struct {
 	IsFirstRecurring           bool       `json:"is_first_recurring,omitempty"`
 }
 
+// BotSubscriptionUpdated is an update: a user payment subscription toward the bot changed. Added in Bot API 10.2.
+type BotSubscriptionUpdated struct {
+	User           *User  `json:"user"`            // the user who subscribed
+	InvoicePayload string `json:"invoice_payload"` // the bot-specified invoice payload
+	// State is the new state. Currently "canceled" (the user canceled), "active" (the user re-enabled a
+	// canceled subscription) or "failed" (the payment failed); Telegram may add values.
+	State string `json:"state"`
+}
+
 // StarAmount represents an amount of Telegram Stars.
 type StarAmount struct {
 	Amount         int `json:"amount"`

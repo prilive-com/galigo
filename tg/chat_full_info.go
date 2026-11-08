@@ -54,7 +54,7 @@ type ChatFullInfo struct {
 	UniqueGiftColors                   *UniqueGiftColors `json:"unique_gift_colors,omitempty"`      // 9.3
 	PaidMessageStarCount               int               `json:"paid_message_star_count,omitempty"` // 9.3
 	GuardBot                           *User             `json:"guard_bot,omitempty"`               // 10.1: chat administrators only
-	Community                          *Community        `json:"-"`                                 // 10.2
+	Community                          *Community        `json:"community,omitempty"`               // 10.2
 }
 
 // ChatLocation represents a location to which a chat is connected.

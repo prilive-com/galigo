@@ -28,7 +28,7 @@ type Update struct {
 	// Message.GuestQueryID; do not use its chat id as a normal chat, and do not edit it through Editable or
 	// MessageSig.
 	GuestMessage *Message                `json:"guest_message,omitempty"`
-	Subscription *BotSubscriptionUpdated `json:"-"` // 10.2
+	Subscription *BotSubscriptionUpdated `json:"subscription,omitempty"` // 10.2
 }
 
 // CallbackQuery represents an incoming callback query from an inline keyboard.

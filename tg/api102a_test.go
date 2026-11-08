@@ -206,6 +206,7 @@ func TestAPI102A_Shapes(t *testing.T) {
 		} {
 			f, ok := reflect.TypeOf(tc.v).FieldByName(tc.field)
 			if assert.True(t, ok, "%T.%s", tc.v, tc.field) {
+				assert.False(t, f.Anonymous, "%T.%s must be a named field, not embedded", tc.v, tc.field)
 				assert.Equal(t, tc.typ, f.Type.String(), "%T.%s", tc.v, tc.field)
 				assert.Equal(t, tc.tag, f.Tag.Get("json"), "%T.%s", tc.v, tc.field)
 			}

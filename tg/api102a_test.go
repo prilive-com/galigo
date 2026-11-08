@@ -15,7 +15,8 @@ import (
 
 // Bot API 10.2 part a: communities and subscription updates (read side). Expected values are literals checked
 // through field selectors and JSONEq, never composite literals of the new types, so a wrong field type still
-// compiles and fails by assertion. Ids are fake.
+// compiles and fails by assertion (assert.Equal compares the int64 literal with the field as any: an int32, int or
+// float64 id is a different type and fails). Ids are fake.
 const (
 	// api102aCommunity has the largest id the spec allows (2^52-1: above 2^32, exact in float64).
 	api102aCommunity = `{"id":4503599627370495,"name":"Test Community"}`
@@ -59,14 +60,14 @@ func TestAPI102A_Community(t *testing.T) {
 	} {
 		var c tg.Community
 		require.NoError(t, api96Strict(t, []byte(tc.in), &c), tc.in)
-		assert.Equal(t, tc.id, int64(c.ID), tc.in)
+		assert.Equal(t, tc.id, c.ID, tc.in)
 		assert.Equal(t, tc.name, c.Name, tc.in)
 		assert.JSONEq(t, tc.in, api102aMarshal(t, c), tc.in)
 	}
 
 	var c tg.Community
 	require.NoError(t, json.Unmarshal([]byte(`{"id":1,"name":"x","future":true}`), &c))
-	assert.Equal(t, int64(1), int64(c.ID))
+	assert.Equal(t, int64(1), c.ID)
 	assert.Equal(t, "x", c.Name)
 	assert.JSONEq(t, `{"id":1,"name":"x"}`, api102aMarshal(t, c))
 }
@@ -76,7 +77,7 @@ func TestAPI102A_ChatAdded(t *testing.T) {
 	var msg tg.Message
 	require.NoError(t, api96Strict(t, []byte(api102aMsgAdded), &msg))
 	require.NotNil(t, msg.CommunityChatAdded)
-	assert.Equal(t, int64(4503599627370495), int64(msg.CommunityChatAdded.Community.ID))
+	assert.Equal(t, int64(4503599627370495), msg.CommunityChatAdded.Community.ID)
 	assert.Equal(t, "Test Community", msg.CommunityChatAdded.Community.Name)
 	assert.JSONEq(t, `{"community":`+api102aCommunity+`}`, api102aMarshal(t, msg.CommunityChatAdded))
 	assert.Nil(t, msg.CommunityChatRemoved)
@@ -109,7 +110,7 @@ func TestAPI102A_ChatFullInfo(t *testing.T) {
 	var c tg.ChatFullInfo
 	require.NoError(t, api96Strict(t, []byte(api102aChatFull), &c))
 	require.NotNil(t, c.Community)
-	assert.Equal(t, int64(4503599627370495), int64(c.Community.ID))
+	assert.Equal(t, int64(4503599627370495), c.Community.ID)
 	assert.Equal(t, "Test Community", c.Community.Name)
 	m := api102aKeys(t, c)
 	require.Contains(t, m, "community")
@@ -174,7 +175,7 @@ func TestAPI102A_Shapes(t *testing.T) {
 		} {
 			rt := reflect.TypeOf(tc.v)
 			var got []row
-			for i := 0; i < rt.NumField(); i++ {
+			for i := range rt.NumField() {
 				f := rt.Field(i)
 				got = append(got, row{f.Name, f.Type.String(), f.Tag.Get("json")})
 			}
@@ -185,7 +186,7 @@ func TestAPI102A_Shapes(t *testing.T) {
 		for _, v := range []any{tg.Community{}, tg.CommunityChatAdded{}, tg.CommunityChatRemoved{}, tg.BotSubscriptionUpdated{}} {
 			for _, rt := range []reflect.Type{reflect.TypeOf(v), reflect.PointerTo(reflect.TypeOf(v))} {
 				var names []string
-				for i := 0; i < rt.NumMethod(); i++ {
+				for i := range rt.NumMethod() {
 					names = append(names, rt.Method(i).Name)
 				}
 				assert.Empty(t, names, "exported methods of %s", rt)
@@ -228,7 +229,7 @@ func TestAPI102A_KeyOwners(t *testing.T) {
 			continue
 		}
 		seen[rt] = true
-		for i := 0; i < rt.NumField(); i++ {
+		for i := range rt.NumField() {
 			f := rt.Field(i)
 			if key, _, _ := strings.Cut(f.Tag.Get("json"), ","); watched[key] {
 				owners = append(owners, rt.Name()+"."+f.Name)

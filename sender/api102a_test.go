@@ -35,7 +35,7 @@ func TestAPI102A_GetChatCommunity(t *testing.T) {
 				return
 			}
 			require.NotNil(t, chat.Community)
-			assert.Equal(t, int64(4503599627370495), int64(chat.Community.ID))
+			assert.Equal(t, int64(4503599627370495), chat.Community.ID)
 			assert.Equal(t, "Test Community", chat.Community.Name)
 		})
 	}

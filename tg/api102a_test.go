@@ -177,6 +177,7 @@ func TestAPI102A_Shapes(t *testing.T) {
 			var got []row
 			for i := range rt.NumField() {
 				f := rt.Field(i)
+				assert.False(t, f.Anonymous, "%s.%s must be a named field, not embedded", rt, f.Name)
 				got = append(got, row{f.Name, f.Type.String(), f.Tag.Get("json")})
 			}
 			assert.Equal(t, tc.rows, got, rt.String())
@@ -213,7 +214,8 @@ func TestAPI102A_Shapes(t *testing.T) {
 }
 
 // T-own: walk every struct type reachable from the decode roots (generated, not a list) and check that the new
-// keys live only on their planned holders, so a duplicate on a near neighbour (Chat, Message) fails.
+// keys live only on their planned holders, so a duplicate on a near neighbour (Chat, Message) fails. The walk stops
+// at interface fields (ChatMember, ...): an exported field added to a concrete type behind one is caught by G-api.
 func TestAPI102A_KeyOwners(t *testing.T) {
 	watched := map[string]bool{"community_chat_added": true, "community_chat_removed": true, "subscription": true, "community": true}
 	seen := map[reflect.Type]bool{}

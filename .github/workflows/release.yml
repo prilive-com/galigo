@@ -1,5 +1,6 @@
 # galigo Release Automation
-# Creates releases with changelog, binaries, and SBOM when tags are pushed
+# Creates releases with changelog, binaries, and SBOM when tags are pushed.
+# The release is made with the preinstalled GitHub CLI (`gh release create`).
 name: Release
 
 on:
@@ -116,13 +117,12 @@ jobs:
           output-file: dist/sbom.spdx.json
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: CHANGELOG.md
-          files: |
-            dist/*
-          draft: false
-          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
-          generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          PRE=""
+          case "${TAG,,}" in *-rc*|*-beta*|*-alpha*) PRE="--prerelease" ;; esac
+          gh release create "$TAG" dist/* --verify-tag --title "$TAG" \
+            --notes-file CHANGELOG.md --generate-notes $PRE

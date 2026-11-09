@@ -24,6 +24,8 @@ type Message struct {
 	MessageThreadID       int                   `json:"message_thread_id,omitempty"`
 	From                  *User                 `json:"from,omitempty"`
 	SenderChat            *Chat                 `json:"sender_chat,omitempty"`
+	ReceiverUser          *User                 `json:"receiver_user,omitempty"`        // 10.2: for ephemeral messages, the user who received the message
+	EphemeralMessageID    int                   `json:"ephemeral_message_id,omitempty"` // 10.2: for ephemeral messages, its id in this chat (may be reused); MessageID is 0
 	Date                  int64                 `json:"date"`
 	Chat                  *Chat                 `json:"chat"`
 	ForwardFrom           *User                 `json:"forward_from,omitempty"`
@@ -442,8 +444,9 @@ type Sticker struct {
 
 // ReplyParameters describes reply behavior for a message.
 type ReplyParameters struct {
-	MessageID                int             `json:"message_id"`
+	MessageID                int             `json:"message_id,omitempty"` // 10.2: optional; required if EphemeralMessageID is not set
 	ChatID                   any             `json:"chat_id,omitempty"`
+	EphemeralMessageID       int             `json:"ephemeral_message_id,omitempty"` // 10.2: incoming ephemeral message to reply to; required if MessageID is not set
 	AllowSendingWithoutReply bool            `json:"allow_sending_without_reply,omitempty"`
 	Quote                    string          `json:"quote,omitempty"`
 	QuoteParseMode           string          `json:"quote_parse_mode,omitempty"`

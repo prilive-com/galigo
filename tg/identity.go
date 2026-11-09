@@ -2,8 +2,9 @@ package tg
 
 // BotCommand represents a bot command shown in the menu.
 type BotCommand struct {
-	Command     string `json:"command"`     // 1-32 chars, lowercase a-z, 0-9, _
-	Description string `json:"description"` // 1-256 chars
+	Command     string `json:"command"`                // 1-32 chars, lowercase a-z, 0-9, _
+	Description string `json:"description"`            // 1-256 chars
+	IsEphemeral bool   `json:"is_ephemeral,omitempty"` // 10.2: the command sends an ephemeral message, seen only by its sender and the bot
 }
 
 // BotCommandScope defines which users see specific commands.

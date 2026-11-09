@@ -543,6 +543,8 @@ func fileCalls() []fileCall {
 		sender.FromFileID("A").WithMediaType("photo"), sender.FromFileID("B").WithMediaType("photo"),
 	}}
 	edit := sender.EditMessageMediaRequest{ChatID: id, MessageID: 42, Media: sender.NewInputMediaPhoto(sender.FromFileID("A"))}
+	eph := sender.EditEphemeralMessageMediaRequest{ChatID: id, ReceiverUserID: 5000000001, EphemeralMessageID: 4242,
+		Media: sender.NewInputMediaPhoto(sender.FromFileID("A"))} // API102C T-w7
 	photo := sender.SendPhotoRequest{ChatID: id, Photo: sender.FromFileID("A"), Caption: "c"}
 	document := sender.SendDocumentRequest{ChatID: id, Document: sender.FromFileID("A"), Caption: "c"}
 	video := sender.SendVideoRequest{ChatID: id, Video: sender.FromFileID("A"), Caption: "c"}
@@ -600,6 +602,9 @@ func fileCalls() []fileCall {
 		}},
 		{"editMessageMedia", "editMessageMedia", edit, mp, func(ctx context.Context, c *sender.Client) error {
 			return msg(func() (*tg.Message, error) { return c.EditMessageMedia(ctx, edit) })
+		}},
+		{"editEphemeralMessageMedia", "editEphemeralMessageMedia", eph, mp, func(ctx context.Context, c *sender.Client) error { // API102C T-w7
+			return c.EditEphemeralMessageMedia(ctx, eph)
 		}},
 		{"sendPoll", "sendPoll", poll, mp, func(ctx context.Context, c *sender.Client) error { // API100D T-s-14
 			return msg(func() (*tg.Message, error) { return c.SendPoll(ctx, poll) })
@@ -677,12 +682,12 @@ func TestWire_W7_Routing(t *testing.T) {
 			assertFiles(t, map[string]wireFile{}, files)
 		})
 	}
-	assert.Equal(t, 18, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll
+	assert.Equal(t, 19, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia
 }
 
 func TestWire_W8_ContentType(t *testing.T) {
 	calls := fileCalls()
-	require.Len(t, calls, 24) // API100B T-s-19: 20 + 3 live-photo rows; API100D T-s-14: + sendPoll
+	require.Len(t, calls, 25) // API100B T-s-19: 20 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia
 	for _, fc := range calls {
 		t.Run(fc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
@@ -708,8 +713,9 @@ var guardPartA = []string{
 	"SendAnimationRequest", "SendVoiceRequest", "SendVideoNoteRequest", "SendStickerRequest",
 	"SendMediaGroupRequest", "EditMessageMediaRequest", "SetChatPhotoRequest",
 	"SetMyProfilePhotoRequest", "UploadStickerFileRequest", "SetStickerSetThumbnailRequest",
-	"SendLivePhotoRequest", // API100B T-s-19
-	"SendPollRequest",      // API100D T-s-14
+	"SendLivePhotoRequest",             // API100B T-s-19
+	"SendPollRequest",                  // API100D T-s-14
+	"EditEphemeralMessageMediaRequest", // API102C T-w7
 }
 
 var guardPartB = []string{
@@ -814,7 +820,7 @@ func senderSources(t *testing.T) map[string]string {
 func TestWire_W7_Guard(t *testing.T) {
 	want := append(append([]string{}, guardPartA...), guardPartB...)
 	sort.Strings(want)
-	require.Len(t, want, 30) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile; API100D T-s-14: + SendPollRequest + InputPollOption
+	require.Len(t, want, 31) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile; API100D T-s-14: + SendPollRequest + InputPollOption; API102C T-w7: + EditEphemeralMessageMediaRequest
 
 	assert.Equal(t, want, guardTypes(t, senderSources(t)))
 

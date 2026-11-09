@@ -158,8 +158,8 @@ func TestAPI101D_SendRichMessageValidation(t *testing.T) {
 		{"chat nil", nil, tg.InputRichMessage{Markdown: "m"}, "", api101dTextRequired, ""},
 		{"chat zero", int64(0), tg.InputRichMessage{Markdown: "m"}, "", api101dTextZero, ""},
 		{"chat empty string", "", tg.InputRichMessage{Markdown: "m"}, "", api101dTextEmpty, ""},
-		{"neither", api101dChat, tg.InputRichMessage{IsRTL: true}, "rich_message", "html or markdown required", ""},
-		{"both", api101dChat, tg.InputRichMessage{HTML: "h", Markdown: "m"}, "rich_message", "use only one of html, markdown", ""},
+		{"neither", api101dChat, tg.InputRichMessage{IsRTL: true}, "rich_message", "html, markdown or blocks required", ""},
+		{"both", api101dChat, tg.InputRichMessage{HTML: "h", Markdown: "m"}, "rich_message", "use only one of html, markdown, blocks", ""},
 		{"bad chat and bad rich", nil, tg.InputRichMessage{HTML: "h", Markdown: "m"}, "", api101dTextRequired, ""},
 		{"markdown, html empty", api101dChat, tg.InputRichMessage{Markdown: "m", HTML: ""}, "", "", `{"markdown":"m"}`},
 		{"whitespace kept", api101dChat, tg.InputRichMessage{Markdown: " "}, "", "", `{"markdown":" "}`},
@@ -293,8 +293,8 @@ func TestAPI101D_SendRichMessageDraftRich(t *testing.T) {
 		req        sender.SendRichMessageDraftRequest
 		field, msg string
 	}{
-		{"neither", sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1}, "rich_message", "html or markdown required"},
-		{"both", sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1, RichMessage: both}, "rich_message", "use only one of html, markdown"},
+		{"neither", sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1}, "rich_message", "html, markdown or blocks required"},
+		{"both", sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1, RichMessage: both}, "rich_message", "use only one of html, markdown, blocks"},
 		{"all bad: chat first", sender.SendRichMessageDraftRequest{ChatID: "@x", RichMessage: both}, "chat_id", api101dDraftInteger},
 		{"draft and rich bad: draft first", sender.SendRichMessageDraftRequest{ChatID: api101dChat, RichMessage: both}, "draft_id", "must be non-zero"},
 	}
@@ -397,11 +397,11 @@ func TestAPI101D_EditMessageTextRichInvalid(t *testing.T) {
 		field, msg string
 	}{
 		{"both, no text", sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9, RichMessage: both},
-			"rich_message", "use only one of html, markdown"},
+			"rich_message", "use only one of html, markdown, blocks"},
 		{"both, with text", sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9, Text: "t", RichMessage: both},
-			"rich_message", "use only one of html, markdown"},
+			"rich_message", "use only one of html, markdown, blocks"},
 		{"neither", sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9, RichMessage: &tg.InputRichMessage{}},
-			"rich_message", "html or markdown required"},
+			"rich_message", "html, markdown or blocks required"},
 		{"link preview first", sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9, RichMessage: both,
 			LinkPreviewOptions: &tg.LinkPreviewOptions{IsDisabled: true, PreferSmallMedia: true, PreferLargeMedia: true}},
 			"", "link_preview_options: PreferSmallMedia and PreferLargeMedia are mutually exclusive"},

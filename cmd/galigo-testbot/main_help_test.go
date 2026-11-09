@@ -49,4 +49,12 @@ func TestHandleHelp_Text(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"  api101 - All 10.1 tests (poll option links, rich messages)"}, api101) // API101A T-tb-9, API101D T-tb-6
+	assert.Contains(t, lines, "Bot API 10.2 (S68):")                                                  // API102D T-tb-4
+	var api102 []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  api102 ") {
+			api102 = append(api102, l)
+		}
+	}
+	assert.Equal(t, []string{"  api102 - All 10.2 tests (rich message blocks)"}, api102) // API102D T-tb-4
 }

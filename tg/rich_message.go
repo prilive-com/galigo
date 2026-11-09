@@ -681,8 +681,9 @@ func (RichBlockThinking) richBlock()               {}
 // SendRichMessage, SendRichMessageDraft and EditMessageText refuse a value that sets both or neither (the server
 // picks one silently when both are set); InputRichMessageContent in an inline result is sent unchecked.
 type InputRichMessage struct {
-	HTML                string `json:"html,omitempty"`
-	Markdown            string `json:"markdown,omitempty"`
-	IsRTL               bool   `json:"is_rtl,omitempty"`
-	SkipEntityDetection bool   `json:"skip_entity_detection,omitempty"`
+	HTML                string           `json:"html,omitempty"`
+	Markdown            string           `json:"markdown,omitempty"`
+	IsRTL               bool             `json:"is_rtl,omitempty"`
+	SkipEntityDetection bool             `json:"skip_entity_detection,omitempty"`
+	Blocks              []InputRichBlock `json:"blocks,omitempty"`
 }

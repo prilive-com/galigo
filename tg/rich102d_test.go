@@ -114,7 +114,7 @@ func TestAPI102D_Marker(t *testing.T) {
 				continue
 			}
 			rt := fd.Recv.List[0].Type
-			if st, ok := rt.(*ast.StarExpr); ok {
+			if st, isStar := rt.(*ast.StarExpr); isStar {
 				rt = st.X
 			}
 			id, ok := rt.(*ast.Ident)

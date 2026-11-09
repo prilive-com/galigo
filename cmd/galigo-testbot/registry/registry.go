@@ -164,6 +164,13 @@ var AllMethods = []Method{
 	{Name: "answerChatJoinRequestQuery", Category: CategoryChatAdmin, Notes: "needs a join request query (guard bot)"},
 	{Name: "sendChatJoinRequestWebApp", Category: CategoryChatAdmin, Notes: "needs a join request query (guard bot)"},
 
+	// === Bot API 10.2 ===
+	{Name: "editEphemeralMessageText", Category: CategoryMessaging, Notes: "needs an ephemeral message (10.3 send parameter, B-57)"},
+	{Name: "editEphemeralMessageMedia", Category: CategoryMessaging, Notes: "needs an ephemeral message (10.3 send parameter, B-57)"},
+	{Name: "editEphemeralMessageCaption", Category: CategoryMessaging, Notes: "needs an ephemeral message (10.3 send parameter, B-57)"},
+	{Name: "editEphemeralMessageReplyMarkup", Category: CategoryMessaging, Notes: "needs an ephemeral message (10.3 send parameter, B-57)"},
+	{Name: "deleteEphemeralMessage", Category: CategoryMessaging, Notes: "needs an ephemeral message (10.3 send parameter, B-57)"},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

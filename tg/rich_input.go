@@ -1,11 +1,85 @@
 package tg
 
-// RED STUB (B-25 10.2d TEST-PLAN §6): the planned types, fields, tags and markers; MarshalJSON writes {}; no depth
-// guard. Not for the repository.
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"reflect"
+)
 
-// InputRichBlock is a block of a rich message to send (Bot API 10.2).
+// Bot API 10.2 rich messages, send side: the blocks of InputRichMessage.Blocks.
+
+// InputRichBlock is a block of a rich message to send (Bot API 10.2): one of the InputRichBlock* types. Each type
+// writes its own "type" value when encoded; the caller does not set it.
 type InputRichBlock interface {
 	inputRichBlock()
+}
+
+// marshalInputRichBlock encodes v (a struct without a "type" field) as a JSON object whose first key is "type" with
+// the value typ.
+func marshalInputRichBlock(typ string, v any) ([]byte, error) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	t, err := json.Marshal(typ)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	buf.WriteString(`{"type":`)
+	buf.Write(t)
+	if inner := body[1 : len(body)-1]; len(inner) > 0 {
+		buf.WriteByte(',')
+		buf.Write(inner)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+// maxInputRichBlockDepth bounds how deep blocks may be nested inside each other. It is a safety bound, not a Bot API
+// rule: each block encodes its children with a fresh json.Marshal, so the encoder's own cycle check cannot see a
+// cycle through nested blocks, and without this bound a cyclic value would overflow the stack.
+const maxInputRichBlockDepth = 100
+
+var errInputRichBlockDepth = errors.New("tg: input rich blocks nested more than 100 levels deep (or in a cycle)")
+
+// inputRichBlockParent is a block that holds other blocks. A type that embeds such a block inherits the method, so the
+// walk below also sees a container wrapped in a caller's type.
+type inputRichBlockParent interface {
+	inputRichBlockChildren() [][]InputRichBlock
+}
+
+// checkInputRichBlockDepth returns an error when blocks, at nesting depth depth, hold blocks nested deeper than
+// maxInputRichBlockDepth. It always ends, also on a cycle. A nil pointer has no children.
+func checkInputRichBlockDepth(blocks []InputRichBlock, depth int) error {
+	if depth > maxInputRichBlockDepth {
+		return errInputRichBlockDepth
+	}
+	for _, b := range blocks {
+		p, ok := b.(inputRichBlockParent)
+		if !ok {
+			continue
+		}
+		if v := reflect.ValueOf(p); v.Kind() == reflect.Pointer && v.IsNil() {
+			continue
+		}
+		for _, c := range p.inputRichBlockChildren() {
+			if err := checkInputRichBlockDepth(c, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// listItemBlocks returns the blocks of each list item.
+func listItemBlocks(items []InputRichBlockListItem) [][]InputRichBlock {
+	out := make([][]InputRichBlock, len(items))
+	for i, it := range items {
+		out[i] = it.Blocks
+	}
+	return out
 }
 
 // InputRichBlockParagraph is a text paragraph, corresponding to the HTML tag <p> (Bot API 10.2).
@@ -118,53 +192,116 @@ type InputRichBlockThinking struct {
 	Text RichText `json:"text"`
 }
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockParagraph) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"paragraph".
+func (b InputRichBlockParagraph) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockParagraph
+	return marshalInputRichBlock("paragraph", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockSectionHeading) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"heading".
+func (b InputRichBlockSectionHeading) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockSectionHeading
+	return marshalInputRichBlock("heading", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockPreformatted) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"pre".
+func (b InputRichBlockPreformatted) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockPreformatted
+	return marshalInputRichBlock("pre", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockFooter) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"footer".
+func (b InputRichBlockFooter) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockFooter
+	return marshalInputRichBlock("footer", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockDivider) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"divider".
+func (b InputRichBlockDivider) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockDivider
+	return marshalInputRichBlock("divider", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockMathematicalExpression) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"mathematical_expression".
+func (b InputRichBlockMathematicalExpression) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockMathematicalExpression
+	return marshalInputRichBlock("mathematical_expression", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockAnchor) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"anchor".
+func (b InputRichBlockAnchor) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockAnchor
+	return marshalInputRichBlock("anchor", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockList) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"list".
+func (b InputRichBlockList) MarshalJSON() ([]byte, error) {
+	if err := checkInputRichBlockDepth([]InputRichBlock{b}, 0); err != nil {
+		return nil, err
+	}
+	type t InputRichBlockList
+	return marshalInputRichBlock("list", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockBlockQuotation) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"blockquote".
+func (b InputRichBlockBlockQuotation) MarshalJSON() ([]byte, error) {
+	if err := checkInputRichBlockDepth([]InputRichBlock{b}, 0); err != nil {
+		return nil, err
+	}
+	type t InputRichBlockBlockQuotation
+	return marshalInputRichBlock("blockquote", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockPullQuotation) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"pullquote".
+func (b InputRichBlockPullQuotation) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockPullQuotation
+	return marshalInputRichBlock("pullquote", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockCollage) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"collage".
+func (b InputRichBlockCollage) MarshalJSON() ([]byte, error) {
+	if err := checkInputRichBlockDepth([]InputRichBlock{b}, 0); err != nil {
+		return nil, err
+	}
+	type t InputRichBlockCollage
+	return marshalInputRichBlock("collage", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockSlideshow) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"slideshow".
+func (b InputRichBlockSlideshow) MarshalJSON() ([]byte, error) {
+	if err := checkInputRichBlockDepth([]InputRichBlock{b}, 0); err != nil {
+		return nil, err
+	}
+	type t InputRichBlockSlideshow
+	return marshalInputRichBlock("slideshow", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockTable) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"table".
+func (b InputRichBlockTable) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockTable
+	return marshalInputRichBlock("table", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockDetails) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"details".
+func (b InputRichBlockDetails) MarshalJSON() ([]byte, error) {
+	if err := checkInputRichBlockDepth([]InputRichBlock{b}, 0); err != nil {
+		return nil, err
+	}
+	type t InputRichBlockDetails
+	return marshalInputRichBlock("details", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockMap) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"map".
+func (b InputRichBlockMap) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockMap
+	return marshalInputRichBlock("map", t(b))
+}
 
-// MarshalJSON is the red stub: it writes an empty object.
-func (b InputRichBlockThinking) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
+// MarshalJSON encodes the block with "type":"thinking".
+func (b InputRichBlockThinking) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockThinking
+	return marshalInputRichBlock("thinking", t(b))
+}
 
 func (InputRichBlockParagraph) inputRichBlock()              {}
 func (InputRichBlockSectionHeading) inputRichBlock()         {}
@@ -182,3 +319,19 @@ func (InputRichBlockTable) inputRichBlock()                  {}
 func (InputRichBlockDetails) inputRichBlock()                {}
 func (InputRichBlockMap) inputRichBlock()                    {}
 func (InputRichBlockThinking) inputRichBlock()               {}
+
+func (b InputRichBlockList) inputRichBlockChildren() [][]InputRichBlock {
+	return listItemBlocks(b.Items)
+}
+func (b InputRichBlockBlockQuotation) inputRichBlockChildren() [][]InputRichBlock {
+	return [][]InputRichBlock{b.Blocks}
+}
+func (b InputRichBlockCollage) inputRichBlockChildren() [][]InputRichBlock {
+	return [][]InputRichBlock{b.Blocks}
+}
+func (b InputRichBlockSlideshow) inputRichBlockChildren() [][]InputRichBlock {
+	return [][]InputRichBlock{b.Blocks}
+}
+func (b InputRichBlockDetails) inputRichBlockChildren() [][]InputRichBlock {
+	return [][]InputRichBlock{b.Blocks}
+}

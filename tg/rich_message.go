@@ -677,9 +677,10 @@ func (RichBlockThinking) richBlock()               {}
 
 // ================== Send side (Bot API 10.1) ==================
 
-// InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of HTML and Markdown.
-// SendRichMessage, SendRichMessageDraft and EditMessageText refuse a value that sets both or neither (the server
-// picks one silently when both are set); InputRichMessageContent in an inline result is sent unchecked.
+// InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of three forms: HTML, Markdown,
+// or Blocks (Bot API 10.2; the InputRichBlock* types; an empty slice counts as not used). SendRichMessage,
+// SendRichMessageDraft and EditMessageText refuse a value that uses none or more than one form (the server picks one
+// silently when several are set); InputRichMessageContent in an inline result is sent unchecked.
 type InputRichMessage struct {
 	HTML                string           `json:"html,omitempty"`
 	Markdown            string           `json:"markdown,omitempty"`

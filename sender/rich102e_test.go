@@ -387,8 +387,8 @@ func api102eImage(media any) api102eImg {
 	return img
 }
 
-// T-rm-7 (t2 O-T2-01, t3 O-T3-02 X-T3-01): the message flags survive the multipart path, each alone with each text
-// form, both together, and with blocks, for each caller.
+// T-rm-7 (t2 O-T2-01, t3 O-T3-02 X-T3-01, c1 C1-01): the message flags survive the multipart path, each alone and
+// both together, with each form (html, markdown, blocks), for each caller.
 func TestAPI102E_SendMediaFlags(t *testing.T) {
 	list := `"media":[{"id":"a","media":{"media":"attach://file0","type":"photo"}}]}`
 	for _, c := range api102dCallers {
@@ -407,6 +407,12 @@ func TestAPI102E_SendMediaFlags(t *testing.T) {
 				`{"markdown":"m","is_rtl":true,"skip_entity_detection":true,` + list},
 			{"is_rtl-blocks", tg.InputRichMessage{Blocks: []tg.InputRichBlock{tg.InputRichBlockDivider{}}, IsRTL: true},
 				`{"is_rtl":true,"blocks":[{"type":"divider"}],` + list},
+			{"both-html", tg.InputRichMessage{HTML: "h", IsRTL: true, SkipEntityDetection: true},
+				`{"html":"h","is_rtl":true,"skip_entity_detection":true,` + list},
+			{"skip_entity_detection-blocks", tg.InputRichMessage{Blocks: []tg.InputRichBlock{tg.InputRichBlockDivider{}}, SkipEntityDetection: true},
+				`{"skip_entity_detection":true,"blocks":[{"type":"divider"}],` + list},
+			{"both-blocks", tg.InputRichMessage{Blocks: []tg.InputRichBlock{tg.InputRichBlockDivider{}}, IsRTL: true, SkipEntityDetection: true},
+				`{"is_rtl":true,"skip_entity_detection":true,"blocks":[{"type":"divider"}],` + list},
 		} {
 			t.Run(c.name+"/"+f.name, func(t *testing.T) {
 				f.rm.Media = []tg.InputRichMessageMedia{{ID: "a", Media: sender.NewInputMediaPhoto(sender.FromBytes([]byte("p"), "p.jpg"))}}

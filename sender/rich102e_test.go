@@ -688,3 +688,74 @@ func TestAPI102E_ZeroEditMedia(t *testing.T) {
 	assert.Contains(t, err.Error(), "InputMedia.Media must have FileID, URL, or Reader set")
 	assert.Equal(t, 0, server.CaptureCount())
 }
+
+// T-rm-8 (c2 C2-01): a nil *tg.InputRichMessage held in an `any` field is not removed by the zero-value skip (the
+// interface is not nil). The builder writes it as JSON null, as before Bot API 10.2e and as the JSON body does; no
+// file, no multipart, no panic.
+func TestAPI102E_TypedNilRichInAny(t *testing.T) {
+	var nilRich *tg.InputRichMessage
+	t.Run("builder", func(t *testing.T) {
+		var got sender.MultipartRequest
+		var err error
+		require.NotPanics(t, func() {
+			got, err = sender.BuildMultipartRequest(struct {
+				RichMessage any `json:"rich_message,omitempty"`
+			}{RichMessage: nilRich})
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"rich_message": "null"}, got.Params)
+		assert.Empty(t, got.Files)
+	})
+	t.Run("send_message_reply_markup", func(t *testing.T) {
+		server := testutil.NewMockServer(t)
+		api101dOnResult(server, "sendMessage", api101dReply)
+		client := testutil.NewTestClient(t, server.BaseURL())
+		var err error
+		require.NotPanics(t, func() {
+			_, err = client.SendMessage(context.Background(), sender.SendMessageRequest{ChatID: api101dChat, Text: "t",
+				ReplyMarkup: nilRich})
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		got := server.LastCapture()
+		assert.Contains(t, got.ContentType, "application/json")
+		assert.JSONEq(t, `{"chat_id":123456789,"text":"t","reply_markup":null}`, string(got.Body))
+	})
+}
+
+// api102eWrapped is a caller's type that embeds InputMedia (plan §4): its file_id or URL encodes through the promoted
+// MarshalJSON; an upload in it is refused.
+type api102eWrapped struct{ sender.InputMedia }
+
+// T-rm-9 (c2 C2-02): a caller's own InputRichMedia type keeps its encoding when the list also holds an upload (the
+// request goes multipart, and the builder must leave that item as it is); an upload inside such a type is refused
+// before any request, and its reader is not opened.
+func TestAPI102E_SendMediaWrapper(t *testing.T) {
+	for _, c := range api102dCallers {
+		t.Run(c.name+"/mixed", func(t *testing.T) {
+			rm := tg.InputRichMessage{HTML: "h", Media: []tg.InputRichMessageMedia{
+				{ID: "w", Media: api102eWrapped{sender.NewInputMediaPhoto(sender.FromFileID("WR"))}},
+				{ID: "u", Media: sender.NewInputMediaPhoto(sender.FromBytes([]byte("p"), "p.jpg"))}}}
+			mt, args, files := api102eCall(t, c, rm)
+			assert.Equal(t, "multipart/form-data", mt)
+			want := map[string]string{"rich_message": `{"html":"h","media":[{"id":"w","media":{"media":"WR","type":"photo"}},` +
+				`{"id":"u","media":{"media":"attach://file0","type":"photo"}}]}`}
+			for k, v := range api102eArgs[c.name] {
+				want[k] = v
+			}
+			assertArgs(t, want, args)
+			assertFiles(t, map[string]wireFile{"file0": {FileName: "p.jpg", Data: []byte("p")}}, files)
+		})
+		t.Run(c.name+"/upload-refused", func(t *testing.T) {
+			var cnt api102eCounter
+			rm := tg.InputRichMessage{HTML: "h", Media: []tg.InputRichMessageMedia{
+				{ID: "w", Media: api102eWrapped{sender.NewInputMediaPhoto(cnt.source("x"))}}}}
+			server, client := api102dServer(t)
+			err := c.call(context.Background(), client, rm)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), api102eUploadErr)
+			assert.Equal(t, 0, server.CaptureCount())
+			cnt.assertUnused(t)
+		})
+	}
+}

@@ -424,19 +424,25 @@ func resolveProfilePhoto(photo InputProfilePhoto) (string, []FilePart, error) {
 	var err error
 	switch p := photo.(type) {
 	case *InputProfilePhotoStatic:
+		if p == nil {
+			return "", nil, tg.NewValidationError("photo", "required")
+		}
 		var ref string
 		if ref, fp, err = resolveInputFile(p.Photo, "profile_photo"); err != nil {
 			return "", nil, fmt.Errorf("photo: %w", err)
 		}
 		m = map[string]any{"type": "static", "photo": ref}
 	case *InputProfilePhotoAnimated:
+		if p == nil {
+			return "", nil, tg.NewValidationError("photo", "required")
+		}
 		var ref string
 		if ref, fp, err = resolveInputFile(p.Animation, "profile_animation"); err != nil {
 			return "", nil, fmt.Errorf("animation: %w", err)
 		}
 		m = map[string]any{"type": "animated", "animation": ref}
 		if p.MainFrameTime > 0 {
-			m["main_frame_time"] = p.MainFrameTime
+			m["main_frame_timestamp"] = p.MainFrameTime
 		}
 	default:
 		return "", nil, fmt.Errorf("unsupported InputProfilePhoto type: %T", photo)

@@ -38,7 +38,7 @@ func (InputProfilePhotoStatic) inputProfilePhotoTag() {}
 // InputProfilePhotoAnimated represents an animated profile photo.
 type InputProfilePhotoAnimated struct {
 	Animation     InputFile `json:"-"` // Handled by multipart encoder
-	MainFrameTime float64   `json:"main_frame_time,omitempty"`
+	MainFrameTime float64   `json:"main_frame_timestamp,omitempty"`
 }
 
 func (InputProfilePhotoAnimated) inputProfilePhotoTag() {}

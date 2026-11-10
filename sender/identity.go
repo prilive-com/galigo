@@ -229,16 +229,20 @@ func (c *Client) GetMyShortDescription(ctx context.Context, opts ...LanguageOpti
 // Added in Bot API 9.4. photo is an *InputProfilePhotoStatic (a .JPG file) or
 // an *InputProfilePhotoAnimated (an MPEG4 file), uploaded as a new file.
 func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputProfilePhoto) error {
-	_ = ctx
-	_ = photo
-	return nil // B-46 red stub: no request yet
+	if photo == nil {
+		return tg.NewValidationError("photo", "required")
+	}
+	ref, files, err := resolveProfilePhoto(photo)
+	if err != nil {
+		return err
+	}
+	return c.callJSON(ctx, "setMyProfilePhoto", &myProfilePhotoPayload{Photo: ref, AttachedFiles: files}, nil)
 }
 
 // RemoveMyProfilePhoto removes the bot's profile photo.
 // Added in Bot API 9.4.
 func (c *Client) RemoveMyProfilePhoto(ctx context.Context) error {
-	_ = ctx
-	return nil // B-46 red stub: no request yet
+	return c.callJSON(ctx, "removeMyProfilePhoto", RemoveMyProfilePhotoRequest{}, nil)
 }
 
 // ================== Default Admin Rights ==================

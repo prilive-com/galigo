@@ -485,9 +485,9 @@ func TestWire_W3_MediaGroupMixed(t *testing.T) {
 // W4 is TestEditMessageMedia_FileID (sender/edit_media_test.go).
 
 func TestWire_W5_EditInline(t *testing.T) {
-	// The real inline reply is "result": true. EditMessageMedia does not
-	// accept it today (B-47), so only the request is checked here.
-	mediaType, args, files, _ := wireCall(t, "editMessageMedia", func(w http.ResponseWriter, _ *http.Request) {
+	// The real inline reply is "result": true; EditMessageMedia returns
+	// (nil, nil) for it (B-47, the result rows are in inline_edit_b47_test.go).
+	mediaType, args, files, err := wireCall(t, "editMessageMedia", func(w http.ResponseWriter, _ *http.Request) {
 		testutil.ReplyOK(w, true)
 	}, func(ctx context.Context, c *sender.Client) error {
 		_, err := c.EditMessageMedia(ctx, sender.EditMessageMediaRequest{
@@ -496,6 +496,7 @@ func TestWire_W5_EditInline(t *testing.T) {
 		})
 		return err
 	})
+	require.NoError(t, err)
 	assert.Equal(t, "multipart/form-data", mediaType)
 	assertArgs(t, map[string]string{
 		"inline_message_id": "inl-1",

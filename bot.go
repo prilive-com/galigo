@@ -305,6 +305,8 @@ func isURL(s string) bool {
 }
 
 // Edit edits a message text.
+// For an inline message the Bot API returns True; Edit then returns a nil
+// Message and a nil error.
 func (b *Bot) Edit(ctx context.Context, e tg.Editable, text string, opts ...sender.EditOption) (*tg.Message, error) {
 	return b.sender.Edit(ctx, e, text, opts...)
 }

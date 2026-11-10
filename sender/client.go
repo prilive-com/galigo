@@ -415,6 +415,8 @@ func (c *Client) SendPhoto(ctx context.Context, req SendPhotoRequest) (*tg.Messa
 }
 
 // EditMessageText edits message text.
+// For an inline message (InlineMessageID) the Bot API returns True; the
+// method then returns a nil Message and a nil error.
 func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest) (*tg.Message, error) {
 	if err := req.LinkPreviewOptions.Validate(); err != nil {
 		return nil, err
@@ -428,34 +430,40 @@ func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return parseEditResult(resp)
 }
 
 // EditMessageCaption edits message caption.
+// For an inline message (InlineMessageID) the Bot API returns True; the
+// method then returns a nil Message and a nil error.
 func (c *Client) EditMessageCaption(ctx context.Context, req EditMessageCaptionRequest) (*tg.Message, error) {
 	resp, err := c.executeRequest(ctx, "editMessageCaption", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return parseEditResult(resp)
 }
 
 // EditMessageReplyMarkup edits message reply markup.
+// For an inline message (InlineMessageID) the Bot API returns True; the
+// method then returns a nil Message and a nil error.
 func (c *Client) EditMessageReplyMarkup(ctx context.Context, req EditMessageReplyMarkupRequest) (*tg.Message, error) {
 	resp, err := c.executeRequest(ctx, "editMessageReplyMarkup", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return parseEditResult(resp)
 }
 
 // EditMessageMedia edits the media content of a message.
+// For an inline message (InlineMessageID) the Bot API returns True; the
+// method then returns a nil Message and a nil error.
 func (c *Client) EditMessageMedia(ctx context.Context, req EditMessageMediaRequest) (*tg.Message, error) {
 	resp, err := c.executeRequest(ctx, "editMessageMedia", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return parseEditResult(resp)
 }
 
 // DeleteMessage deletes a message.
@@ -495,6 +503,7 @@ func (c *Client) AnswerCallbackQuery(ctx context.Context, req AnswerCallbackQuer
 // Edit convenience methods using Editable interface
 
 // Edit edits a message text using Editable.
+// For an inline message it returns a nil Message and a nil error (see EditMessageText).
 func (c *Client) Edit(ctx context.Context, e tg.Editable, text string, opts ...EditOption) (*tg.Message, error) {
 	msgID, chatID := e.MessageSig()
 	req := EditMessageTextRequest{Text: text}
@@ -859,6 +868,15 @@ func extractChatID(chatID tg.ChatID) string {
 	default:
 		return fmt.Sprint(v)
 	}
+}
+
+// parseEditResult parses the result of an edit method: the edited Message,
+// or nil for an inline message, where the Bot API returns True.
+func parseEditResult(resp *apiResponse) (*tg.Message, error) {
+	if string(resp.Result) == "true" {
+		return nil, nil
+	}
+	return parseMessage(resp)
 }
 
 func parseMessage(resp *apiResponse) (*tg.Message, error) {

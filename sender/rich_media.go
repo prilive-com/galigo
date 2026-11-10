@@ -64,6 +64,10 @@ func handleMediaField(req *MultipartRequest, fieldName string, v any, attachIdx 
 	case tg.InputRichMessage:
 		return false, handleRichMessage(req, fieldName, m, attachIdx)
 	case *tg.InputRichMessage:
+		if m == nil { // a nil pointer held in an `any` field: JSON null, as the JSON body writes it
+			req.Params[fieldName] = "null"
+			return false, nil
+		}
 		return false, handleRichMessage(req, fieldName, *m, attachIdx)
 	}
 	return handlePollField(req, fieldName, v, attachIdx)

@@ -150,22 +150,13 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
-		case *InputMedia, []InputPollOption: // poll media (Bot API 10.0); nil is skipped above
-			needsForm, err := handlePollField(&result, fieldName, v, &attachIdx)
+		case *InputMedia, []InputPollOption, tg.InputRichMessage, *tg.InputRichMessage:
+			// poll media (Bot API 10.0) and rich message media (Bot API 10.2); a nil pointer is skipped above
+			needsForm, err := handleMediaField(&result, fieldName, v, &attachIdx)
 			if err != nil {
 				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 			formOnly = formOnly || needsForm
-
-		case tg.InputRichMessage: // Bot API 10.2: uploads in Media
-			if err := handleRichMessage(&result, fieldName, v, &attachIdx); err != nil {
-				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
-			}
-
-		case *tg.InputRichMessage: // nil is skipped above
-			if err := handleRichMessage(&result, fieldName, *v, &attachIdx); err != nil {
-				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
-			}
 
 		case string:
 			result.Params[fieldName] = v

@@ -56,6 +56,19 @@ func (r richMediaItem) InputRichMediaType() string {
 	return s
 }
 
+// handleMediaField writes a field whose media the builder resolves: a rich message (Bot API 10.2, handleRichMessage;
+// it needs no form of its own: an upload adds a file part) or poll media (Bot API 10.0, handlePollField). It reports
+// whether the field needs multipart/form-data. One builder case for both keeps buildMultipartRequest's complexity.
+func handleMediaField(req *MultipartRequest, fieldName string, v any, attachIdx *int) (bool, error) {
+	switch m := v.(type) {
+	case tg.InputRichMessage:
+		return false, handleRichMessage(req, fieldName, m, attachIdx)
+	case *tg.InputRichMessage:
+		return false, handleRichMessage(req, fieldName, *m, attachIdx)
+	}
+	return handlePollField(req, fieldName, v, attachIdx)
+}
+
 // handleRichMessage writes a rich_message field (Bot API 10.2). Each InputMedia in its Media list is replaced, in a
 // copy, by the item inputMediaItem builds: an upload becomes an attach:// item with its own file part, in list order;
 // a file_id or URL gives the same item as InputMedia.MarshalJSON. The caller's value is not changed. Without an upload

@@ -3,8 +3,10 @@ package sender_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"reflect"
 	"testing"
@@ -191,6 +193,22 @@ func TestB46_BadPhoto(t *testing.T) {
 				assert.Equal(t, 0, server.CaptureCount())
 			})
 		}
+	}
+}
+
+// T-4b: the resolver returns a JSON encoding error before any request
+// (C1-01): an infinite MainFrameTime is not valid JSON.
+func TestB46_MarshalError(t *testing.T) {
+	for _, c := range b46Callers() {
+		t.Run(c.name, func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			client := testutil.NewTestClient(t, server.BaseURL())
+			err := c.call(context.Background(), client, &sender.InputProfilePhotoAnimated{
+				Animation: sender.FromBytes([]byte("v"), "v.mp4"), MainFrameTime: math.Inf(1)})
+			var ue *json.UnsupportedValueError
+			require.True(t, errors.As(err, &ue), "error %v", err)
+			assert.Equal(t, 0, server.CaptureCount())
+		})
 	}
 }
 

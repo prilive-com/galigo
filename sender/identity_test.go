@@ -333,25 +333,10 @@ func TestSetMyProfilePhoto(t *testing.T) {
 
 	client := testutil.NewTestClient(t, server.BaseURL())
 	photoData := []byte{0x89, 0x50, 0x4E, 0x47} // PNG header
-	err := client.SetMyProfilePhoto(context.Background(), sender.FromBytes(photoData, "photo.png"))
+	err := client.SetMyProfilePhoto(context.Background(), &sender.InputProfilePhotoStatic{Photo: sender.FromBytes(photoData, "photo.png")})
 	require.NoError(t, err)
-}
-
-func TestSetMyProfilePhoto_Personal(t *testing.T) {
-	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/setMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, true)
-	})
-
-	client := testutil.NewTestClient(t, server.BaseURL())
-	photoData := []byte{0x89, 0x50, 0x4E, 0x47}
-	err := client.SetMyProfilePhoto(context.Background(), sender.FromBytes(photoData, "photo.png"), sender.PersonalPhoto())
-	require.NoError(t, err)
-
-	cap := server.LastCapture()
-	// FromBytes triggers multipart encoding, so check the multipart body
-	cap.AssertContentType(t, "multipart/form-data")
-	assert.Contains(t, cap.BodyString(), "is_personal")
+	require.Equal(t, 1, server.CaptureCount())
+	server.LastCapture().AssertContentType(t, "multipart/form-data")
 }
 
 func TestRemoveMyProfilePhoto(t *testing.T) {
@@ -363,18 +348,4 @@ func TestRemoveMyProfilePhoto(t *testing.T) {
 	client := testutil.NewTestClient(t, server.BaseURL())
 	err := client.RemoveMyProfilePhoto(context.Background())
 	require.NoError(t, err)
-}
-
-func TestRemoveMyProfilePhoto_Personal(t *testing.T) {
-	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/removeMyProfilePhoto", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, true)
-	})
-
-	client := testutil.NewTestClient(t, server.BaseURL())
-	err := client.RemoveMyProfilePhoto(context.Background(), sender.PersonalPhoto())
-	require.NoError(t, err)
-
-	cap := server.LastCapture()
-	cap.AssertJSONField(t, "is_personal", true)
 }

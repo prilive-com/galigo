@@ -2,12 +2,15 @@ package sender
 
 // InputMedia represents media content for editMessageMedia and, since Bot
 // API 10.0, poll media (SendPollRequest.Media and .ExplanationMedia,
-// InputPollOption.Media). Albums (sendMediaGroup) use []InputFile instead.
+// InputPollOption.Media); since Bot API 10.2 also rich message media
+// (tg.InputRichMessageMedia and the media blocks: it implements tg.InputRichMedia).
+// Albums (sendMediaGroup) use []InputFile instead.
 // Use one of the constructors: NewInputMediaPhoto, NewInputMediaDocument, etc.
 type InputMedia struct {
 	// Type is the media type: "photo", "video", "document", "audio",
 	// "animation", "live_photo"; for poll media also "sticker", "location",
-	// "venue" (Bot API 10.0); for poll option media also "link" (Bot API 10.1).
+	// "venue" (Bot API 10.0); for poll option media also "link" (Bot API 10.1);
+	// for rich message media also "voice_note" (Bot API 10.2).
 	Type string
 
 	// Media is the file to send (FileID, URL, or Reader upload).

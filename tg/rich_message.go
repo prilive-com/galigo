@@ -680,11 +680,14 @@ func (RichBlockThinking) richBlock()               {}
 // InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of three forms: HTML, Markdown,
 // or Blocks (Bot API 10.2; the InputRichBlock* types; an empty slice counts as not used). SendRichMessage,
 // SendRichMessageDraft and EditMessageText refuse a value that uses none or more than one form (the server picks one
-// silently when several are set); InputRichMessageContent in an inline result is sent unchecked.
+// silently when several are set); InputRichMessageContent in an inline result is sent unchecked. Media (Bot API 10.2)
+// lists the media that HTML or Markdown names with tg://photo?id=, tg://video?id= (also an animation) or
+// tg://audio?id= (also a voice note) links; it is not a form. sender.Client sends an upload in Media as multipart.
 type InputRichMessage struct {
-	HTML                string           `json:"html,omitempty"`
-	Markdown            string           `json:"markdown,omitempty"`
-	IsRTL               bool             `json:"is_rtl,omitempty"`
-	SkipEntityDetection bool             `json:"skip_entity_detection,omitempty"`
-	Blocks              []InputRichBlock `json:"blocks,omitempty"`
+	HTML                string                  `json:"html,omitempty"`
+	Markdown            string                  `json:"markdown,omitempty"`
+	IsRTL               bool                    `json:"is_rtl,omitempty"`
+	SkipEntityDetection bool                    `json:"skip_entity_detection,omitempty"`
+	Blocks              []InputRichBlock        `json:"blocks,omitempty"`
+	Media               []InputRichMessageMedia `json:"media,omitempty"`
 }

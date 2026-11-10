@@ -678,7 +678,7 @@ go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 # Bot API 10.1 scenarios (S66, S67)
 go run ./cmd/galigo-testbot --run api101                 # All 10.1 tests
 
-# Bot API 10.2 scenarios (S68)
+# Bot API 10.2 scenarios (S68, S69)
 go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 
 # Show method coverage
@@ -826,11 +826,12 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S66-PollOptionLink | sendPoll | Poll whose options have links (`InputMediaLink`, multipart without files), then a poll with a link and a photo upload; each option's media kind and link URL is checked |
 | S67-RichMessage | sendRichMessage, editMessageText, sendRichMessageDraft | Rich message from markdown (the reply has a rich message and no text), edited to HTML rich content with `editMessageText`, cleaned up, then a rich draft; the draft works in private chats only, so in a group the step is skipped |
 
-#### Bot API 10.2 (S68)
+#### Bot API 10.2 (S68, S69)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
-| S68-RichBlocks | sendRichMessage, sendRichMessageDraft | Rich message made of blocks (`InputRichMessage.Blocks`): heading, paragraph, preformatted, divider, mathematical expression, anchor, list, block quotation, pull quotation, table, details, map and footer, with blocks nested in a list item, a quotation and details; the block kinds of the reply are checked; cleaned up, then a draft with a thinking block (private chats only, so in a group the step is skipped). Collage and slideshow are proved by mock tests only: the server refuses them with text blocks only (`RICH_MESSAGE_BLOCK_UNEXPECTED`) |
+| S68-RichBlocks | sendRichMessage, sendRichMessageDraft | Rich message made of blocks (`InputRichMessage.Blocks`): heading, paragraph, preformatted, divider, mathematical expression, anchor, list, block quotation, pull quotation, table, details, map and footer, with blocks nested in a list item, a quotation and details; the block kinds of the reply are checked; cleaned up, then a draft with a thinking block (private chats only, so in a group the step is skipped). Collage and slideshow are sent by S69: the server refuses them with text blocks only (`RICH_MESSAGE_BLOCK_UNEXPECTED`) |
+| S69-RichMedia | sendRichMessage, editMessageText | Rich message from markdown whose `tg://` links name the media list (`InputRichMessage.Media`), with one upload of each kind (photo, video, audio, animation, voice note; multipart): the reply has a paragraph and the five media blocks; then the five media blocks (`InputRichBlockPhoto` … `InputRichBlockVoiceNote`, each with a caption), a collage and a slideshow of two photo blocks, by the file_ids of that reply; then that message is edited to markdown with a new photo upload; cleaned up. The server takes `tg://photo`, `tg://video` (also an animation) and `tg://audio` (also a voice note) links, and refuses `tg://animation`, `tg://voice_note`, `tg://voice`; S69's animation is the MP4 fixture (the GIF fixture was refused in the live trial). Not live-proved: a draft with media (private chats only), uploads in inline results and in media blocks (galigo refuses them locally: mock tests) |
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -938,7 +939,7 @@ cmd/galigo-testbot/
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
 │   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
-│   ├── api102.go      # Bot API 10.2 (S68: rich message blocks)
+│   ├── api102.go      # Bot API 10.2 (S68: rich message blocks, S69: rich message media)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

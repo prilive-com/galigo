@@ -308,7 +308,7 @@ func TestB46_Shape(t *testing.T) {
 	shape := func(v any) []field {
 		rt := reflect.TypeOf(v)
 		out := []field{}
-		for i := 0; i < rt.NumField(); i++ {
+		for i := range rt.NumField() {
 			f := rt.Field(i)
 			require.False(t, f.Anonymous, "%s.%s embedded", rt.Name(), f.Name)
 			out = append(out, field{f.Name, f.Type.String(), f.Tag.Get("json")})

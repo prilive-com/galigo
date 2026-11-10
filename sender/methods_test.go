@@ -132,16 +132,17 @@ func TestEdit_WithEditable(t *testing.T) {
 func TestEdit_InlineMessage(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/editMessageText", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyMessage(w, 0) // Inline messages return empty
+		testutil.ReplyOK(w, true) // the Bot API returns True for an inline message (B-47)
 	})
 
 	client := testutil.NewTestClient(t, server.BaseURL())
 
 	// Inline message has no chatID
 	editable := mockEditable{msgID: "inline_msg_123", chatID: 0}
-	_, err := client.Edit(context.Background(), editable, "New text")
+	msg, err := client.Edit(context.Background(), editable, "New text")
 
 	require.NoError(t, err)
+	require.Nil(t, msg)
 
 	cap := server.LastCapture()
 	cap.AssertJSONField(t, "inline_message_id", "inline_msg_123")

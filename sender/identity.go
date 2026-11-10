@@ -62,17 +62,16 @@ type GetMyShortDescriptionRequest struct {
 }
 
 // SetMyProfilePhotoRequest represents a setMyProfilePhoto request.
-// Added in Bot API 9.4.
+// Added in Bot API 9.4. Photo is an *InputProfilePhotoStatic or an
+// *InputProfilePhotoAnimated; profile photos can only be uploaded as a new
+// file (FromBytes, FromReader).
 type SetMyProfilePhotoRequest struct {
-	Photo      InputFile `json:"photo"`
-	IsPersonal bool      `json:"is_personal,omitempty"`
+	Photo InputProfilePhoto `json:"-"` // Handled by multipart
 }
 
 // RemoveMyProfilePhotoRequest represents a removeMyProfilePhoto request.
-// Added in Bot API 9.4.
-type RemoveMyProfilePhotoRequest struct {
-	IsPersonal bool `json:"is_personal,omitempty"`
-}
+// Added in Bot API 9.4. The method takes no parameters.
+type RemoveMyProfilePhotoRequest struct{}
 
 // SetMyDefaultAdministratorRightsRequest represents a setMyDefaultAdministratorRights request.
 type SetMyDefaultAdministratorRightsRequest struct {
@@ -227,23 +226,23 @@ func (c *Client) GetMyShortDescription(ctx context.Context, opts ...LanguageOpti
 }
 
 // SetMyProfilePhoto sets the bot's profile photo.
-// Added in Bot API 9.4.
-func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputFile, opts ...ProfilePhotoOption) error {
-	req := SetMyProfilePhotoRequest{Photo: photo}
-	for _, opt := range opts {
-		opt.applyToSetProfilePhoto(&req)
+// Added in Bot API 9.4. photo is an *InputProfilePhotoStatic (a .JPG file) or
+// an *InputProfilePhotoAnimated (an MPEG4 file), uploaded as a new file.
+func (c *Client) SetMyProfilePhoto(ctx context.Context, photo InputProfilePhoto) error {
+	if photo == nil {
+		return tg.NewValidationError("photo", "required")
 	}
-	return c.callJSON(ctx, "setMyProfilePhoto", req, nil)
+	ref, files, err := resolveProfilePhoto(photo)
+	if err != nil {
+		return err
+	}
+	return c.callJSON(ctx, "setMyProfilePhoto", &myProfilePhotoPayload{Photo: ref, AttachedFiles: files}, nil)
 }
 
 // RemoveMyProfilePhoto removes the bot's profile photo.
 // Added in Bot API 9.4.
-func (c *Client) RemoveMyProfilePhoto(ctx context.Context, opts ...ProfilePhotoOption) error {
-	req := RemoveMyProfilePhotoRequest{}
-	for _, opt := range opts {
-		opt.applyToRemoveProfilePhoto(&req)
-	}
-	return c.callJSON(ctx, "removeMyProfilePhoto", req, nil)
+func (c *Client) RemoveMyProfilePhoto(ctx context.Context) error {
+	return c.callJSON(ctx, "removeMyProfilePhoto", RemoveMyProfilePhotoRequest{}, nil)
 }
 
 // ================== Default Admin Rights ==================
@@ -355,27 +354,4 @@ func ForChannels() AdminRightsOption {
 // WithAdminRightsForChannels sets the default administrator rights for channels.
 func WithAdminRightsForChannels(rights tg.ChatAdministratorRights) AdminRightsOption {
 	return adminRightsOption{rights: &rights, forChannels: true}
-}
-
-// ProfilePhotoOption configures profile photo methods.
-type ProfilePhotoOption interface {
-	applyToSetProfilePhoto(*SetMyProfilePhotoRequest)
-	applyToRemoveProfilePhoto(*RemoveMyProfilePhotoRequest)
-}
-
-type profilePhotoOption struct {
-	isPersonal bool
-}
-
-func (o profilePhotoOption) applyToSetProfilePhoto(r *SetMyProfilePhotoRequest) {
-	r.IsPersonal = o.isPersonal
-}
-
-func (o profilePhotoOption) applyToRemoveProfilePhoto(r *RemoveMyProfilePhotoRequest) {
-	r.IsPersonal = o.isPersonal
-}
-
-// PersonalPhoto marks the photo as visible only to the current user chat.
-func PersonalPhoto() ProfilePhotoOption {
-	return profilePhotoOption{isPersonal: true}
 }

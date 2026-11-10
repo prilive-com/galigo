@@ -252,6 +252,7 @@ func wireCall(t *testing.T, method string, reply http.HandlerFunc, call func(ctx
 	require.Equal(t, 1, server.CaptureCount(), "requests sent (call error: %v)", callErr)
 	c := server.LastCapture()
 	require.Equal(t, "/bot"+testutil.TestToken+"/"+method, c.Path)
+	require.Empty(t, c.Query, "no argument in the URL query") // B-46: a URL argument is not in the body
 	mediaType, args, files := wireArgs(t, capturedRequest(c))
 	return mediaType, args, files, callErr
 }
@@ -554,7 +555,6 @@ func fileCalls() []fileCall {
 	videoNote := sender.SendVideoNoteRequest{ChatID: id, VideoNote: sender.FromFileID("A")}
 	stickerSend := sender.SendStickerRequest{ChatID: id, Sticker: sender.FromFileID("A")}
 	chatPhoto := sender.SetChatPhotoRequest{ChatID: id, Photo: sender.FromFileID("A")}
-	myPhoto := sender.SetMyProfilePhotoRequest{Photo: sender.FromFileID("A")}
 	upload := sender.UploadStickerFileRequest{UserID: 1, Sticker: sender.FromFileID("A"), StickerFormat: "static"}
 	thumb := sender.SetStickerSetThumbnailRequest{Name: "n", UserID: 1, Thumbnail: sender.FromFileID("A"), Format: "static"}
 	// API100B T-s-19: the three live-photo calls by file ids.
@@ -622,8 +622,8 @@ func fileCalls() []fileCall {
 		{"setChatPhoto", "setChatPhoto", chatPhoto, js, func(ctx context.Context, c *sender.Client) error {
 			return c.SetChatPhoto(ctx, id, sender.FromFileID("A"))
 		}},
-		{"setMyProfilePhoto", "setMyProfilePhoto", myPhoto, js, func(ctx context.Context, c *sender.Client) error {
-			return c.SetMyProfilePhoto(ctx, sender.FromFileID("A"))
+		{"setMyProfilePhoto", "setMyProfilePhoto", nil, js, func(ctx context.Context, c *sender.Client) error { // B-46: InputProfilePhoto
+			return c.SetMyProfilePhoto(ctx, &sender.InputProfilePhotoStatic{Photo: sender.FromFileID("A")})
 		}},
 		{"uploadStickerFile", "uploadStickerFile", upload, js, func(ctx context.Context, c *sender.Client) error {
 			_, err := c.UploadStickerFile(ctx, upload)
@@ -682,7 +682,7 @@ func TestWire_W7_Routing(t *testing.T) {
 			assertFiles(t, map[string]wireFile{}, files)
 		})
 	}
-	assert.Equal(t, 19, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia
+	assert.Equal(t, 18, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia; B-46: - setMyProfilePhoto (builder payload)
 }
 
 func TestWire_W8_ContentType(t *testing.T) {
@@ -712,7 +712,7 @@ var guardPartA = []string{
 	"SendPhotoRequest", "SendDocumentRequest", "SendVideoRequest", "SendAudioRequest",
 	"SendAnimationRequest", "SendVoiceRequest", "SendVideoNoteRequest", "SendStickerRequest",
 	"SendMediaGroupRequest", "EditMessageMediaRequest", "SetChatPhotoRequest",
-	"SetMyProfilePhotoRequest", "UploadStickerFileRequest", "SetStickerSetThumbnailRequest",
+	"UploadStickerFileRequest", "SetStickerSetThumbnailRequest",
 	"SendLivePhotoRequest",             // API100B T-s-19
 	"SendPollRequest",                  // API100D T-s-14
 	"EditEphemeralMessageMediaRequest", // API102C T-w7
@@ -721,6 +721,7 @@ var guardPartA = []string{
 var guardPartB = []string{
 	"CreateNewStickerSetRequest", "AddStickerToSetRequest", "ReplaceStickerInSetRequest",
 	"PostStoryRequest", "EditStoryRequest", "SetBusinessAccountProfilePhotoRequest",
+	"SetMyProfilePhotoRequest", // B-46: InputProfilePhoto, built by resolveProfilePhoto
 	"InputMedia", "InputSticker", "InputProfilePhotoStatic", "InputProfilePhotoAnimated",
 	"InputStoryContentPhoto", "InputStoryContentVideo",
 	"InputFile",       // API100B T-s-19: InputFile.Photo is a nested *InputFile

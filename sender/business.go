@@ -396,49 +396,64 @@ type profilePhotoPayload struct {
 	AttachedFiles        []FilePart `json:"_file_parts"`
 }
 
+// myProfilePhotoPayload is the internal multipart-ready payload for setMyProfilePhoto.
+type myProfilePhotoPayload struct {
+	Photo         string     `json:"photo"`
+	AttachedFiles []FilePart `json:"_file_parts"`
+}
+
 // buildProfilePhotoPayload resolves InputProfilePhoto to a multipart-ready payload.
 func buildProfilePhotoPayload(req SetBusinessAccountProfilePhotoRequest) (*profilePhotoPayload, error) {
-	payload := &profilePhotoPayload{
+	ref, files, err := resolveProfilePhoto(req.Photo)
+	if err != nil {
+		return nil, err
+	}
+	return &profilePhotoPayload{
 		BusinessConnectionID: req.BusinessConnectionID,
+		Photo:                ref,
 		IsPublic:             req.IsPublic,
-	}
+		AttachedFiles:        files,
+	}, nil
+}
 
-	switch p := req.Photo.(type) {
+// resolveProfilePhoto returns the JSON of an InputProfilePhoto and the file
+// part of its upload, if any. A nil pointer is a validation error.
+func resolveProfilePhoto(photo InputProfilePhoto) (string, []FilePart, error) {
+	var m map[string]any
+	var fp *FilePart
+	var err error
+	switch p := photo.(type) {
 	case *InputProfilePhotoStatic:
-		ref, fp, err := resolveInputFile(p.Photo, "profile_photo")
-		if err != nil {
-			return nil, fmt.Errorf("photo: %w", err)
+		if p == nil {
+			return "", nil, tg.NewValidationError("photo", "required")
 		}
-		if fp != nil {
-			payload.AttachedFiles = append(payload.AttachedFiles, *fp)
+		var ref string
+		if ref, fp, err = resolveInputFile(p.Photo, "profile_photo"); err != nil {
+			return "", nil, fmt.Errorf("photo: %w", err)
 		}
-		data, err := json.Marshal(map[string]any{"type": "static", "photo": ref})
-		if err != nil {
-			return nil, err
-		}
-		payload.Photo = string(data)
-
+		m = map[string]any{"type": "static", "photo": ref}
 	case *InputProfilePhotoAnimated:
-		ref, fp, err := resolveInputFile(p.Animation, "profile_animation")
-		if err != nil {
-			return nil, fmt.Errorf("animation: %w", err)
+		if p == nil {
+			return "", nil, tg.NewValidationError("photo", "required")
 		}
-		if fp != nil {
-			payload.AttachedFiles = append(payload.AttachedFiles, *fp)
+		var ref string
+		if ref, fp, err = resolveInputFile(p.Animation, "profile_animation"); err != nil {
+			return "", nil, fmt.Errorf("animation: %w", err)
 		}
-		m := map[string]any{"type": "animated", "animation": ref}
+		m = map[string]any{"type": "animated", "animation": ref}
 		if p.MainFrameTime > 0 {
-			m["main_frame_time"] = p.MainFrameTime
+			m["main_frame_timestamp"] = p.MainFrameTime
 		}
-		data, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		payload.Photo = string(data)
-
 	default:
-		return nil, fmt.Errorf("unsupported InputProfilePhoto type: %T", req.Photo)
+		return "", nil, fmt.Errorf("unsupported InputProfilePhoto type: %T", photo)
 	}
-
-	return payload, nil
+	data, err := json.Marshal(m)
+	if err != nil {
+		return "", nil, err
+	}
+	var files []FilePart
+	if fp != nil {
+		files = []FilePart{*fp}
+	}
+	return string(data), files, nil
 }

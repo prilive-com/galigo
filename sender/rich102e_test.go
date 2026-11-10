@@ -759,3 +759,28 @@ func TestAPI102E_SendMediaWrapper(t *testing.T) {
 		})
 	}
 }
+
+// T-rm-10 (c3 C3-01, E-0117): on the multipart path the rebuilt items keep every string as given: the id, the
+// caption, the parse mode and a file_id with edge whitespace, for a value and a pointer item, for each caller (the
+// server checks them, plan §4).
+func TestAPI102E_SendMediaAsGiven(t *testing.T) {
+	for _, c := range api102dCallers {
+		t.Run(c.name, func(t *testing.T) {
+			ptr := sender.NewInputMediaVideo(sender.FromFileID(" V\t")).WithCaption("\tvc ").WithParseMode(" HTML\t")
+			rm := tg.InputRichMessage{Markdown: "m", Media: []tg.InputRichMessageMedia{
+				{ID: " p\t", Media: sender.NewInputMediaPhoto(sender.FromBytes([]byte("p"), "p.jpg")).WithCaption(" c\t").
+					WithParseMode("\tMarkdownV2 ")},
+				{ID: "\tq ", Media: &ptr}}}
+			mt, args, files := api102eCall(t, c, rm)
+			assert.Equal(t, "multipart/form-data", mt)
+			want := map[string]string{"rich_message": `{"markdown":"m","media":[` +
+				`{"id":" p\t","media":{"caption":" c\t","media":"attach://file0","parse_mode":"\tMarkdownV2 ","type":"photo"}},` +
+				`{"id":"\tq ","media":{"caption":"\tvc ","media":" V\t","parse_mode":" HTML\t","type":"video"}}]}`}
+			for k, v := range api102eArgs[c.name] {
+				want[k] = v
+			}
+			assertArgs(t, want, args)
+			assertFiles(t, map[string]wireFile{"file0": {FileName: "p.jpg", Data: []byte("p")}}, files)
+		})
+	}
+}

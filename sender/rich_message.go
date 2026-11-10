@@ -73,14 +73,24 @@ func (c *Client) SendRichMessageDraft(ctx context.Context, req SendRichMessageDr
 	return c.callJSON(ctx, "sendRichMessageDraft", req, nil, extractChatID(req.ChatID))
 }
 
-// validateInputRichMessage checks the spec rule "exactly one of the fields html, markdown" (Bot API 10.1). An empty
-// string counts as not used; it is not sent.
+// validateInputRichMessage checks the spec rule "exactly one of the fields html, markdown, or blocks" (Bot API 10.2).
+// An empty string or an empty blocks slice counts as not used; it is not sent.
 func validateInputRichMessage(m tg.InputRichMessage) error {
+	used := 0
+	if m.HTML != "" {
+		used++
+	}
+	if m.Markdown != "" {
+		used++
+	}
+	if len(m.Blocks) > 0 {
+		used++
+	}
 	switch {
-	case m.HTML == "" && m.Markdown == "":
-		return tg.NewValidationError("rich_message", "html or markdown required")
-	case m.HTML != "" && m.Markdown != "":
-		return tg.NewValidationError("rich_message", "use only one of html, markdown")
+	case used == 0:
+		return tg.NewValidationError("rich_message", "html, markdown or blocks required")
+	case used > 1:
+		return tg.NewValidationError("rich_message", "use only one of html, markdown, blocks")
 	}
 	return nil
 }

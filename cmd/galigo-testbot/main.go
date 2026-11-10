@@ -98,6 +98,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllAPI96Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
+	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -269,6 +270,9 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	// Bot API 10.1 (S66, S67)
 	case "api101", "api-101", "10.1":
 		scenarios = suites.AllAPI101Scenarios()
+	// Bot API 10.2 (S68)
+	case "api102", "api-102", "10.2":
+		scenarios = suites.AllAPI102Scenarios()
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -283,10 +287,11 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllAPI96Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
+		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, live-photos, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all")
 		os.Exit(1)
 	}
 
@@ -666,6 +671,9 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	// Bot API 10.1 (S66, S67)
 	case "api101", "api-101", "10.1":
 		scenarios = suites.AllAPI101Scenarios()
+	// Bot API 10.2 (S68)
+	case "api102", "api-102", "10.2":
+		scenarios = suites.AllAPI102Scenarios()
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -680,6 +688,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(scenarios, suites.AllAPI96Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
+		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
@@ -728,6 +737,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllAPI96Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
+	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -804,6 +814,9 @@ Bot API 10.0 (S51-S54, S57-S65):
 
 Bot API 10.1 (S66, S67):
   api101 - All 10.1 tests (poll option links, rich messages)
+
+Bot API 10.2 (S68):
+  api102 - All 10.2 tests (rich message blocks)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

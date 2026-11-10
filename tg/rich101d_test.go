@@ -73,6 +73,7 @@ func TestAPI101D_InputRichMessageShape(t *testing.T) {
 		{"Markdown", "string", "markdown,omitempty"},
 		{"IsRTL", "bool", "is_rtl,omitempty"},
 		{"SkipEntityDetection", "bool", "skip_entity_detection,omitempty"},
+		{"Blocks", "[]tg.InputRichBlock", "blocks,omitempty"}, // B-25 10.2d AC1
 	}, rich101dFields(t, tg.InputRichMessage{}))
 }
 

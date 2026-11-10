@@ -678,6 +678,9 @@ go run ./cmd/galigo-testbot --run live-photos            # S57-S59: Live photos
 # Bot API 10.1 scenarios (S66, S67)
 go run ./cmd/galigo-testbot --run api101                 # All 10.1 tests
 
+# Bot API 10.2 scenarios (S68)
+go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -823,6 +826,12 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S66-PollOptionLink | sendPoll | Poll whose options have links (`InputMediaLink`, multipart without files), then a poll with a link and a photo upload; each option's media kind and link URL is checked |
 | S67-RichMessage | sendRichMessage, editMessageText, sendRichMessageDraft | Rich message from markdown (the reply has a rich message and no text), edited to HTML rich content with `editMessageText`, cleaned up, then a rich draft; the draft works in private chats only, so in a group the step is skipped |
 
+#### Bot API 10.2 (S68)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S68-RichBlocks | sendRichMessage, sendRichMessageDraft | Rich message made of blocks (`InputRichMessage.Blocks`): heading, paragraph, preformatted, divider, mathematical expression, anchor, list, block quotation, pull quotation, table, details, map and footer, with blocks nested in a list item, a quotation and details; the block kinds of the reply are checked; cleaned up, then a draft with a thinking block (private chats only, so in a group the step is skipped). Collage and slideshow are proved by mock tests only: the server refuses them with text blocks only (`RICH_MESSAGE_BLOCK_UNEXPECTED`) |
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -929,6 +938,7 @@ cmd/galigo-testbot/
 │   ├── api96.go       # Bot API 9.6 (S47-S50: polls, quizzes, poll option replies, prepared buttons)
 │   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
+│   ├── api102.go      # Bot API 10.2 (S68: rich message blocks)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

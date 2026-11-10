@@ -686,5 +686,6 @@ type InputRichMessage struct {
 	Markdown            string           `json:"markdown,omitempty"`
 	IsRTL               bool             `json:"is_rtl,omitempty"`
 	SkipEntityDetection bool             `json:"skip_entity_detection,omitempty"`
-	Blocks              []InputRichBlock `json:"blocks,omitempty"`
+	Blocks              []InputRichBlock        `json:"blocks,omitempty"`
+	Media               []InputRichMessageMedia `json:"media,omitempty"`
 }

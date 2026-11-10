@@ -63,3 +63,6 @@ func S68_RichBlocks() engine.Scenario {
 func AllAPI102Scenarios() []engine.Scenario {
 	return []engine.Scenario{S68_RichBlocks()}
 }
+
+// S69_RichMedia is a stub for the red record (TEST-PLAN §7).
+func S69_RichMedia() engine.Scenario { return &engine.BaseScenario{} }

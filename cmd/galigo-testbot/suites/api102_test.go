@@ -23,7 +23,7 @@ var s68Kinds = []string{"heading", "paragraph", "pre", "divider", "mathematical_
 // T-tb-1: the 10.2 suite is S68, with its covered methods and these exact steps (whole values through viewSteps).
 func TestAPI102Scenarios(t *testing.T) {
 	got := AllAPI102Scenarios()
-	require.Len(t, got, 1)
+	require.Len(t, got, 2) // B-25 10.2e: S69 (TestAPI102E_S69Steps)
 	assert.Equal(t, "S68-RichBlocks", got[0].Name())
 	assert.Equal(t, []string{"sendRichMessage", "sendRichMessageDraft"}, got[0].Covers())
 	text := func(s string) tg.RichText { return tg.RichText{Plain: s} }

@@ -122,13 +122,16 @@ func TestAPI102D_Marker(t *testing.T) {
 			receivers[fd.Name.Name] = append(receivers[fd.Name.Name], id.Name)
 		}
 	}
-	var want16 []string
+	var want []string
 	for _, k := range rich102dKinds {
-		want16 = append(want16, k.goType)
+		want = append(want, k.goType)
 	}
-	slices.Sort(want16)
+	for _, k := range rich102eKinds { // B-25 10.2e: the five media blocks
+		want = append(want, k.goType)
+	}
+	slices.Sort(want)
 	slices.Sort(receivers["inputRichBlock"])
-	assert.Equal(t, want16, receivers["inputRichBlock"], "the types that declare inputRichBlock")
+	assert.Equal(t, want, receivers["inputRichBlock"], "the types that declare inputRichBlock")
 	slices.Sort(receivers["inputRichBlockChildren"])
 	assert.Equal(t, []string{"InputRichBlockBlockQuotation", "InputRichBlockCollage", "InputRichBlockDetails",
 		"InputRichBlockList", "InputRichBlockSlideshow"}, receivers["inputRichBlockChildren"],

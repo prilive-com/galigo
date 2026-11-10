@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 // FilePart represents a file to be uploaded via multipart.
@@ -154,6 +156,16 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 			formOnly = formOnly || needsForm
+
+		case tg.InputRichMessage: // Bot API 10.2: uploads in Media
+			if err := handleRichMessage(&result, fieldName, v, &attachIdx); err != nil {
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
+			}
+
+		case *tg.InputRichMessage: // nil is skipped above
+			if err := handleRichMessage(&result, fieldName, *v, &attachIdx); err != nil {
+				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
+			}
 
 		case string:
 			result.Params[fieldName] = v

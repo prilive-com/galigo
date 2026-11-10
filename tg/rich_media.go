@@ -53,27 +53,32 @@ type InputRichBlockVoiceNote struct {
 
 // MarshalJSON encodes the block with "type":"animation".
 func (b InputRichBlockAnimation) MarshalJSON() ([]byte, error) {
-	return []byte("{}"), nil // stub
+	type t InputRichBlockAnimation
+	return marshalInputRichBlock("animation", t(b))
 }
 
 // MarshalJSON encodes the block with "type":"audio".
 func (b InputRichBlockAudio) MarshalJSON() ([]byte, error) {
-	return []byte("{}"), nil // stub
+	type t InputRichBlockAudio
+	return marshalInputRichBlock("audio", t(b))
 }
 
 // MarshalJSON encodes the block with "type":"photo".
 func (b InputRichBlockPhoto) MarshalJSON() ([]byte, error) {
-	return []byte("{}"), nil // stub
+	type t InputRichBlockPhoto
+	return marshalInputRichBlock("photo", t(b))
 }
 
 // MarshalJSON encodes the block with "type":"video".
 func (b InputRichBlockVideo) MarshalJSON() ([]byte, error) {
-	return []byte("{}"), nil // stub
+	type t InputRichBlockVideo
+	return marshalInputRichBlock("video", t(b))
 }
 
 // MarshalJSON encodes the block with "type":"voice_note".
 func (b InputRichBlockVoiceNote) MarshalJSON() ([]byte, error) {
-	return []byte("{}"), nil // stub
+	type t InputRichBlockVoiceNote
+	return marshalInputRichBlock("voice_note", t(b))
 }
 
 func (InputRichBlockAnimation) inputRichBlock() {}

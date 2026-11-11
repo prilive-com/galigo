@@ -24,22 +24,23 @@ import (
 // b50User is above 2^32, so a 32-bit truncation shows in the body.
 const b50User = int64(5000000001)
 
-// b50Methods calls each new method; every row runs for both. notPending is the error Telegram gives the method
-// when the user has no pending join request (measured 2026-11-11).
+// b50Methods calls each new method; every row runs for both.
 var b50Methods = []struct {
-	method     string
-	notPending string
-	call       func(context.Context, *sender.Client, tg.ChatID, int64) error
+	method string
+	call   func(context.Context, *sender.Client, tg.ChatID, int64) error
 }{
-	{"approveChatJoinRequest", "Bad Request: USER_ALREADY_PARTICIPANT",
-		func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
-			return c.ApproveChatJoinRequest(ctx, chat, user)
-		}},
-	{"declineChatJoinRequest", "Bad Request: HIDE_REQUESTER_MISSING",
-		func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
-			return c.DeclineChatJoinRequest(ctx, chat, user)
-		}},
+	{"approveChatJoinRequest", func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
+		return c.ApproveChatJoinRequest(ctx, chat, user)
+	}},
+	{"declineChatJoinRequest", func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
+		return c.DeclineChatJoinRequest(ctx, chat, user)
+	}},
 }
+
+// b50Texts are the 400 texts Telegram returned on 2026-11-11 when a bot approved (USER_ALREADY_PARTICIPANT) and
+// declined (HIDE_REQUESTER_MISSING) a request for its own id: a chat member with no pending request. U4 gives
+// each method both texts, so neither method may turn either text into success.
+var b50Texts = []string{"Bad Request: USER_ALREADY_PARTICIPANT", "Bad Request: HIDE_REQUESTER_MISSING"}
 
 // U1: the request for each method and chat id kind.
 func TestB50_U1_Body(t *testing.T) {
@@ -123,23 +124,25 @@ func TestB50_U3_ValidEdges(t *testing.T) {
 	}
 }
 
-// U4: an API error is a *tg.APIError with the method name; each method gets its own measured text.
+// U4: an API error is a *tg.APIError with the method name, for each method and each measured text.
 func TestB50_U4_APIError(t *testing.T) {
 	for _, m := range b50Methods {
-		t.Run(m.method, func(t *testing.T) {
-			server := testutil.NewMockServer(t)
-			server.On(api101bPath(m.method), func(w http.ResponseWriter, _ *http.Request) {
-				testutil.ReplyError(w, 400, m.notPending, nil)
+		for _, text := range b50Texts {
+			t.Run(m.method+"/"+text, func(t *testing.T) {
+				server := testutil.NewMockServer(t)
+				server.On(api101bPath(m.method), func(w http.ResponseWriter, _ *http.Request) {
+					testutil.ReplyError(w, 400, text, nil)
+				})
+				client := testutil.NewTestClient(t, server.BaseURL())
+				err := m.call(context.Background(), client, api100Chat, b50User)
+				var apiErr *tg.APIError
+				require.True(t, errors.As(err, &apiErr), "error %v", err)
+				assert.Equal(t, 400, apiErr.Code)
+				assert.Equal(t, text, apiErr.Description)
+				assert.Equal(t, m.method, apiErr.Method)
+				assert.Equal(t, 1, server.CaptureCount())
 			})
-			client := testutil.NewTestClient(t, server.BaseURL())
-			err := m.call(context.Background(), client, api100Chat, b50User)
-			var apiErr *tg.APIError
-			require.True(t, errors.As(err, &apiErr), "error %v", err)
-			assert.Equal(t, 400, apiErr.Code)
-			assert.Equal(t, m.notPending, apiErr.Description)
-			assert.Equal(t, m.method, apiErr.Method)
-			assert.Equal(t, 1, server.CaptureCount())
-		})
+		}
 	}
 }
 
@@ -148,13 +151,21 @@ func TestB50_U5_NoRetry(t *testing.T) {
 	sets := []struct {
 		name  string
 		first func(http.ResponseWriter)
-		check func(*testing.T, error)
+		check func(*testing.T, string, error)
 	}{
 		{"502", func(w http.ResponseWriter) { testutil.ReplyServerError(w, http.StatusBadGateway, "Bad Gateway") },
-			func(t *testing.T, err error) { require.Error(t, err) }},
-		// the 429 error carries its sentinel through errors.Is (AC4)
+			func(t *testing.T, _ string, err error) { require.Error(t, err) }},
+		// the 429 error is the *tg.APIError with its details, and carries its sentinel through errors.Is (AC4)
 		{"429", func(w http.ResponseWriter) { testutil.ReplyRateLimit(w, 1) },
-			func(t *testing.T, err error) { require.ErrorIs(t, err, tg.ErrTooManyRequests) }},
+			func(t *testing.T, method string, err error) {
+				require.ErrorIs(t, err, tg.ErrTooManyRequests)
+				var apiErr *tg.APIError
+				require.True(t, errors.As(err, &apiErr), "error %v", err)
+				assert.Equal(t, 429, apiErr.Code)
+				assert.Equal(t, method, apiErr.Method)
+				assert.Equal(t, "Too Many Requests: retry after 1", apiErr.Description)
+				assert.Equal(t, time.Second, apiErr.RetryAfter)
+			}},
 	}
 	for _, set := range sets {
 		t.Run(set.name, func(t *testing.T) {
@@ -178,7 +189,7 @@ func TestB50_U5_NoRetry(t *testing.T) {
 				sender.WithGroupRateLimit(1000, 100), sender.WithPerChatRateLimit(1000, 100))
 			for _, m := range b50Methods {
 				server.ResetCaptures()
-				set.check(t, m.call(context.Background(), client, api100Chat, b50User))
+				set.check(t, m.method, m.call(context.Background(), client, api100Chat, b50User))
 				assert.Equal(t, 1, server.CaptureCount(), "%s: exactly one request", m.method)
 			}
 			assert.Equal(t, 0, sleeper.CallCount(), "no backoff sleep before the control")

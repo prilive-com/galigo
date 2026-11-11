@@ -612,11 +612,14 @@ func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.M
 }
 
 func (c *Client) executeRequest(ctx context.Context, method string, payload any, chatIDs ...string) (*apiResponse, error) {
-	// Apply rate limiting if a chatID is provided
+	// Every request waits on the global limiter; a request with a chat id
+	// also waits on that chat's limiter first (B-51).
 	if len(chatIDs) > 0 && chatIDs[0] != "" {
 		if err := c.waitForRateLimit(ctx, chatIDs[0]); err != nil {
 			return nil, err
 		}
+	} else if err := c.globalLimiter.Wait(ctx); err != nil {
+		return nil, err
 	}
 	return c.breaker.Execute(func() (*apiResponse, error) {
 		return c.doRequest(ctx, method, payload)

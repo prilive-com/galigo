@@ -52,7 +52,7 @@ if errors.Is(err, tg.ErrBotBlocked) {
 |-------|---------|-------------------|
 | `ErrCircuitOpen` | Circuit breaker is open | Service degraded — galigo will recover automatically after 30s |
 | `ErrMaxRetries` | All retry attempts exhausted | Log failure, increment error counter, alert if sustained |
-| `ErrRateLimited` | Local rate limiter blocked request | Request queued — wait for next available slot |
+| `ErrRateLimited` | Defined for compatibility; the local limiter does not return it | A local limiter refusal returns the `rate` package's error or the context's error (`ctx.Err()`) |
 | `ErrResponseTooLarge` | Response exceeded size limit | Log, investigate large response |
 
 ### Validation Errors

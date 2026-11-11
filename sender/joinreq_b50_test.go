@@ -24,17 +24,21 @@ import (
 // b50User is above 2^32, so a 32-bit truncation shows in the body.
 const b50User = int64(5000000001)
 
-// b50Methods calls each new method; every row runs for both.
+// b50Methods calls each new method; every row runs for both. notPending is the error Telegram gives the method
+// when the user has no pending join request (measured 2026-11-11).
 var b50Methods = []struct {
-	method string
-	call   func(context.Context, *sender.Client, tg.ChatID, int64) error
+	method     string
+	notPending string
+	call       func(context.Context, *sender.Client, tg.ChatID, int64) error
 }{
-	{"approveChatJoinRequest", func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
-		return c.ApproveChatJoinRequest(ctx, chat, user)
-	}},
-	{"declineChatJoinRequest", func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
-		return c.DeclineChatJoinRequest(ctx, chat, user)
-	}},
+	{"approveChatJoinRequest", "Bad Request: USER_ALREADY_PARTICIPANT",
+		func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
+			return c.ApproveChatJoinRequest(ctx, chat, user)
+		}},
+	{"declineChatJoinRequest", "Bad Request: HIDE_REQUESTER_MISSING",
+		func(ctx context.Context, c *sender.Client, chat tg.ChatID, user int64) error {
+			return c.DeclineChatJoinRequest(ctx, chat, user)
+		}},
 }
 
 // U1: the request for each method and chat id kind.
@@ -98,33 +102,41 @@ func TestB50_U2_Validation(t *testing.T) {
 	}
 }
 
-// U3: the smallest valid values are sent.
+// U3: the smallest valid values are sent as given.
 func TestB50_U3_ValidEdges(t *testing.T) {
+	chats := []struct {
+		chat tg.ChatID
+		want string
+	}{
+		{int64(1), `{"chat_id":1,"user_id":1}`},
+		{"@a", `{"chat_id":"@a","user_id":1}`},
+	}
 	for _, m := range b50Methods {
-		for _, chat := range []tg.ChatID{int64(1), "@a"} {
+		for _, c := range chats {
 			server := testutil.NewMockServer(t)
 			api101bOK(server, "approveChatJoinRequest", "declineChatJoinRequest")
 			client := testutil.NewTestClient(t, server.BaseURL())
-			require.NoError(t, m.call(context.Background(), client, chat, 1), "%s %v", m.method, chat)
-			assert.Equal(t, 1, server.CaptureCount(), "%s %v", m.method, chat)
+			require.NoError(t, m.call(context.Background(), client, c.chat, 1), "%s %v", m.method, c.chat)
+			require.Equal(t, 1, server.CaptureCount(), "%s %v", m.method, c.chat)
+			assert.JSONEq(t, c.want, string(server.LastCapture().Body), "%s %v", m.method, c.chat)
 		}
 	}
 }
 
-// U4: an API error is a *tg.APIError with the method name.
+// U4: an API error is a *tg.APIError with the method name; each method gets its own measured text.
 func TestB50_U4_APIError(t *testing.T) {
 	for _, m := range b50Methods {
 		t.Run(m.method, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
 			server.On(api101bPath(m.method), func(w http.ResponseWriter, _ *http.Request) {
-				testutil.ReplyError(w, 400, "Bad Request: USER_ALREADY_PARTICIPANT", nil)
+				testutil.ReplyError(w, 400, m.notPending, nil)
 			})
 			client := testutil.NewTestClient(t, server.BaseURL())
 			err := m.call(context.Background(), client, api100Chat, b50User)
 			var apiErr *tg.APIError
 			require.True(t, errors.As(err, &apiErr), "error %v", err)
 			assert.Equal(t, 400, apiErr.Code)
-			assert.Equal(t, "Bad Request: USER_ALREADY_PARTICIPANT", apiErr.Description)
+			assert.Equal(t, m.notPending, apiErr.Description)
 			assert.Equal(t, m.method, apiErr.Method)
 			assert.Equal(t, 1, server.CaptureCount())
 		})

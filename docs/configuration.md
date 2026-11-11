@@ -60,6 +60,10 @@ galigo enforces Telegram's rate limits automatically.
 
 **Per-chat limiters** are created on-demand and cleaned up after 10 minutes of inactivity to prevent memory leaks.
 
+**Which requests wait.** The global limiter applies to every request a `sender.Client` sends. The per-chat limiter applies only to requests with a chat id. The global limiter does not apply to `receiver` traffic (its `getUpdates` calls and webhook requests).
+
+**A rate of 0 does not turn the limiter off.** With `WithRateLimit(0, burst)` the first `burst` requests pass. After that, a request waits until its context ends, or fails at once if its context has a deadline. With a burst of 0 every request fails at once. To raise or remove the limit, pass a high rate, for example `WithRateLimit(1000, 100)`.
+
 ## Retry Strategy
 
 | Parameter | Value |

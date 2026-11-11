@@ -347,16 +347,26 @@ func TestAPI101B_NoRetryNetworkError(t *testing.T) {
 	assert.GreaterOrEqual(t, rt.n.Load(), int32(2), "the control call is retried")
 }
 
-// T-s-9: a chat-less call waits on no limiter (plan AC6; pins today's behaviour, B-51 would change this row).
-func TestAPI101B_NoRateLimit(t *testing.T) {
+// T-s-9: a chat-less call waits on the global limiter (B-51; this row replaces TestAPI101B_NoRateLimit, which pinned
+// the behaviour before B-51).
+func TestAPI101B_GlobalRateLimit(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	api101bOK(server, "answerChatJoinRequestQuery", "sendChatJoinRequestWebApp", "sendMessage")
 	client := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(0, 0))
 	for _, m := range api101bMethods {
 		server.ResetCaptures()
-		require.NoError(t, m.call(context.Background(), client), m.method)
-		require.NoError(t, m.call(context.Background(), client), m.method)
-		assert.Equal(t, 2, server.CaptureCount(), "%s: two requests", m.method)
+		err := m.call(context.Background(), client)
+		require.Error(t, err, m.method)
+		assert.EqualError(t, err, "rate: Wait(n=1) exceeds limiter's burst 0", m.method)
+		assert.Equal(t, 0, server.CaptureCount(), "%s: no request", m.method)
+	}
+
+	// positive control: the same methods on a client with a high limit send one request each
+	high := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(1000, 100))
+	for _, m := range api101bMethods {
+		server.ResetCaptures()
+		require.NoError(t, m.call(context.Background(), high), m.method)
+		assert.Equal(t, 1, server.CaptureCount(), "%s: one request", m.method)
 	}
 
 	// control, last: a call with a chat id waits on the global limiter, which has burst 0

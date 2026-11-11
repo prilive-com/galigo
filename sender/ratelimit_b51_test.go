@@ -174,7 +174,7 @@ func TestB51_RefusalIsNotBreakerFailure(t *testing.T) {
 			s := b51Server(t)
 			c := testutil.NewBreakerTestClient(t, s.BaseURL(), sender.WithRateLimit(0, 0),
 				sender.WithPerChatRateLimit(1000, 100), sender.WithGroupRateLimit(1000, 100))
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				err := b51Call(t, b51Ctx(t), c, cl)
 				require.Error(t, err, "call %d", i+1)
 				assert.EqualError(t, err, b51Burst0, "call %d", i+1)
@@ -209,11 +209,11 @@ func TestB51_Concurrent(t *testing.T) {
 	const workers, calls = 16, 20
 	var wg sync.WaitGroup
 	errs := make(chan error, workers*calls)
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			for i := 0; i < calls; i++ {
+			for i := range calls {
 				ctx, cancel := context.WithTimeout(context.Background(), b51Deadline)
 				errs <- b51Classes[(w+i)%len(b51Classes)].call(ctx, c)
 				cancel()
@@ -233,7 +233,7 @@ func TestB51_RealWait(t *testing.T) {
 	s := b51Server(t)
 	c := b51Client(t, s, 10, 1)
 	start := time.Now()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		require.NoError(t, b51Call(t, b51Ctx(t), c, b51Classes[0]))
 	}
 	assert.GreaterOrEqual(t, time.Since(start), 180*time.Millisecond)
@@ -265,7 +265,7 @@ func TestB51_BreakerOpenTakesToken(t *testing.T) {
 	c := testutil.NewBreakerTestClient(t, s.BaseURL(), sender.WithRateLimit(0.001, 3),
 		sender.WithPerChatRateLimit(1000, 100), sender.WithGroupRateLimit(1000, 100))
 	getMe := b51Classes[0]
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		err := b51Call(t, b51Ctx(t), c, getMe)
 		var apiErr *tg.APIError
 		require.ErrorAs(t, err, &apiErr, "call %d", i+1)

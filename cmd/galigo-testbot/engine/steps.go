@@ -358,10 +358,10 @@ func (s *CleanupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, er
 			rt.cleanupCarry[k] = evCount(ev, k)
 		}
 		// errors.Join keeps each *tg.APIError. The runner repeats a step only when the first *tg.APIError that
-		// errors.As finds is a 429, so 429s go first, the longest RetryAfter first (B-30). Evidence keeps item order.
-		order := slices.Clone(failed)
-		slices.SortStableFunc(order, func(a, b error) int { return cmp.Compare(retryAfter429(b), retryAfter429(a)) })
-		return result, fmt.Errorf("cleanup: %w", errors.Join(order...))
+		// errors.As finds is a 429, so 429s go first, the longest RetryAfter first (B-30). Sorting in place is safe:
+		// deleteTracked already wrote the evidence lines in item order.
+		slices.SortStableFunc(failed, func(a, b error) int { return cmp.Compare(retryAfter429(b), retryAfter429(a)) })
+		return result, fmt.Errorf("cleanup: %w", errors.Join(failed...))
 	}
 	return result, nil
 }

@@ -867,7 +867,7 @@ func TestB30_C12_TagPairs(t *testing.T) {
 		assert.Equal(t, []string{"tag:-1001/555/t", "tag:-1001/777/t", "tag:-1001/555/", "tag:-1001/777/"}, f.keys())
 		assert.Equal(t, map[string]any{"deleted_count": 0, "tags_cleared": 1}, evMap(t, *sr))
 	})
-	t.Run("second cleared first kept", func(t *testing.T) { // [t3a] A-T3-02 = O-T3-02
+	t.Run("second cleared first kept", func(t *testing.T) { // [t3a] register A-T3-02 and O-T3-02
 		f := newB30Fake()
 		rt := b30RT(f)
 		tag(t, rt, b30Chat, 555, "t")

@@ -400,7 +400,7 @@ func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[st
 		failed = append(failed, fmt.Errorf("%s: %w", label, err))
 		var apiErr *tg.APIError
 		permanent := errors.As(err, &apiErr) && !apiErr.IsRetryable()
-		return false, !(dropPermanent && permanent)
+		return false, !dropPermanent || !permanent
 	}
 
 	msgs := 0

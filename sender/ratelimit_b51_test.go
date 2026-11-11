@@ -310,8 +310,9 @@ func TestB51_BlockedWaitDoesNotBlockOthers(t *testing.T) {
 	}
 }
 
-// R14 (T2-01, E-0143): a census of the chat-less methods named in PLAN §2 and §8: with a zero limiter each one is
-// refused before any request, so no method can be exempt from the global wait.
+// R14 (T2-01, E-0143): a census of the chat-less methods named in PLAN §2 and §8, plus the two payment answers
+// (C1-02): with a zero limiter each one is refused before any request, so none of these methods is exempt from the
+// global wait.
 func TestB51_ChatLessMethodsCensus(t *testing.T) {
 	census := []b51Class{
 		{"logOut", func(ctx context.Context, c *sender.Client) error { return c.LogOut(ctx) }},
@@ -339,6 +340,12 @@ func TestB51_ChatLessMethodsCensus(t *testing.T) {
 		{"setGameScore inline", func(ctx context.Context, c *sender.Client) error {
 			_, err := c.SetGameScore(ctx, sender.SetGameScoreRequest{UserID: 5000000001, Score: 1, InlineMessageID: "i"})
 			return err
+		}},
+		{"answerShippingQuery", func(ctx context.Context, c *sender.Client) error {
+			return c.AnswerShippingQuery(ctx, sender.AnswerShippingQueryRequest{ShippingQueryID: "q", ErrorMessage: "e"})
+		}},
+		{"answerPreCheckoutQuery", func(ctx context.Context, c *sender.Client) error {
+			return c.AnswerPreCheckoutQuery(ctx, sender.AnswerPreCheckoutQueryRequest{PreCheckoutQueryID: "q", OK: true})
 		}},
 	}
 	for _, cl := range census {

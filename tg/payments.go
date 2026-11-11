@@ -99,12 +99,13 @@ type TransactionPartner interface {
 
 // TransactionPartnerUser represents a transaction with a user.
 type TransactionPartnerUser struct {
-	Type               string `json:"type"` // Always "user"
-	User               User   `json:"user"`
-	InvoicePayload     string `json:"invoice_payload,omitempty"`
-	PaidMediaPayload   string `json:"paid_media_payload,omitempty"`
-	SubscriptionPeriod int    `json:"subscription_period,omitempty"`
-	Gift               *Gift  `json:"gift,omitempty"`
+	Type               string      `json:"type"` // Always "user"
+	User               User        `json:"user"`
+	InvoicePayload     string      `json:"invoice_payload,omitempty"`
+	PaidMediaPayload   string      `json:"paid_media_payload,omitempty"`
+	SubscriptionPeriod int         `json:"subscription_period,omitempty"`
+	PaidMedia          []PaidMedia `json:"paid_media,omitempty"` // 7.9: the paid media bought, for paid media payments
+	Gift               *Gift       `json:"gift,omitempty"`
 }
 
 func (TransactionPartnerUser) transactionPartnerTag() {}

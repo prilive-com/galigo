@@ -24,7 +24,7 @@ type TextQuote struct {
 }
 
 // ExternalReplyInfo describes the message a message replies to, which may come from another chat
-// or forum topic (Bot API 7.0). The fields paid_media (7.6) and widget (10.4) are not supported yet.
+// or forum topic (Bot API 7.0). The field widget (10.4) is not supported yet.
 // Story and Checklist use the existing tg.Story and tg.Checklist types, which do not yet match the spec in
 // every field.
 type ExternalReplyInfo struct {
@@ -36,6 +36,7 @@ type ExternalReplyInfo struct {
 	Audio              *Audio              `json:"audio,omitempty"`
 	Document           *Document           `json:"document,omitempty"`
 	LivePhoto          *LivePhoto          `json:"live_photo,omitempty"` // 10.0
+	PaidMedia          *PaidMediaInfo      `json:"paid_media,omitempty"` // 7.6
 	Photo              []PhotoSize         `json:"photo,omitempty"`
 	Sticker            *Sticker            `json:"sticker,omitempty"`
 	Story              *Story              `json:"story,omitempty"`

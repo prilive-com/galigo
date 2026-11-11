@@ -51,3 +51,32 @@ func (c *Client) SendChatJoinRequestWebApp(ctx context.Context, req SendChatJoin
 	}
 	return c.callJSON(ctx, "sendChatJoinRequestWebApp", req, nil)
 }
+
+// chatJoinRequestDecision is the body of approveChatJoinRequest and declineChatJoinRequest.
+type chatJoinRequestDecision struct {
+	ChatID tg.ChatID `json:"chat_id"`
+	UserID int64     `json:"user_id"`
+}
+
+// ApproveChatJoinRequest approves a chat join request (Bot API 5.4); see tg.ChatJoinRequest. The bot must be an
+// administrator in the chat with the can_invite_users right. It is not retried.
+func (c *Client) ApproveChatJoinRequest(ctx context.Context, chatID tg.ChatID, userID int64) error {
+	return c.decideChatJoinRequest(ctx, "approveChatJoinRequest", chatID, userID)
+}
+
+// DeclineChatJoinRequest declines a chat join request (Bot API 5.4); see tg.ChatJoinRequest. The bot must be an
+// administrator in the chat with the can_invite_users right. It is not retried.
+func (c *Client) DeclineChatJoinRequest(ctx context.Context, chatID tg.ChatID, userID int64) error {
+	return c.decideChatJoinRequest(ctx, "declineChatJoinRequest", chatID, userID)
+}
+
+// decideChatJoinRequest validates the ids and sends approveChatJoinRequest or declineChatJoinRequest.
+func (c *Client) decideChatJoinRequest(ctx context.Context, method string, chatID tg.ChatID, userID int64) error {
+	if err := validateChatID(chatID); err != nil {
+		return err
+	}
+	if err := validateUserID(userID); err != nil {
+		return err
+	}
+	return c.callJSON(ctx, method, chatJoinRequestDecision{ChatID: chatID, UserID: userID}, nil, extractChatID(chatID))
+}

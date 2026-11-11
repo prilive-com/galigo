@@ -106,6 +106,10 @@ var AllMethods = []Method{
 	// Forum
 	{Name: "getForumTopicIconStickers", Category: CategoryChatAdmin},
 
+	// Join requests (Bot API 5.4)
+	{Name: "approveChatJoinRequest", Category: CategoryChatAdmin, Notes: "needs a pending join request (second account)"},
+	{Name: "declineChatJoinRequest", Category: CategoryChatAdmin, Notes: "needs a pending join request (second account)"},
+
 	// === Extended: Stickers ===
 	{Name: "createNewStickerSet", Category: CategoryExtended},
 	{Name: "getStickerSet", Category: CategoryExtended},

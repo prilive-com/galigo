@@ -77,6 +77,22 @@ func TestAPI101Scenarios(t *testing.T) {
 				Notes: "needs a join request query (guard bot)"}, found[0])
 		}
 	})
+
+	// B-50 R1: approveChatJoinRequest and declineChatJoinRequest are in the registry, once each, with no scenario
+	// (a real decision needs a pending join request from a second account).
+	t.Run("registry_join_request_decisions", func(t *testing.T) {
+		for _, name := range []string{"approveChatJoinRequest", "declineChatJoinRequest"} {
+			var found []registry.Method
+			for _, m := range registry.AllMethods {
+				if m.Name == name {
+					found = append(found, m)
+				}
+			}
+			require.Len(t, found, 1, name)
+			assert.Equal(t, registry.Method{Name: name, Category: registry.CategoryChatAdmin,
+				Notes: "needs a pending join request (second account)"}, found[0])
+		}
+	})
 }
 
 // fake101dGroup runs S67 on the real runner as in a group: send and edit return a rich message, the draft is refused

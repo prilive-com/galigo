@@ -49,6 +49,7 @@ type Message struct {
 	CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`
 	Photo                 []PhotoSize           `json:"photo,omitempty"`
 	Document              *Document             `json:"document,omitempty"`
+	PaidMedia             *PaidMediaInfo        `json:"paid_media,omitempty"` // 7.6
 	Animation             *Animation            `json:"animation,omitempty"`
 	Video                 *Video                `json:"video,omitempty"`
 	LivePhoto             *LivePhoto            `json:"live_photo,omitempty"` // 10.0; Photo is also set (spec)

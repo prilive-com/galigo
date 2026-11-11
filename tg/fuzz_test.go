@@ -10,6 +10,7 @@ import (
 func FuzzUnmarshalTransactionPartner(f *testing.F) {
 	// Seeds: valid types, unknown type, edge cases
 	f.Add([]byte(`{"type":"user","user":{"id":1,"is_bot":false,"first_name":"A"}}`))
+	f.Add([]byte(`{"type":"user","user":{"id":1,"is_bot":false,"first_name":"A"},"paid_media":[{"type":"photo","photo":[]},{"type":"x","width":"w"}]}`))
 	f.Add([]byte(`{"type":"fragment","withdrawal_state":{"type":"pending"}}`))
 	f.Add([]byte(`{"type":"telegram_ads"}`))
 	f.Add([]byte(`{"type":"telegram_api","request_count":1}`))
@@ -76,6 +77,7 @@ func FuzzChatBoostUnmarshalJSON(f *testing.F) {
 func FuzzStarTransactionUnmarshalJSON(f *testing.F) {
 	f.Add([]byte(`{"id":"tx1","amount":100,"date":1,"source":{"type":"user","user":{"id":1,"is_bot":false,"first_name":"A"}}}`))
 	f.Add([]byte(`{"id":"tx2","amount":0,"date":0,"source":null,"receiver":null}`))
+	f.Add([]byte(`{"id":"tx3","amount":1,"date":1,"source":{"type":"user","user":{"id":1,"is_bot":false,"first_name":"A"},"paid_media":[{"type":"video","video":{"file_id":"v","file_unique_id":"u","width":1,"height":1,"duration":1}},{"type":"photo","photo":"x"}]}}`))
 	f.Add([]byte(`{}`))
 	f.Add([]byte(`null`))
 	f.Add([]byte(`{invalid`))

@@ -38,6 +38,7 @@ const (
 		`"audio":{"file_id":"au","file_unique_id":"auu","duration":1},` +
 		`"document":{"file_id":"do","file_unique_id":"dou"},` +
 		`"live_photo":{"photo":[{"file_id":"lp","file_unique_id":"lpu","width":1,"height":1}],"file_id":"lv","file_unique_id":"lvu","width":1,"height":1,"duration":1},` +
+		`"paid_media":{"star_count":3,"paid_media":[{"type":"preview","width":5}]},` +
 		`"photo":[{"file_id":"ph","file_unique_id":"phu","width":2,"height":2}],` +
 		`"sticker":{"file_id":"st","file_unique_id":"stu","type":"regular","width":1,"height":1,"is_animated":false,"is_video":false},` +
 		`"story":{"chat":{"id":-1009876543210,"type":"channel"},"id":9},` +
@@ -222,6 +223,10 @@ func TestB48A_ExternalFull(t *testing.T) {
 	assert.Equal(t, "lv", e.LivePhoto.FileID)
 	require.Len(t, e.LivePhoto.Photo, 1)
 	assert.Equal(t, "lp", e.LivePhoto.Photo[0].FileID)
+	require.NotNil(t, e.PaidMedia) // B-48b1
+	assert.Equal(t, 3, e.PaidMedia.StarCount)
+	require.Len(t, e.PaidMedia.PaidMedia, 1)
+	assert.Equal(t, 5, e.PaidMedia.PaidMedia[0].Width)
 	require.Len(t, e.Photo, 1)
 	assert.Equal(t, "ph", e.Photo[0].FileID)
 	require.NotNil(t, e.Sticker)
@@ -268,13 +273,13 @@ func TestB48A_ExternalFull(t *testing.T) {
 	assert.JSONEq(t, b48aOriginChannel, string(keys["origin"]))
 }
 
-// T-eri-2: the left-out keys (paid_media: B-48b; widget, rich_texts: 10.4) decode leniently and have no field.
+// T-eri-2: the left-out keys (widget, rich_texts: 10.4) decode leniently and have no field. (paid_media has a field
+// since B-48b1: tg/paid_media_b48b_test.go T-hold-2.)
 func TestB48A_LeftOut(t *testing.T) {
 	for _, tc := range []struct {
 		name, in, key string
 		v             func() any
 	}{
-		{"paid_media", `{"origin":{"type":"user","date":1},"paid_media":{"star_count":1,"paid_media":[]}}`, "paid_media", func() any { return &tg.ExternalReplyInfo{} }},
 		{"widget", `{"origin":{"type":"user","date":1},"widget":{"id":"w"}}`, "widget", func() any { return &tg.ExternalReplyInfo{} }},
 		{"rich_texts", `{"text":"a","position":0,"rich_texts":["a"]}`, "rich_texts", func() any { return &tg.TextQuote{} }},
 	} {
@@ -382,7 +387,7 @@ var b48aSpecKeys = map[string][]string{
 	"MessageOrigin": {"type", "date", "sender_user", "sender_user_name", "sender_chat", "author_signature", "chat", "message_id"},
 	"TextQuote":     {"text", "entities", "position", "is_manual"},
 	"ExternalReplyInfo": {"origin", "chat", "message_id", "link_preview_options", "animation", "audio", "document", "live_photo",
-		"photo", "sticker", "story", "video", "video_note", "voice", "has_media_spoiler", "checklist", "contact", "dice", "game",
+		"paid_media", "photo", "sticker", "story", "video", "video_note", "voice", "has_media_spoiler", "checklist", "contact", "dice", "game",
 		"giveaway", "giveaway_winners", "invoice", "location", "poll", "venue"},
 	"Giveaway": {"chats", "winners_selection_date", "winner_count", "only_new_members", "has_public_winners", "prize_description",
 		"country_codes", "prize_star_count", "premium_subscription_month_count"},
@@ -415,7 +420,7 @@ func TestB48A_Shapes(t *testing.T) {
 			{"LinkPreviewOptions", "*tg.LinkPreviewOptions", "link_preview_options,omitempty"},
 			{"Animation", "*tg.Animation", "animation,omitempty"}, {"Audio", "*tg.Audio", "audio,omitempty"},
 			{"Document", "*tg.Document", "document,omitempty"}, {"LivePhoto", "*tg.LivePhoto", "live_photo,omitempty"},
-			{"Photo", "[]tg.PhotoSize", "photo,omitempty"}, {"Sticker", "*tg.Sticker", "sticker,omitempty"},
+			{"PaidMedia", "*tg.PaidMediaInfo", "paid_media,omitempty"}, {"Photo", "[]tg.PhotoSize", "photo,omitempty"}, {"Sticker", "*tg.Sticker", "sticker,omitempty"},
 			{"Story", "*tg.Story", "story,omitempty"}, {"Video", "*tg.Video", "video,omitempty"},
 			{"VideoNote", "*tg.VideoNote", "video_note,omitempty"}, {"Voice", "*tg.Voice", "voice,omitempty"},
 			{"HasMediaSpoiler", "bool", "has_media_spoiler,omitempty"}, {"Checklist", "*tg.Checklist", "checklist,omitempty"},

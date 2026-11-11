@@ -3,6 +3,8 @@ package sender_test
 import (
 	"context"
 	"net/http"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -98,17 +100,23 @@ func b51Ctx(t *testing.T) context.Context {
 	return ctx
 }
 
-// R1: a zero limiter refuses every class before any request.
+// R1: a zero limiter refuses every class before any request, with a long and with a short deadline (C2-04: the
+// deadline is an input class too, so a fast lane for short deadlines fails here).
 func TestB51_ZeroLimiterRefusesEveryClass(t *testing.T) {
+	deadlines := []time.Duration{b51Deadline, 100 * time.Millisecond}
 	for _, cl := range b51Classes {
-		t.Run(cl.name, func(t *testing.T) {
-			s := b51Server(t)
-			c := b51Client(t, s, 0, 0)
-			err := b51Call(t, b51Ctx(t), c, cl)
-			require.Error(t, err)
-			assert.EqualError(t, err, b51Burst0)
-			assert.Equal(t, 0, s.CaptureCount(), "no request")
-		})
+		for _, d := range deadlines {
+			t.Run(cl.name+" "+d.String(), func(t *testing.T) {
+				s := b51Server(t)
+				c := b51Client(t, s, 0, 0)
+				ctx, cancel := context.WithTimeout(context.Background(), d)
+				defer cancel()
+				err := b51Call(t, ctx, c, cl)
+				require.Error(t, err)
+				assert.EqualError(t, err, b51Burst0)
+				assert.Equal(t, 0, s.CaptureCount(), "no request")
+			})
+		}
 	}
 }
 
@@ -310,9 +318,10 @@ func TestB51_BlockedWaitDoesNotBlockOthers(t *testing.T) {
 	}
 }
 
-// R14 (T2-01, E-0143): a census of the chat-less methods named in PLAN §2 and §8, plus the two payment answers
-// (C1-02): with a zero limiter each one is refused before any request, so none of these methods is exempt from the
-// global wait.
+// R14 (T2-01, E-0143): a census of the chat-less methods named in PLAN §2 and §8, plus every Answer* method of
+// sender.Client (C1-02, C2-03: the time-critical answers a fast lane would touch, backlog B-79): with a zero limiter
+// each one is refused before any request, so none of these methods is exempt from the global wait. A new Answer*
+// method that is not listed here fails the guard at the end.
 func TestB51_ChatLessMethodsCensus(t *testing.T) {
 	census := []b51Class{
 		{"logOut", func(ctx context.Context, c *sender.Client) error { return c.LogOut(ctx) }},
@@ -347,6 +356,22 @@ func TestB51_ChatLessMethodsCensus(t *testing.T) {
 		{"answerPreCheckoutQuery", func(ctx context.Context, c *sender.Client) error {
 			return c.AnswerPreCheckoutQuery(ctx, sender.AnswerPreCheckoutQueryRequest{PreCheckoutQueryID: "q", OK: true})
 		}},
+		{"answerWebAppQuery", func(ctx context.Context, c *sender.Client) error {
+			_, err := c.AnswerWebAppQuery(ctx, sender.AnswerWebAppQueryRequest{WebAppQueryID: "q",
+				Result: tg.InlineQueryResultArticle{ID: "1", Title: "t",
+					InputMessageContent: tg.InputTextMessageContent{MessageText: "t"}}})
+			return err
+		}},
+		{"answerGuestQuery", func(ctx context.Context, c *sender.Client) error {
+			_, err := c.AnswerGuestQuery(ctx, sender.AnswerGuestQueryRequest{GuestQueryID: "q",
+				Result: tg.InlineQueryResultArticle{ID: "1", Title: "t",
+					InputMessageContent: tg.InputTextMessageContent{MessageText: "t"}}})
+			return err
+		}},
+		{"answerChatJoinRequestQuery", func(ctx context.Context, c *sender.Client) error {
+			return c.AnswerChatJoinRequestQuery(ctx, sender.AnswerChatJoinRequestQueryRequest{
+				ChatJoinRequestQueryID: "q", Result: sender.JoinRequestApprove})
+		}},
 	}
 	for _, cl := range census {
 		t.Run(cl.name, func(t *testing.T) {
@@ -358,5 +383,19 @@ func TestB51_ChatLessMethodsCensus(t *testing.T) {
 			assert.Equal(t, 0, s.CaptureCount(), "no request")
 			assert.Equal(t, 0, c.ChatLimiterCount(), "no per-chat limiter")
 		})
+	}
+	// Guard: every Answer* API method is in the census (Answer itself is a helper that calls AnswerCallbackQuery).
+	listed := map[string]bool{}
+	for _, cl := range census {
+		listed[cl.name] = true
+	}
+	ct := reflect.TypeFor[*sender.Client]()
+	for i := range ct.NumMethod() {
+		name := ct.Method(i).Name
+		if !strings.HasPrefix(name, "Answer") || name == "Answer" {
+			continue
+		}
+		api := strings.ToLower(name[:1]) + name[1:]
+		assert.True(t, listed[api], "%s is not in the census", api)
 	}
 }

@@ -29,6 +29,15 @@ type SuccessfulPayment struct {
 	IsFirstRecurring           bool       `json:"is_first_recurring,omitempty"`
 }
 
+// Invoice is basic information about an invoice.
+type Invoice struct {
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	StartParameter string `json:"start_parameter"`
+	Currency       string `json:"currency"`     // ISO 4217, or "XTR" for Telegram Stars
+	TotalAmount    int    `json:"total_amount"` // in the smallest units of the currency
+}
+
 // BotSubscriptionUpdated is an update: a user payment subscription toward the bot changed. Added in Bot API 10.2.
 type BotSubscriptionUpdated struct {
 	User           *User  `json:"user"`            // the user who subscribed

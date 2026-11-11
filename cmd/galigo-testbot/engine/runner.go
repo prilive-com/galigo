@@ -67,16 +67,30 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 		"description", scenario.Description(),
 		"covers", scenario.Covers())
 
+	r.runtime.cleanupCarry = nil // counts of a failed CleanupStep attempt belong to that scenario only
+
+	// A panicking step skips the code after the loop; the deferred call still cleans up before the panic leaves Run
+	// (B-30). Deferred calls run while a panic unwinds, so the panic and its stack trace are not changed.
+	panicking := true
+	defer func() {
+		if panicking {
+			r.cleanupAfterStop(ctx, result)
+		}
+	}()
+
+	stopped := false
 	for _, step := range scenario.Steps() {
 		// Check context cancellation
 		if ctx.Err() != nil {
 			result.Error = ctx.Err().Error()
+			stopped = true
 			break
 		}
 
 		// Check message budget
 		if r.messageCount >= r.maxMessages {
 			result.Error = fmt.Sprintf("message budget exceeded (%d)", r.maxMessages)
+			stopped = true
 			break
 		}
 
@@ -90,18 +104,26 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 				result.Skipped = true
 				result.SkipReason = err.Error()
 				r.logger.Info("scenario skipped", "step", step.Name(), "reason", err.Error())
+				stopped = true
 				break
 			}
 			result.Success = false
 			result.Error = fmt.Sprintf("step %q failed: %v", step.Name(), err)
+			stopped = true
 			break
 		}
 
 		// Pace between steps: base delay + random jitter
 		if err := r.pace(ctx); err != nil {
 			result.Error = err.Error()
+			stopped = true
 			break
 		}
+	}
+
+	panicking = false
+	if stopped {
+		r.cleanupAfterStop(ctx, result)
 	}
 
 	if result.Error == "" {
@@ -118,6 +140,41 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 		"messages", r.messageCount)
 
 	return result
+}
+
+// cleanupAfterStop deletes what a stopped scenario left tracked (messages, sticker sets, member tags), on a context
+// that outlives the scenario's (each call bounded by deleteTracked), and records it as the step "cleanup after stop".
+// One attempt per item, with no 429 wait. A failed item is named in the step and the scenario fails. An item whose
+// error is permanent (a non-retryable *tg.APIError) is then dropped from tracking, so it does not fail every later
+// scenario of the run; a transient failure (circuit breaker, network, 429, 500–504, rate-limit wait) stays tracked for a
+// later cleanup (B-30, B-55). Nothing tracked: no call, no step.
+func (r *Runner) cleanupAfterStop(parent context.Context, result *ScenarioResult) {
+	rt := r.runtime
+	if len(rt.CreatedMessages)+len(rt.CreatedStickerSets)+len(rt.taggedMembers) == 0 {
+		return
+	}
+
+	start := time.Now()
+	ev, failed := deleteTracked(context.WithoutCancel(parent), rt, true)
+	step := StepResult{
+		StepName: "cleanup after stop",
+		Method:   "deleteMessage",
+		Duration: time.Since(start),
+		Success:  len(failed) == 0,
+		Evidence: ev,
+	}
+	if len(failed) > 0 {
+		step.Error = errors.Join(failed...).Error()
+		result.Success = false
+		if result.Error != "" {
+			result.Error += "; "
+		}
+		result.Error += "cleanup after stop: " + step.Error
+		r.logger.Warn("cleanup after stop failed", "scenario", result.ScenarioName, "evidence", ev)
+	} else {
+		r.logger.Info("cleanup after stop", "scenario", result.ScenarioName, "evidence", ev)
+	}
+	result.Steps = append(result.Steps, step)
 }
 
 // runStepWithRetry executes a step, retrying on 429 errors.

@@ -185,24 +185,48 @@ func TestB48B1_Holders(t *testing.T) {
 		assert.Equal(t, "preview", src.PaidMedia[1].Type)
 		assert.Equal(t, 480, src.PaidMedia[1].Height)
 		// C1-01: the item list keeps a future kind, a preview with no size, and the source order (not sorted by type).
-		mixed := strings.Replace(src0, `"paid_media":[`, `"paid_media":[{"type":"x","x_new":1},{"type":"preview"},`, 1)
+		// C3-01 (fixed after the third review, not re-reviewed): plus a video, a live photo and a photo with two sizes,
+		// and the same list without paid_media_payload. C3-02: both through Source and through Receiver.
+		photo2 := `{"type":"photo","photo":[{"file_id":"a","file_unique_id":"au","width":90,"height":90},` +
+			`{"file_id":"b","file_unique_id":"bu","width":320,"height":320}]}`
+		mixed := strings.Replace(src0, `"paid_media":[`, `"paid_media":[{"type":"x","x_new":1},{"type":"preview"},`+
+			b48bVideo+`,`+b48bLive+`,`+photo2+`,`, 1)
 		require.NotEqual(t, src0, mixed)
-		var want tg.TransactionPartnerUser
-		require.NoError(t, json.Unmarshal([]byte(mixed), &want))
-		require.Len(t, want.PaidMedia, 4)
-		var tx2 tg.StarTransaction
-		require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-1b","amount":1,"date":1700000000,"source":`+mixed+`}`), &tx2))
-		assert.Equal(t, want, tx2.Source, "the Source decode keeps every item, in order")
+		nopay := strings.Replace(mixed, `"paid_media_payload":"order-42",`, ``, 1)
+		require.NotEqual(t, mixed, nopay)
+		for _, in := range []string{mixed, nopay} {
+			var want tg.TransactionPartnerUser
+			require.NoError(t, json.Unmarshal([]byte(in), &want))
+			require.Len(t, want.PaidMedia, 7)
+			require.NotNil(t, want.PaidMedia[2].Video)
+			require.NotNil(t, want.PaidMedia[3].LivePhoto)
+			require.Len(t, want.PaidMedia[4].Photo, 2)
+			for _, key := range []string{"source", "receiver"} {
+				var tx2 tg.StarTransaction
+				require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-1b","amount":1,"date":1700000000,"`+key+`":`+in+`}`), &tx2))
+				got := tx2.Source
+				if key == "receiver" {
+					got = tx2.Receiver
+				}
+				assert.Equal(t, want, got, "the %s decode keeps every item, in order", key)
+			}
+		}
 	})
 	t.Run("star_transaction_fallback", func(t *testing.T) { // P1-02: a paid_media item that does not decode keeps the raw partner
 		// C1-01: one space after the first comma, so Raw must be the source bytes, not a compacted copy.
 		bad := `{"type":"user", "user":{"id":5000000002,"is_bot":false,"first_name":"Buyer"},"paid_media":[{"type":"photo","photo":"x"}]}`
-		var tx tg.StarTransaction
-		require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-2","amount":1,"date":1700000000,"source":`+bad+`}`), &tx))
-		src, ok := tx.Source.(tg.TransactionPartnerUnknown)
-		require.True(t, ok, "source is %T", tx.Source)
-		assert.Equal(t, "user", src.Type)
-		assert.Equal(t, bad, string(src.Raw), "Raw keeps the source bytes exactly (T1-04)")
+		for _, key := range []string{"source", "receiver"} { // C3-02: the receiver decode too
+			var tx tg.StarTransaction
+			require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-2","amount":1,"date":1700000000,"`+key+`":`+bad+`}`), &tx))
+			p := tx.Source
+			if key == "receiver" {
+				p = tx.Receiver
+			}
+			src, ok := p.(tg.TransactionPartnerUnknown)
+			require.True(t, ok, "%s is %T", key, p)
+			assert.Equal(t, "user", src.Type)
+			assert.Equal(t, bad, string(src.Raw), "Raw keeps the %s bytes exactly (T1-04)", key)
+		}
 	})
 	t.Run("update", func(t *testing.T) {
 		var u tg.Update

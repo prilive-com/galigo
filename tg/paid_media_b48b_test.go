@@ -15,8 +15,9 @@ import (
 
 // B-48b1: the Bot API 7.6 paid media read side (PaidMediaInfo, PaidMedia with its 10.0 live_photo kind,
 // PaidMediaPurchased) and the holders Message.paid_media, ExternalReplyInfo.paid_media, TransactionPartnerUser.paid_media,
-// Update.purchased_paid_media. No test builds a new type with a composite literal: values come from decoded JSON and
-// are read by selectors, so a type mutant compiles and fails by assertion. Ids are fake. The helpers api96Strict
+// Update.purchased_paid_media. No test builds a new type with a keyed composite literal (only zero values like
+// tg.PaidMedia{}): values come from decoded JSON and are read by selectors, so a field mutant compiles and fails by
+// assertion. Ids are fake. The helpers api96Strict
 // (tg/api96_test.go), api102aMarshal and api102aKeys (tg/api102a_test.go) are reused.
 const (
 	b48bPhoto   = `{"type":"photo","photo":[{"file_id":"pp","file_unique_id":"ppu","width":90,"height":90}]}`
@@ -183,9 +184,19 @@ func TestB48B1_Holders(t *testing.T) {
 		require.Len(t, src.PaidMedia, 2)
 		assert.Equal(t, "preview", src.PaidMedia[1].Type)
 		assert.Equal(t, 480, src.PaidMedia[1].Height)
+		// C1-01: the item list keeps a future kind, a preview with no size, and the source order (not sorted by type).
+		mixed := strings.Replace(src0, `"paid_media":[`, `"paid_media":[{"type":"x","x_new":1},{"type":"preview"},`, 1)
+		require.NotEqual(t, src0, mixed)
+		var want tg.TransactionPartnerUser
+		require.NoError(t, json.Unmarshal([]byte(mixed), &want))
+		require.Len(t, want.PaidMedia, 4)
+		var tx2 tg.StarTransaction
+		require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-1b","amount":1,"date":1700000000,"source":`+mixed+`}`), &tx2))
+		assert.Equal(t, want, tx2.Source, "the Source decode keeps every item, in order")
 	})
 	t.Run("star_transaction_fallback", func(t *testing.T) { // P1-02: a paid_media item that does not decode keeps the raw partner
-		bad := `{"type":"user","user":{"id":5000000002,"is_bot":false,"first_name":"Buyer"},"paid_media":[{"type":"photo","photo":"x"}]}`
+		// C1-01: one space after the first comma, so Raw must be the source bytes, not a compacted copy.
+		bad := `{"type":"user", "user":{"id":5000000002,"is_bot":false,"first_name":"Buyer"},"paid_media":[{"type":"photo","photo":"x"}]}`
 		var tx tg.StarTransaction
 		require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-2","amount":1,"date":1700000000,"source":`+bad+`}`), &tx))
 		src, ok := tx.Source.(tg.TransactionPartnerUnknown)

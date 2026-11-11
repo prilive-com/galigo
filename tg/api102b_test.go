@@ -157,7 +157,7 @@ func TestAPI102B_Shapes(t *testing.T) {
 	for _, tc := range []struct {
 		v    any
 		want int
-	}{{tg.BotCommand{}, 3}, {tg.ReplyParameters{}, 9}, {tg.Message{}, 58}} {
+	}{{tg.BotCommand{}, 3}, {tg.ReplyParameters{}, 9}, {tg.Message{}, 61}} {
 		t.Run(fmt.Sprintf("NumField %T", tc.v), func(t *testing.T) {
 			assert.Equal(t, tc.want, reflect.TypeOf(tc.v).NumField())
 		})

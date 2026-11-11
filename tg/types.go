@@ -28,12 +28,15 @@ type Message struct {
 	EphemeralMessageID    int                   `json:"ephemeral_message_id,omitempty"` // 10.2: for ephemeral messages, its id in this chat (may be reused); MessageID is 0
 	Date                  int64                 `json:"date"`
 	Chat                  *Chat                 `json:"chat"`
-	ForwardFrom           *User                 `json:"forward_from,omitempty"`
-	ForwardFromChat       *Chat                 `json:"forward_from_chat,omitempty"`
-	ForwardDate           int64                 `json:"forward_date,omitempty"`
+	ForwardFrom           *User                 `json:"forward_from,omitempty"`      // replaced by forward_origin in the documented API (7.0); the server still sends it
+	ForwardFromChat       *Chat                 `json:"forward_from_chat,omitempty"` // replaced by forward_origin in the documented API (7.0); the server still sends it
+	ForwardDate           int64                 `json:"forward_date,omitempty"`      // replaced by forward_origin in the documented API (7.0); the server still sends it
+	ForwardOrigin         *MessageOrigin        `json:"forward_origin,omitempty"`    // 7.0: for forwarded messages, the original message
 	IsTopicMessage        bool                  `json:"is_topic_message,omitempty"`
 	IsAutomaticForward    bool                  `json:"is_automatic_forward,omitempty"`
 	ReplyToMessage        *Message              `json:"reply_to_message,omitempty"`
+	ExternalReply         *ExternalReplyInfo    `json:"external_reply,omitempty"` // 7.0: the replied message, maybe from another chat or topic
+	Quote                 *TextQuote            `json:"quote,omitempty"`          // 7.0: the quoted part of the replied message
 	ViaBot                *User                 `json:"via_bot,omitempty"`
 	EditDate              int64                 `json:"edit_date,omitempty"`
 	HasProtectedContent   bool                  `json:"has_protected_content,omitempty"`

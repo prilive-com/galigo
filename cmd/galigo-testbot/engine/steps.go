@@ -1,8 +1,11 @@
 package engine
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/prilive-com/galigo/sender"
@@ -143,13 +146,15 @@ func (s *SendPhotoWithParseModeStep) Execute(ctx context.Context, rt *Runtime) (
 		return nil, fmt.Errorf("sendPhoto with ParseMode %q: %w", s.ParseMode, err)
 	}
 
-	// Verify formatting was applied (caption entities exist)
-	if len(msg.CaptionEntities) == 0 {
-		return nil, fmt.Errorf("sendPhoto: ParseMode %q accepted but no caption entities returned", s.ParseMode)
-	}
-
+	// Track first, so a failed check below still leaves the photo to the cleanup (B-30)
 	rt.LastMessage = msg
 	rt.TrackMessage(rt.ChatID, msg.MessageID)
+
+	// Verify formatting was applied (caption entities exist)
+	if len(msg.CaptionEntities) == 0 {
+		return &StepResult{StepName: s.Name(), Method: "sendPhoto", MessageIDs: []int{msg.MessageID}},
+			fmt.Errorf("sendPhoto: ParseMode %q accepted but no caption entities returned", s.ParseMode)
+	}
 
 	// Capture file_id for reuse
 	var fileID string
@@ -331,47 +336,133 @@ func (s *SendChatActionStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 	}, nil
 }
 
-// CleanupStep deletes all tracked messages.
+// CleanupStep deletes all tracked messages and sticker sets and clears recorded member tags.
 type CleanupStep struct{}
 
 func (s *CleanupStep) Name() string { return "cleanup" }
 
 func (s *CleanupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
-	deleted := 0
-	var lastErr error
-
-	for _, cm := range rt.CreatedMessages {
-		if err := rt.Sender.DeleteMessage(ctx, cm.ChatID, cm.MessageID); err != nil {
-			lastErr = err
-			// Continue trying to delete other messages
-		} else {
-			deleted++
+	ev, failed := deleteTracked(ctx, rt, false)
+	// The runner repeats this step on a 429 and keeps only the last result; add what the failed attempts did, so
+	// the counts stay complete (B-30 p2). Runner.Run clears the carry when a scenario starts.
+	for k, n := range rt.cleanupCarry {
+		if n > 0 {
+			ev[k] = evCount(ev, k) + n
 		}
 	}
-
-	// Clear the list
-	rt.CreatedMessages = rt.CreatedMessages[:0]
-	rt.LastMessage = nil
-
-	// Clean up sticker sets (best-effort)
-	for _, name := range rt.CreatedStickerSets {
-		_ = rt.Sender.DeleteStickerSet(ctx, name)
+	rt.cleanupCarry = nil
+	result := &StepResult{Method: "deleteMessage", Evidence: ev}
+	if len(failed) > 0 {
+		rt.cleanupCarry = map[string]int{}
+		for _, k := range []string{"deleted_count", "sticker_sets_deleted", "tags_cleared"} {
+			rt.cleanupCarry[k] = evCount(ev, k)
+		}
+		// errors.Join keeps each *tg.APIError. The runner repeats a step only when the first *tg.APIError that
+		// errors.As finds is a 429, so 429s go first, the longest RetryAfter first (B-30). Sorting in place is safe:
+		// deleteTracked already wrote the evidence lines in item order.
+		slices.SortStableFunc(failed, func(a, b error) int { return cmp.Compare(retryAfter429(b), retryAfter429(a)) })
+		return result, fmt.Errorf("cleanup: %w", errors.Join(failed...))
 	}
-	rt.CreatedStickerSets = rt.CreatedStickerSets[:0]
-
-	result := &StepResult{
-		Method: "deleteMessage",
-		Evidence: map[string]any{
-			"deleted_count": deleted,
-		},
-	}
-
-	// Only fail if we couldn't delete any messages and there were messages to delete
-	if lastErr != nil && deleted == 0 {
-		return result, lastErr
-	}
-
 	return result, nil
+}
+
+// retryAfter429 returns a 429 error's RetryAfter, or -1 when err is not a 429.
+func retryAfter429(err error) time.Duration {
+	var apiErr *tg.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == 429 {
+		return apiErr.RetryAfter
+	}
+	return -1
+}
+
+// evCount reads an int count from cleanup evidence (0 when absent).
+func evCount(ev map[string]any, k string) int {
+	n, _ := ev[k].(int)
+	return n
+}
+
+// deleteTracked deletes every tracked message and sticker set and clears every recorded member tag, each call with
+// its own 15 s bound (the sender's per-chat limiter waits about 3 s per call in a group). Done items leave the
+// runtime's lists; failed items stay (in order), so a later call retries only them. With dropPermanent, an item whose
+// error is a non-retryable *tg.APIError (for example 400 "message to delete not found") is dropped instead: a retry
+// cannot help it, and it is still reported here. It returns the evidence (deleted_count counts messages only;
+// sticker_sets_deleted, tags_cleared and failed only when non-zero) and one error per failed item, naming the item
+// and wrapping the sender's error (B-30, B-55).
+func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[string]any, []error) {
+	var failed []error
+	try := func(label string, call func(context.Context) error) (done, keep bool) {
+		cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		err := call(cctx)
+		if err == nil {
+			return true, false
+		}
+		failed = append(failed, fmt.Errorf("%s: %w", label, err))
+		var apiErr *tg.APIError
+		permanent := errors.As(err, &apiErr) && !apiErr.IsRetryable()
+		return false, !dropPermanent || !permanent
+	}
+
+	msgs := 0
+	keptMsgs := rt.CreatedMessages[:0:0]
+	for _, cm := range rt.CreatedMessages {
+		done, keep := try(fmt.Sprintf("message %d/%d", cm.ChatID, cm.MessageID), func(c context.Context) error {
+			return rt.Sender.DeleteMessage(c, cm.ChatID, cm.MessageID)
+		})
+		if done {
+			msgs++
+		} else if keep {
+			keptMsgs = append(keptMsgs, cm)
+		}
+	}
+	rt.CreatedMessages = keptMsgs
+	if lm := rt.LastMessage; lm != nil && !slices.ContainsFunc(keptMsgs, func(cm CreatedMessage) bool {
+		return cm.MessageID == lm.MessageID && (lm.Chat == nil || cm.ChatID == lm.Chat.ID)
+	}) {
+		rt.LastMessage = nil // deleted, dropped or never tracked: no later step may use it
+	}
+
+	sets := 0
+	keptSets := rt.CreatedStickerSets[:0:0]
+	for _, name := range rt.CreatedStickerSets {
+		done, keep := try("sticker set "+name, func(c context.Context) error { return rt.Sender.DeleteStickerSet(c, name) })
+		if done {
+			sets++
+		} else if keep {
+			keptSets = append(keptSets, name)
+		}
+	}
+	rt.CreatedStickerSets = keptSets
+
+	tags := 0
+	keptTags := rt.taggedMembers[:0:0]
+	for _, tm := range rt.taggedMembers {
+		done, keep := try(fmt.Sprintf("member tag %d/%d", tm.chatID, tm.userID), func(c context.Context) error {
+			return rt.Sender.SetChatMemberTag(c, tm.chatID, tm.userID, "")
+		})
+		if done {
+			tags++
+		} else if keep {
+			keptTags = append(keptTags, tm)
+		}
+	}
+	rt.taggedMembers = keptTags
+
+	ev := map[string]any{"deleted_count": msgs}
+	if sets > 0 {
+		ev["sticker_sets_deleted"] = sets
+	}
+	if tags > 0 {
+		ev["tags_cleared"] = tags
+	}
+	if len(failed) > 0 {
+		lines := make([]string, len(failed))
+		for i, err := range failed {
+			lines[i] = err.Error()
+		}
+		ev["failed"] = lines
+	}
+	return ev, failed
 }
 
 // ================= Phase C: Keyboard Steps =================

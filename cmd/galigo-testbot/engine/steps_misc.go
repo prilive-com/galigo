@@ -24,15 +24,22 @@ func (s *SendDiceStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, e
 	}
 
 	rt.LastMessage = msg
-	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	ev := map[string]any{
+		"message_id": msg.MessageID,
+		"emoji":      emoji,
+	}
+	if rt.ChatID > 0 {
+		// Bot API deleteMessage: "A dice message in a private chat can only be deleted if it was sent more than 24
+		// hours ago." Not tracked, so the cleanup does not fail on a delete that cannot work (B-30).
+		ev["not_tracked"] = "a dice message in a private chat cannot be deleted for 24 hours"
+	} else {
+		rt.TrackMessage(rt.ChatID, msg.MessageID)
+	}
 
 	return &StepResult{
 		Method:     "sendDice",
 		MessageIDs: []int{msg.MessageID},
-		Evidence: map[string]any{
-			"message_id": msg.MessageID,
-			"emoji":      emoji,
-		},
+		Evidence:   ev,
 	}, nil
 }
 

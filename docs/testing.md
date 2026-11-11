@@ -570,7 +570,7 @@ go test -race ./...
 
 ## Acceptance Tests (galigo-testbot)
 
-The testbot validates API methods against the real Telegram Bot API. It sends actual messages, uploads files, and verifies responses. All created messages are cleaned up after each scenario.
+The testbot validates API methods against the real Telegram Bot API. It sends actual messages, uploads files, and verifies responses. What a scenario creates is deleted by its own cleanup step, or by the runner when the scenario stops early (see [Cleanup](#cleanup)).
 
 ### Prerequisites
 
@@ -756,7 +756,7 @@ S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 req
 |----------|---------|-------------|
 | S25-GeoLocation | sendLocation | GPS location |
 | S26-GeoVenue | sendVenue | Venue with title and address |
-| S27-ContactAndDice | sendContact, sendDice | Phone contact and animated dice |
+| S27-ContactAndDice | sendContact, sendDice | Phone contact and animated dice (in a private chat the dice stays: Telegram deletes a private-chat dice only after 24 hours) |
 | S28-BulkOps | forwardMessages, copyMessages, deleteMessages | Bulk message operations |
 | S29-Reactions | setMessageReaction | Emoji reactions on messages |
 | S30-UserInfo | getUserProfilePhotos, getUserChatBoosts | User profile and boost info |
@@ -869,6 +869,14 @@ All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`
 | `voice.ogg` | OGG Opus | 124B | 3 OGG pages with 1 silent Opus frame (raw bytes) |
 | `video.mp4` | MP4/H.264 | 663B | 320x240 single black frame (minimal ftyp+moov+mdat) |
 | `videonote.mp4` | MP4/H.264 | 663B | 240x240 square single black frame (for video notes) |
+
+### Cleanup
+
+Steps track what they create: messages (`TrackMessage`), sticker sets (`TrackStickerSet`) and member tags (`SetChatMemberTagStep`). A scenario's `CleanupStep` deletes the messages and sticker sets and clears the tags. It keeps every item whose delete fails and then fails, naming each item; a 429 makes the runner repeat the step.
+
+When a scenario stops before all its steps succeed (a failed step, a skip, the message budget, the scenario timeout, a cancelled context) or a step panics, the runner deletes everything still tracked. After an early stop it also adds the step `cleanup after stop` to the report. A panic still ends the run and no report is written, so the log is the only record of that cleanup. If an item cannot be deleted, the scenario fails and the step names the item. An item that failed with a permanent Telegram error (not 429 and not 500–504, see `APIError.IsRetryable`) is then no longer tracked; other failures stay tracked for a later cleanup.
+
+Limits: Ctrl-C ends `--run` without cleanup; a scenario whose steps all succeed but leaves something tracked keeps it for a later `CleanupStep`; restore steps (webhook, chat title, photo, permissions) are not run after an early stop.
 
 ### Evidence Reports
 

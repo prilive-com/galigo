@@ -201,7 +201,13 @@ func TestAPI100D_ViewSeesBytes(t *testing.T) {
 // such as the cleanup's deleteMessage, panics) and answers sendLivePhoto and sendMediaGroup.
 type fakeLive struct {
 	engine.SenderClient
-	album []*tg.Message
+	album   []*tg.Message
+	deleted [][2]int64 // B-30: the runner's cleanup after a stop deletes what the failed scenario tracked
+}
+
+func (f *fakeLive) DeleteMessage(_ context.Context, chatID int64, messageID int) error {
+	f.deleted = append(f.deleted, [2]int64{chatID, int64(messageID)})
+	return nil
 }
 
 func (f *fakeLive) SendLivePhoto(_ context.Context, _ int64, _, _ engine.MediaInput, _ string) (*tg.Message, error) {
@@ -232,13 +238,18 @@ func TestAPI100B_S58FailedAlbumKeepsIDs(t *testing.T) { // API100B T-tb-8
 	var report struct {
 		Success bool `json:"success"`
 		Steps   []struct {
+			StepName   string `json:"step_name"`
 			Method     string `json:"method"`
 			MessageIDs []int  `json:"message_ids"`
 		} `json:"steps"`
 	}
 	require.NoError(t, json.Unmarshal(b, &report))
 	assert.False(t, report.Success)
-	require.Len(t, report.Steps, 2, "the cleanup step did not run")
+	require.Len(t, report.Steps, 3, "the scenario's own cleanup step did not run; the runner's cleanup after stop did")
 	assert.Equal(t, "sendMediaGroup", report.Steps[1].Method)
 	assert.Equal(t, []int{911, 912}, report.Steps[1].MessageIDs)
+	assert.Equal(t, "deleteMessage", report.Steps[2].Method) // B-30: cleanup after stop
+	assert.Equal(t, "cleanup after stop", report.Steps[2].StepName)
+	assert.Equal(t, [][2]int64{{testutil.TestChatID, 901}, {testutil.TestChatID, 911}, {testutil.TestChatID, 912}}, f.deleted)
+	assert.Empty(t, rt.CreatedMessages)
 }

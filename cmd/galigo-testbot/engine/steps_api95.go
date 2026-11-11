@@ -43,6 +43,7 @@ func (s *SetChatMemberTagStep) Execute(ctx context.Context, rt *Runtime) (*StepR
 		}
 		return nil, err
 	}
+	rt.recordTag(rt.ChatID, userID, s.Tag != "")
 
 	return &StepResult{
 		Method:   "setChatMemberTag",

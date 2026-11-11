@@ -71,6 +71,9 @@ type CreatedMessage struct {
 	MessageID int
 }
 
+// taggedMember is a (chat, user) pair whose member tag a step set.
+type taggedMember struct{ chatID, userID int64 }
+
 // ChatContext holds probed chat capabilities.
 type ChatContext struct {
 	ChatID   int64
@@ -114,6 +117,12 @@ type Runtime struct {
 	BulkMessageIDs     []int             // For bulk operations
 	CapturedFileIDs    map[string]string // name -> file_id for reuse
 	CreatedStickerSets []string          // sticker set names to clean up
+
+	// taggedMembers: members whose tag a step set and did not clear yet; the runner clears them after a stop (B-55).
+	taggedMembers []taggedMember
+	// cleanupCarry: the counts of a CleanupStep attempt that failed, added by its repeat (the runner keeps only the
+	// last attempt's result); cleared when a scenario starts.
+	cleanupCarry map[string]int
 
 	// Probed capabilities
 	ChatCtx *ChatContext
@@ -205,6 +214,21 @@ func (rt *Runtime) TrackMessage(chatID int64, messageID int) {
 		ChatID:    chatID,
 		MessageID: messageID,
 	})
+}
+
+// recordTag notes that the member's tag is set (on) or cleared (off), so a stopped scenario can clear it (B-55).
+func (rt *Runtime) recordTag(chatID, userID int64, on bool) {
+	for i, tm := range rt.taggedMembers {
+		if tm.chatID == chatID && tm.userID == userID {
+			if !on {
+				rt.taggedMembers = append(rt.taggedMembers[:i], rt.taggedMembers[i+1:]...)
+			}
+			return
+		}
+	}
+	if on {
+		rt.taggedMembers = append(rt.taggedMembers, taggedMember{chatID, userID})
+	}
 }
 
 // TrackStickerSet adds a sticker set name to the cleanup list.

@@ -426,6 +426,7 @@ func TestB48B2_BadCallsTouchNothing(t *testing.T) {
 			_, err = client.SendPaidMedia(context.Background(), good)
 			var apiErr *tg.APIError
 			require.True(t, errors.As(err, &apiErr), "control call %d: %v", i, err)
+			assert.IsType(t, &tg.APIError{}, err, "control call %d: the *tg.APIError itself, not wrapped (upgrade note; A-C3-01)", i)
 			assert.Equal(t, http.StatusBadGateway, apiErr.Code)
 		}
 		_, err = client.SendPaidMedia(context.Background(), good)

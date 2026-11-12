@@ -58,7 +58,7 @@ func TestB48C1_StatusListsCoverAll(t *testing.T) {
 		if !ok || !call.Ellipsis.IsValid() || len(call.Args) != 2 {
 			return nil, false
 		}
-		if fn, ok := call.Fun.(*ast.Ident); !ok || fn.Name != "append" {
+		if fn, isIdent := call.Fun.(*ast.Ident); !isIdent || fn.Name != "append" {
 			return nil, false
 		}
 		last, ok := group(call.Args[1])

@@ -253,15 +253,20 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		server := testutil.NewMockServer(t)
-		branch := make(chan string, 1) // which way the handler ended (O-C1-02)
+		type ending struct {
+			branch string
+			wait   time.Duration // from the caller's cancel to the end of the request context
+		}
+		branch := make(chan ending, 1) // which way the handler ended (O-C1-02), and when (A-C2-01)
 		server.On("/bot"+testutil.TestToken+"/sendPaidMedia", func(w http.ResponseWriter, r *http.Request) {
 			cancel()
+			start := time.Now()
 			select {
 			case <-r.Context().Done():
-				branch <- "cancelled"
+				branch <- ending{"cancelled", time.Since(start)}
 			case <-time.After(3 * time.Second): // the caller's cancel was lost: reply, so the row fails
 				paidReply(w)
-				branch <- "replied"
+				branch <- ending{"replied", time.Since(start)}
 			}
 		})
 		msg, err := NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())).SendPaidMedia(ctx, req)
@@ -271,7 +276,10 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		assert.Equal(t, 1, server.CaptureCount())
 		select {
 		case b := <-branch:
-			assert.Equal(t, "cancelled", b, "the HTTP request itself must see the cancel; a returned context.Canceled alone is not proof")
+			assert.Equal(t, "cancelled", b.branch, "the HTTP request itself must see the cancel; a returned context.Canceled alone is not proof")
+			// The caller's cancel, not some later timeout of the adapter's own, must end the request:
+			// measured 2.6 ms max under -race (200 runs), so 250 ms leaves a wide margin (A-C2-01).
+			assert.Less(t, b.wait, 250*time.Millisecond, "the request ended long after the caller's cancel")
 		case <-time.After(5 * time.Second):
 			t.Fatal("the handler did not end")
 		}

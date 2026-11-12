@@ -431,6 +431,7 @@ func TestB48B2_BadCallsTouchNothing(t *testing.T) {
 		_, err = client.SendPaidMedia(context.Background(), good)
 		assert.ErrorIs(t, err, gobreaker.ErrOpenState, "control: the breaker opens after two 502s (no withRetry, so no ErrCircuitOpen wrap)")
 		assert.NotErrorIs(t, err, tg.ErrCircuitOpen, "the open breaker is not wrapped in ErrCircuitOpen (upgrade note; A-C1-01)")
+		assert.Same(t, gobreaker.ErrOpenState, err, "the bare breaker error, not wrapped at all (upgrade note; O-C2-01)")
 		assert.Equal(t, 3, server.CaptureCount())
 	})
 	t.Run("limiter", func(t *testing.T) {

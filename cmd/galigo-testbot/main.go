@@ -99,6 +99,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -748,6 +749,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {

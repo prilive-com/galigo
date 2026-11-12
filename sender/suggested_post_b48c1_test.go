@@ -33,6 +33,10 @@ var b48c1SpecMethods = []string{
 
 // b48c1Full is the full value the wire rows send, and b48c1FullJSON its JSON (amount 10^13: a TON price in
 // nanograms that does not fit a 32-bit int).
+// b48c1ChannelChat is a channel-style (negative) chat id: the client must not refuse the parameter for a chat kind
+// (AC5: the server checks the chat) [C1-02].
+const b48c1ChannelChat = int64(-1001234567890)
+
 var b48c1Full = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 10000000000000}, SendDate: 1900000000}
 
 const b48c1FullJSON = `{"price":{"currency":"TON","amount":10000000000000},"send_date":1900000000}`
@@ -43,8 +47,9 @@ type b48c1Call struct {
 	method string
 	req    any
 	paths  []string // the paths the method has: "json" (no upload), "upload" (form), "fileid" (form without an upload: paid
-	// media), "upload-ptr" (form, the rich media upload as a *InputMedia)
-	send func(ctx context.Context, c *sender.Client, path string, spp *tg.SuggestedPostParameters, topic int64) error
+	// media), "upload-ptr" (form, the rich media upload as a *InputMedia), "thumb-upload" (form: the file by id, only its
+	// thumbnail uploaded) [C1-03]
+	send func(ctx context.Context, c *sender.Client, path string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error
 }
 
 func b48c1File(path, name string) sender.InputFile {
@@ -54,71 +59,79 @@ func b48c1File(path, name string) sender.InputFile {
 	return sender.FromFileID("ID-" + name)
 }
 
+// b48c1Thumb is a thumbnail: uploaded on the upload paths and on "thumb-upload", else by file id.
+func b48c1Thumb(path, name string) sender.InputFile {
+	if path == "thumb-upload" {
+		path = "upload"
+	}
+	return b48c1File(path, name)
+}
+
 func b48c1Err[T any](_ T, err error) error { return err }
 
 func b48c1Calls() []b48c1Call {
-	id := testutil.TestChatID
 	both, jsonOnly := []string{"json", "upload"}, []string{"json"}
+	thumb := []string{"json", "upload", "thumb-upload"} // the five types with a thumbnail [C1-03]
 	return []b48c1Call{
-		{"sendMessage", sender.SendMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendMessage(ctx, sender.SendMessageRequest{ChatID: id, Text: "t", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendMessage", sender.SendMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendMessage(ctx, sender.SendMessageRequest{ChatID: chat, Text: "t", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"forwardMessage", sender.ForwardMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.ForwardMessage(ctx, sender.ForwardMessageRequest{ChatID: id, FromChatID: int64(5), MessageID: 6, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"forwardMessage", sender.ForwardMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.ForwardMessage(ctx, sender.ForwardMessageRequest{ChatID: chat, FromChatID: int64(5), MessageID: 6, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"copyMessage", sender.CopyMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.CopyMessage(ctx, sender.CopyMessageRequest{ChatID: id, FromChatID: int64(5), MessageID: 6, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"copyMessage", sender.CopyMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.CopyMessage(ctx, sender.CopyMessageRequest{ChatID: chat, FromChatID: int64(5), MessageID: 6, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendPhoto", sender.SendPhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendPhoto(ctx, sender.SendPhotoRequest{ChatID: id, Photo: b48c1File(up, "p.jpg"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendPhoto", sender.SendPhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendPhoto(ctx, sender.SendPhotoRequest{ChatID: chat, Photo: b48c1File(up, "p.jpg"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendLivePhoto", sender.SendLivePhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendLivePhoto(ctx, sender.SendLivePhotoRequest{ChatID: id, LivePhoto: b48c1File(up, "l.mp4"), Photo: b48c1File(up, "l.jpg"), DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
+		{"sendLivePhoto", sender.SendLivePhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendLivePhoto(ctx, sender.SendLivePhotoRequest{ChatID: chat, LivePhoto: b48c1File(up, "l.mp4"), Photo: b48c1File(up, "l.jpg"), DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
 		}},
-		{"sendAudio", sender.SendAudioRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			th := b48c1File(up, "t.jpg") // a second file: the thumbnail
-			return b48c1Err(c.SendAudio(ctx, sender.SendAudioRequest{ChatID: id, Audio: b48c1File(up, "a.mp3"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendAudio", sender.SendAudioRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			th := b48c1Thumb(up, "t.jpg") // a second file: the thumbnail
+			return b48c1Err(c.SendAudio(ctx, sender.SendAudioRequest{ChatID: chat, Audio: b48c1File(up, "a.mp3"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendDocument", sender.SendDocumentRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			th := b48c1File(up, "t.jpg")
-			return b48c1Err(c.SendDocument(ctx, sender.SendDocumentRequest{ChatID: id, Document: b48c1File(up, "d.txt"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendDocument", sender.SendDocumentRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			th := b48c1Thumb(up, "t.jpg")
+			return b48c1Err(c.SendDocument(ctx, sender.SendDocumentRequest{ChatID: chat, Document: b48c1File(up, "d.txt"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendVideo", sender.SendVideoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			th := b48c1File(up, "t.jpg")
-			return b48c1Err(c.SendVideo(ctx, sender.SendVideoRequest{ChatID: id, Video: b48c1File(up, "v.mp4"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendVideo", sender.SendVideoRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			th := b48c1Thumb(up, "t.jpg")
+			return b48c1Err(c.SendVideo(ctx, sender.SendVideoRequest{ChatID: chat, Video: b48c1File(up, "v.mp4"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendAnimation", sender.SendAnimationRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			th := b48c1File(up, "t.jpg")
-			return b48c1Err(c.SendAnimation(ctx, sender.SendAnimationRequest{ChatID: id, Animation: b48c1File(up, "g.gif"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendAnimation", sender.SendAnimationRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			th := b48c1Thumb(up, "t.jpg")
+			return b48c1Err(c.SendAnimation(ctx, sender.SendAnimationRequest{ChatID: chat, Animation: b48c1File(up, "g.gif"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendVoice", sender.SendVoiceRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendVoice(ctx, sender.SendVoiceRequest{ChatID: id, Voice: b48c1File(up, "v.ogg"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendVoice", sender.SendVoiceRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendVoice(ctx, sender.SendVoiceRequest{ChatID: chat, Voice: b48c1File(up, "v.ogg"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendVideoNote", sender.SendVideoNoteRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			th := b48c1File(up, "t.jpg")
-			return b48c1Err(c.SendVideoNote(ctx, sender.SendVideoNoteRequest{ChatID: id, VideoNote: b48c1File(up, "n.mp4"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendVideoNote", sender.SendVideoNoteRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			th := b48c1Thumb(up, "t.jpg")
+			return b48c1Err(c.SendVideoNote(ctx, sender.SendVideoNoteRequest{ChatID: chat, VideoNote: b48c1File(up, "n.mp4"), Thumbnail: &th, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendPaidMedia", sender.SendPaidMediaRequest{}, []string{"fileid", "upload"}, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendPaidMedia(ctx, sender.SendPaidMediaRequest{ChatID: id, StarCount: 1,
+		{"sendPaidMedia", sender.SendPaidMediaRequest{}, []string{"fileid", "upload"}, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendPaidMedia(ctx, sender.SendPaidMediaRequest{ChatID: chat, StarCount: 1,
 				Media: []sender.InputPaidMedia{sender.NewInputPaidMediaPhoto(b48c1File(up, "m.jpg"))}, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendLocation", sender.SendLocationRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendLocation(ctx, sender.SendLocationRequest{ChatID: id, Latitude: 1.5, Longitude: 2.5, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendLocation", sender.SendLocationRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendLocation(ctx, sender.SendLocationRequest{ChatID: chat, Latitude: 1.5, Longitude: 2.5, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendVenue", sender.SendVenueRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendVenue(ctx, sender.SendVenueRequest{ChatID: id, Latitude: 1.5, Longitude: 2.5, Title: "t", Address: "a", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendVenue", sender.SendVenueRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendVenue(ctx, sender.SendVenueRequest{ChatID: chat, Latitude: 1.5, Longitude: 2.5, Title: "t", Address: "a", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendContact", sender.SendContactRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendContact(ctx, sender.SendContactRequest{ChatID: id, PhoneNumber: "+1000", FirstName: "f", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendContact", sender.SendContactRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendContact(ctx, sender.SendContactRequest{ChatID: chat, PhoneNumber: "+1000", FirstName: "f", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendDice", sender.SendDiceRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
+		{"sendDice", sender.SendDiceRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			// SendDice takes options; SendDiceOption is func(*SendDiceRequest), so a caller sets the fields in its own option.
-			return b48c1Err(c.SendDice(ctx, id, func(r *sender.SendDiceRequest) { r.DirectMessagesTopicID, r.SuggestedPostParameters = topic, spp }))
+			return b48c1Err(c.SendDice(ctx, chat, func(r *sender.SendDiceRequest) { r.DirectMessagesTopicID, r.SuggestedPostParameters = topic, spp }))
 		}},
-		{"sendSticker", sender.SendStickerRequest{}, both, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendSticker(ctx, sender.SendStickerRequest{ChatID: id, Sticker: b48c1File(up, "s.webp"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
+		{"sendSticker", sender.SendStickerRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendSticker(ctx, sender.SendStickerRequest{ChatID: chat, Sticker: b48c1File(up, "s.webp"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendRichMessage", sender.SendRichMessageRequest{}, []string{"json", "upload", "upload-ptr"}, func(ctx context.Context, c *sender.Client, up string, spp *tg.SuggestedPostParameters, topic int64) error {
+		{"sendRichMessage", sender.SendRichMessageRequest{}, []string{"json", "upload", "upload-ptr"}, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			rich := tg.InputRichMessage{Markdown: "m"}
 			switch m := sender.NewInputMediaPhoto(b48c1File("upload", "r.jpg")); up { // an upload in the media list: the form path (B-61)
 			case "upload":
@@ -126,10 +139,10 @@ func b48c1Calls() []b48c1Call {
 			case "upload-ptr":
 				rich.Media = []tg.InputRichMessageMedia{{ID: "p", Media: &m}}
 			}
-			return b48c1Err(c.SendRichMessage(ctx, sender.SendRichMessageRequest{ChatID: id, RichMessage: rich, DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
+			return b48c1Err(c.SendRichMessage(ctx, sender.SendRichMessageRequest{ChatID: chat, RichMessage: rich, DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
 		}},
-		{"sendInvoice", sender.SendInvoiceRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendInvoice(ctx, sender.SendInvoiceRequest{ChatID: id, Title: "t", Description: "d", Payload: "p", Currency: "XTR",
+		{"sendInvoice", sender.SendInvoiceRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			return b48c1Err(c.SendInvoice(ctx, sender.SendInvoiceRequest{ChatID: chat, Title: "t", Description: "d", Payload: "p", Currency: "XTR",
 				Prices: []tg.LabeledPrice{{Label: "l", Amount: 1}}, DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
 	}
@@ -363,16 +376,18 @@ const (
 )
 
 // The other bounds the server checks (spec: XTR 5-100000, TON 10^7-10^13, a date 300 s to 30 days ahead), each sent
-// unchanged: TON below its minimum, XTR above its maximum, a zero amount (an explicit price, not an absent one), and
-// a date one minute ahead [A-T3-03 = O-T3-01, O-T3-02, O-T3-03].
+// unchanged: TON below its minimum and above its maximum, XTR above its maximum, a zero amount (an explicit price, not
+// an absent one), and a date one minute ahead [A-T3-03 = O-T3-01, O-T3-02, O-T3-03, C1-01].
 var (
 	b48c1TONLow   = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 1}}
+	b48c1TONHigh  = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 10000000000001}} // [C1-01]
 	b48c1XTRHigh  = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "XTR", Amount: 100001}}
 	b48c1ZeroCost = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "XTR", Amount: 0}}
 )
 
 const (
 	b48c1TONLowJSON   = `{"price":{"currency":"TON","amount":1}}`
+	b48c1TONHighJSON  = `{"price":{"currency":"TON","amount":10000000000001}}`
 	b48c1XTRHighJSON  = `{"price":{"currency":"XTR","amount":100001}}`
 	b48c1ZeroCostJSON = `{"price":{"currency":"XTR","amount":0}}`
 )
@@ -395,23 +410,31 @@ func TestB48C1_Wire(t *testing.T) {
 				spp   *tg.SuggestedPostParameters
 				topic int64  // 0 = the key is absent
 				want  string // the parameter's JSON; "" = the key is absent
+				chat  int64  // 0 = testutil.TestChatID
 			}{
-				{"full", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON},
-				{"empty", &tg.SuggestedPostParameters{}, 7, `{}`},
-				{"none", nil, 0, ""},
-				{"spp_only", b48c1Bad, 0, b48c1BadJSON},
-				{"topic_only", nil, b48c1BigTopic(c.method), ""},
-				{"price_only", b48c1PriceOnly, 0, b48c1PriceOnlyJSON},
-				{"date_only", b48c1DateOnly, 0, b48c1DateOnlyJSON},
-				{"ton_low", b48c1TONLow, 0, b48c1TONLowJSON},
-				{"xtr_high", b48c1XTRHigh, 0, b48c1XTRHighJSON},
-				{"zero_price", b48c1ZeroCost, 0, b48c1ZeroCostJSON},
-				{"near_date", &tg.SuggestedPostParameters{SendDate: soon}, 0, soonJSON},
+				{"full", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON, 0},
+				{"empty", &tg.SuggestedPostParameters{}, 7, `{}`, 0},
+				{"none", nil, 0, "", 0},
+				{"spp_only", b48c1Bad, 0, b48c1BadJSON, 0},
+				{"topic_only", nil, b48c1BigTopic(c.method), "", 0},
+				{"price_only", b48c1PriceOnly, 0, b48c1PriceOnlyJSON, 0},
+				{"date_only", b48c1DateOnly, 0, b48c1DateOnlyJSON, 0},
+				{"ton_low", b48c1TONLow, 0, b48c1TONLowJSON, 0},
+				{"xtr_high", b48c1XTRHigh, 0, b48c1XTRHighJSON, 0},
+				{"zero_price", b48c1ZeroCost, 0, b48c1ZeroCostJSON, 0},
+				{"near_date", &tg.SuggestedPostParameters{SendDate: soon}, 0, soonJSON, 0},
+				{"ton_high", b48c1TONHigh, 0, b48c1TONHighJSON, 0},                                    // above the TON maximum [C1-01]
+				{"channel_chat", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON, b48c1ChannelChat}, // a channel chat id [C1-02]
 			} {
 				t.Run(c.method+"/"+up+"/"+r.name, func(t *testing.T) {
+					chat := r.chat
+					if chat == 0 {
+						chat = testutil.TestChatID
+					}
 					mediaType, args, files, raw, err := b48c1WireCall(t, c.method, replyAny(c.method),
-						func(ctx context.Context, cl *sender.Client) error { return c.send(ctx, cl, up, r.spp, r.topic) })
+						func(ctx context.Context, cl *sender.Client) error { return c.send(ctx, cl, up, chat, r.spp, r.topic) })
 					require.NoError(t, err)
+					assert.Equal(t, strconv.FormatInt(chat, 10), args["chat_id"], "the chat id unchanged")
 					assert.Equal(t, wantType, mediaType)
 					assert.Len(t, files, b48c1Files(c.method, up), "file parts")
 					got, ok := args["suggested_post_parameters"]
@@ -458,6 +481,9 @@ func b48c1WireCall(t *testing.T, method string, reply http.HandlerFunc, call fun
 
 // b48c1Files is the number of file parts a call sends on a path.
 func b48c1Files(method, path string) int {
+	if path == "thumb-upload" {
+		return 1 // the thumbnail only [C1-03]
+	}
 	if !strings.HasPrefix(path, "upload") {
 		return 0
 	}

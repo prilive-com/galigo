@@ -48,7 +48,7 @@ type b48c1Call struct {
 	req    any
 	paths  []string // the paths the method has: "json" (no upload), "upload" (form), "fileid" (form without an upload: paid
 	// media), "upload-ptr" (form, the rich media upload as a *InputMedia), "thumb-upload" (form: the file by id, only its
-	// thumbnail uploaded) [C1-03]
+	// thumbnail uploaded) [C1-03], "live-id" / "photo-id" (form: that live photo file by id, the other one uploaded) [C2-01]
 	send func(ctx context.Context, c *sender.Client, path string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error
 }
 
@@ -85,8 +85,15 @@ func b48c1Calls() []b48c1Call {
 		{"sendPhoto", sender.SendPhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			return b48c1Err(c.SendPhoto(ctx, sender.SendPhotoRequest{ChatID: chat, Photo: b48c1File(up, "p.jpg"), DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
 		}},
-		{"sendLivePhoto", sender.SendLivePhotoRequest{}, both, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
-			return b48c1Err(c.SendLivePhoto(ctx, sender.SendLivePhotoRequest{ChatID: chat, LivePhoto: b48c1File(up, "l.mp4"), Photo: b48c1File(up, "l.jpg"), DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
+		{"sendLivePhoto", sender.SendLivePhotoRequest{}, []string{"json", "upload", "live-id", "photo-id"}, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
+			live, photo := up, up
+			switch up { // one file by id, the other uploaded [C2-01]
+			case "live-id":
+				live, photo = "json", "upload"
+			case "photo-id":
+				live, photo = "upload", "json"
+			}
+			return b48c1Err(c.SendLivePhoto(ctx, sender.SendLivePhotoRequest{ChatID: chat, LivePhoto: b48c1File(live, "l.mp4"), Photo: b48c1File(photo, "l.jpg"), DirectMessagesTopicID: int(topic), SuggestedPostParameters: spp}))
 		}},
 		{"sendAudio", sender.SendAudioRequest{}, thumb, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			th := b48c1Thumb(up, "t.jpg") // a second file: the thumbnail
@@ -437,6 +444,10 @@ func TestB48C1_Wire(t *testing.T) {
 					assert.Equal(t, strconv.FormatInt(chat, 10), args["chat_id"], "the chat id unchanged")
 					assert.Equal(t, wantType, mediaType)
 					assert.Len(t, files, b48c1Files(c.method, up), "file parts")
+					if m, ok := b48c1Mixed[c.method+"/"+up]; ok { // which file is the upload and which goes by id [C2-02]
+						assert.Contains(t, files, m.upload, "the uploaded part")
+						assert.Equal(t, m.id, args[m.idField], "the file sent by id")
+					}
 					got, ok := args["suggested_post_parameters"]
 					if r.want == "" {
 						assert.False(t, ok, "suggested_post_parameters sent: %q", got)
@@ -479,10 +490,21 @@ func b48c1WireCall(t *testing.T, method string, reply http.HandlerFunc, call fun
 	return mediaType, args, files, raw, callErr
 }
 
+// b48c1Mixed names, for each path with one file by id and one upload, the upload's part and the id's field and value.
+var b48c1Mixed = map[string]struct{ upload, idField, id string }{
+	"sendAudio/thumb-upload":     {"thumbnail", "audio", "ID-a.mp3"},
+	"sendDocument/thumb-upload":  {"thumbnail", "document", "ID-d.txt"},
+	"sendVideo/thumb-upload":     {"thumbnail", "video", "ID-v.mp4"},
+	"sendAnimation/thumb-upload": {"thumbnail", "animation", "ID-g.gif"},
+	"sendVideoNote/thumb-upload": {"thumbnail", "video_note", "ID-n.mp4"},
+	"sendLivePhoto/live-id":      {"photo", "live_photo", "ID-l.mp4"},
+	"sendLivePhoto/photo-id":     {"live_photo", "photo", "ID-l.jpg"},
+}
+
 // b48c1Files is the number of file parts a call sends on a path.
 func b48c1Files(method, path string) int {
-	if path == "thumb-upload" {
-		return 1 // the thumbnail only [C1-03]
+	if path == "thumb-upload" || path == "live-id" || path == "photo-id" {
+		return 1 // the thumbnail only [C1-03]; the one uploaded live photo file [C2-01]
 	}
 	if !strings.HasPrefix(path, "upload") {
 		return 0

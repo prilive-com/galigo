@@ -477,6 +477,7 @@ func TestAPI101D_RequestShapes(t *testing.T) {
 		{"MessageEffectID", "string", "message_effect_id,omitempty"},
 		{"ReplyParameters", "*tg.ReplyParameters", "reply_parameters,omitempty"},
 		{"ReplyMarkup", "interface {}", "reply_markup,omitempty"},
+		{"SuggestedPostParameters", "*tg.SuggestedPostParameters", "suggested_post_parameters,omitempty"}, // B-48c1
 	}, api101dFields(sender.SendRichMessageRequest{}))
 	assert.Equal(t, []api101dField{
 		{"ChatID", "interface {}", "chat_id"},

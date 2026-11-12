@@ -99,6 +99,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -199,6 +200,8 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = []engine.Scenario{suites.S21_Stars()}
 	case "paid-media":
 		scenarios = []engine.Scenario{suites.S70_PaidMedia()}
+	case "suggested-posts":
+		scenarios = suites.AllSuggestedPostScenarios()
 	case "invoice":
 		scenarios = []engine.Scenario{suites.S22_Invoice()}
 	// Extended: Gifts
@@ -290,10 +293,11 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+		scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all")
+		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all")
 		os.Exit(1)
 	}
 
@@ -582,6 +586,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = []engine.Scenario{suites.S21_Stars()}
 	case "paid-media":
 		scenarios = []engine.Scenario{suites.S70_PaidMedia()}
+	case "suggested-posts":
+		scenarios = suites.AllSuggestedPostScenarios()
 	case "invoice":
 		scenarios = []engine.Scenario{suites.S22_Invoice()}
 	case "gifts":
@@ -693,6 +699,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+		scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
@@ -742,6 +749,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -797,6 +805,7 @@ Extended:
   star-balance      - Star balance only (S21)
   invoice           - Send invoice (S22)
   paid-media        - Send paid media: photo, video, live photo (S70)
+  suggested-posts   - Suggested post parameters reach the server: JSON and form (S71)
   gifts             - Gift catalog (S23)
   checklists        - Checklist lifecycle (S24)
 

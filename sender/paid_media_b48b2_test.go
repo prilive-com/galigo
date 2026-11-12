@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -24,7 +25,8 @@ import (
 
 // B-48b2: sendPaidMedia (Bot API 7.6; the live photo item since 10.0). TEST-PLAN §2.1.
 
-// b48b2RequestKeys is the spec's sendPaidMedia key list in order, without suggested_post_parameters (B-48c).
+// b48b2RequestKeys is the spec's sendPaidMedia key list in order, without suggested_post_parameters (B-48c1 adds
+// it as the struct's last field; suggested_post_b48c1_test.go tests it).
 var b48b2RequestKeys = []string{
 	"business_connection_id", "chat_id", "message_thread_id", "direct_messages_topic_id", "star_count", "media",
 	"payload", "caption", "parse_mode", "caption_entities", "show_caption_above_media", "disable_notification",
@@ -50,7 +52,7 @@ func TestB48B2_Shapes(t *testing.T) {
 			{"BusinessConnectionID", "string", "business_connection_id,omitempty"},
 			{"ChatID", "interface {}", "chat_id"},
 			{"MessageThreadID", "int", "message_thread_id,omitempty"},
-			{"DirectMessagesTopicID", "int", "direct_messages_topic_id,omitempty"},
+			{"DirectMessagesTopicID", "int64", "direct_messages_topic_id,omitempty"},
 			{"StarCount", "int", "star_count"},
 			{"Media", "[]sender.InputPaidMedia", "media"},
 			{"Payload", "string", "payload,omitempty"},
@@ -63,6 +65,7 @@ func TestB48B2_Shapes(t *testing.T) {
 			{"AllowPaidBroadcast", "bool", "allow_paid_broadcast,omitempty"},
 			{"ReplyParameters", "*tg.ReplyParameters", "reply_parameters,omitempty"},
 			{"ReplyMarkup", "interface {}", "reply_markup,omitempty"},
+			{"SuggestedPostParameters", "*tg.SuggestedPostParameters", "suggested_post_parameters,omitempty"}, // B-48c1
 		}
 		require.Equal(t, len(want), rt.NumField())
 		keys := make([]string, 0, rt.NumField())
@@ -74,7 +77,7 @@ func TestB48B2_Shapes(t *testing.T) {
 			assert.False(t, f.Anonymous, "field %s", f.Name)
 			keys = append(keys, strings.TrimSuffix(w.tag, ",omitempty"))
 		}
-		assert.Equal(t, b48b2RequestKeys, keys)
+		assert.Equal(t, append(slices.Clone(b48b2RequestKeys), "suggested_post_parameters"), keys)
 	})
 	t.Run("item", func(t *testing.T) {
 		rt := reflect.TypeFor[sender.InputPaidMedia]()

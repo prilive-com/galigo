@@ -31,6 +31,10 @@ type SendLivePhotoRequest struct {
 	MessageEffectID       string              `json:"message_effect_id,omitempty"`
 	ReplyParameters       *tg.ReplyParameters `json:"reply_parameters,omitempty"`
 	ReplyMarkup           any                 `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendLivePhoto sends a live photo. It is not retried: a resend could post the

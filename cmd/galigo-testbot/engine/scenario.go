@@ -407,6 +407,8 @@ type SendOptions struct {
 	Caption            string                 // For media methods (sendPhoto, sendDocument, etc.)
 	LinkPreviewOptions *tg.LinkPreviewOptions // For sendMessage
 	ReplyParameters    *tg.ReplyParameters    // For sendMessage (9.6)
+
+	SuggestedPostParameters *tg.SuggestedPostParameters // For sendMessage and sendPhoto (9.2)
 }
 
 // WithReplyMarkup sets the reply markup.
@@ -441,6 +443,13 @@ func WithLinkPreviewOptions(opts *tg.LinkPreviewOptions) SendOption {
 func WithReplyParameters(rp *tg.ReplyParameters) SendOption {
 	return func(o *SendOptions) {
 		o.ReplyParameters = rp
+	}
+}
+
+// WithSuggestedPostParameters sets suggested post parameters for sendMessage and sendPhoto (9.2).
+func WithSuggestedPostParameters(p *tg.SuggestedPostParameters) SendOption {
+	return func(o *SendOptions) {
+		o.SuggestedPostParameters = p
 	}
 }
 

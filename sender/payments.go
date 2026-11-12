@@ -37,6 +37,11 @@ type SendInvoiceRequest struct {
 	ProtectContent            bool                     `json:"protect_content,omitempty"`
 	ReplyParameters           *tg.ReplyParameters      `json:"reply_parameters,omitempty"`
 	ReplyMarkup               *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // CreateInvoiceLinkRequest represents a createInvoiceLink request.

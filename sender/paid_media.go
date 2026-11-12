@@ -66,13 +66,12 @@ func NewInputPaidMediaLivePhoto(video, photo InputFile) InputPaidMedia {
 // StarCount is the price in Telegram Stars (the spec allows 1-25000) and Media
 // holds up to 10 items; the client checks only that both are set and that each
 // item has its files (the server checks the limits). The request is always
-// sent as multipart/form-data. The spec's suggested_post_parameters is not
-// supported yet (B-48c).
+// sent as multipart/form-data.
 type SendPaidMediaRequest struct {
 	BusinessConnectionID  string              `json:"business_connection_id,omitempty"` // 7.9
 	ChatID                tg.ChatID           `json:"chat_id"`
 	MessageThreadID       int                 `json:"message_thread_id,omitempty"`
-	DirectMessagesTopicID int                 `json:"direct_messages_topic_id,omitempty"`
+	DirectMessagesTopicID int64               `json:"direct_messages_topic_id,omitempty"`
 	StarCount             int                 `json:"star_count"`
 	Media                 []InputPaidMedia    `json:"media"`
 	Payload               string              `json:"payload,omitempty"` // 7.10: comes back in TransactionPartnerUser and Update.PurchasedPaidMedia
@@ -85,6 +84,10 @@ type SendPaidMediaRequest struct {
 	AllowPaidBroadcast    bool                `json:"allow_paid_broadcast,omitempty"`
 	ReplyParameters       *tg.ReplyParameters `json:"reply_parameters,omitempty"`
 	ReplyMarkup           any                 `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendPaidMedia sends paid media (Bot API 7.6). It is not retried: a resend could

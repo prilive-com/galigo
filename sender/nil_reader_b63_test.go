@@ -332,6 +332,15 @@ func TestB63_Builder(t *testing.T) {
 		// The whole value must be JSON: an object followed by text does not
 		// count (test round t2, Claude A-T2-03).
 		{"trailing_text_ignored", "file1", "media", payload{A: `{"media":"attach://file1"} x`, Media: `{"media":"attach://file1"}`}},
+		// A nested value that is not the reference string never counts: null,
+		// a bool, a number, or an object with no reference (change round c1,
+		// Codex O-C1-01).
+		{"nested_null_ignored", "file1", "media", payload{A: `[null]`, Media: `{"media":"attach://file1"}`}},
+		{"nested_bools_ignored", "file1", "media", payload{A: `[true,false]`, Media: `{"media":"attach://file1"}`}},
+		{"nested_number_ignored", "file1", "media", payload{A: `{"n":0}`, Media: `{"media":"attach://file1"}`}},
+		{"object_without_ref_ignored", "file1", "media", payload{A: `[{"n":"x"}]`, Media: `{"media":"attach://file1"}`}},
+		// JSON allows white space before the value (change round c1, Claude A-C1-01).
+		{"leading_space_value", "file1", "media", payload{Media: ` [{"type":"photo","media":"attach://file1"}]`}},
 	}
 	require.Equal(t, []byte{0x5c, 'u', '0', '0', '6', '1'}, []byte(b63EscA), "the escape must be bytes, not the letter")
 	for _, row := range rows {

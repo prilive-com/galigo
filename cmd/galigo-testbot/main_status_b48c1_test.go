@@ -19,10 +19,13 @@ import (
 // the set of groups in each "all" case must be a subset of the set in each status function.
 //
 // [C2-01 Codex, C2-03 Claude] A group counts only when its call is an argument of the one supported shape,
-// `scenarios := append(suites.AllXScenarios(), suites.AllYScenarios()...)` or
+// `scenarios := append(suites.AllXScenarios(), suites.AllYScenarios()...)` (`=` in the "all" cases) or
 // `scenarios = append(scenarios, suites.AllXScenarios()...)`. Any other write to `scenarios`, and any
 // suites.All*Scenarios call outside that shape (a discarded result, a loop), fails the test; in an "all" case every
 // statement must have that shape, so a group reached through a helper fails too. A new shape needs this test changed.
+// [C3-01, C3-02 Claude, C3-01 Codex] Each supported append must be a top-level statement of the list's own block (the
+// function body, or the "all" case body), so an append inside an `if` or in a nested block with a second `scenarios`
+// fails; and the two-group append must be the first one, and only the first, so starting the list again fails.
 func TestB48C1_StatusListsCoverAll(t *testing.T) {
 	f, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, parser.SkipObjectResolution)
 	require.NoError(t, err)
@@ -74,12 +77,18 @@ func TestB48C1_StatusListsCoverAll(t *testing.T) {
 		return nil, false
 	}
 	// groups returns the groups appended under n. Every write to scenarios and every group call under n must be
-	// part of a supported append; with strict, every statement in stmts must be one.
+	// part of a supported append that is one of stmts (the list's own block); with strict, every statement in stmts
+	// must be one.
 	groups := func(where string, n ast.Node, stmts []ast.Stmt, strict bool) map[string]bool {
-		got, inAppend := map[string]bool{}, map[ast.Node]bool{}
+		got, inAppend, top := map[string]bool{}, map[ast.Node]bool{}, map[ast.Stmt]bool{}
+		for _, st := range stmts {
+			top[st] = true
+		}
 		ast.Inspect(n, func(n ast.Node) bool {
 			if st, ok := n.(ast.Stmt); ok {
 				if gs, ok := appended(st); ok {
+					assert.True(t, top[st], "%s: an append that is not a statement of the list itself", where)
+					assert.Equal(t, len(gs) == 2, len(got) == 0, "%s: the two-group append must be the first, and only the first", where)
 					for _, g := range gs {
 						got[g] = true
 					}
@@ -131,7 +140,7 @@ func TestB48C1_StatusListsCoverAll(t *testing.T) {
 		assert.True(t, all["AllSuggestedPostScenarios"], "%s: S71 runs in all", run)
 		for _, status := range []string{"showCoverageStatus", "handleStatus"} {
 			require.Contains(t, funcs, status)
-			counted := groups(status, funcs[status], nil, false)
+			counted := groups(status, funcs[status], funcs[status].Body.List, false)
 			var missing []string
 			for g := range all {
 				if !counted[g] {

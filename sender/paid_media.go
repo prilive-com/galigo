@@ -65,8 +65,9 @@ func NewInputPaidMediaLivePhoto(video, photo InputFile) InputPaidMedia {
 //
 // StarCount is the price in Telegram Stars (the spec allows 1-25000) and Media
 // holds up to 10 items; the client checks only that both are set and that each
-// item has its files (the server checks the limits). The request is always sent as multipart/form-data. The
-// spec's suggested_post_parameters is not supported yet (B-48c).
+// item has its files (the server checks the limits). The request is always
+// sent as multipart/form-data. The spec's suggested_post_parameters is not
+// supported yet (B-48c).
 type SendPaidMediaRequest struct {
 	BusinessConnectionID  string              `json:"business_connection_id,omitempty"` // 7.9
 	ChatID                tg.ChatID           `json:"chat_id"`
@@ -131,9 +132,10 @@ func validatePaidMediaItems(list []InputPaidMedia) error {
 }
 
 // handlePaidMedia writes sendPaidMedia's media list: one JSON item per
-// InputPaidMedia, in list order. Each upload (the media, a live photo's static
-// photo, a video's thumbnail and cover, in that order) becomes an attach://fileN
-// file part; a file id or URL is written as given.
+// InputPaidMedia, in list order. Each upload becomes an attach://fileN file
+// part, in this order: the media, then Media.Photo, Thumbnail and Cover when
+// set, whatever the Type (a live_photo item without Media.Photo is an error);
+// a file id or URL is written as given.
 func handlePaidMedia(req *MultipartRequest, fieldName string, list []InputPaidMedia, attachIdx *int) error {
 	items := make([]map[string]any, 0, len(list))
 	for i, m := range list {

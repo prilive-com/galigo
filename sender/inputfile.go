@@ -52,10 +52,11 @@ type InputFile struct {
 	// the item's "photo" value in sendMediaGroup, editMessageMedia, the poll
 	// media of sendPoll (media, explanation_media, an option's media) and rich
 	// message media (Bot API 10.2: InputMedia.MarshalJSON and the rich message
-	// multipart builder), and sendPaidMedia's media (InputPaidMedia). Use a file id or an upload; the spec says a URL is not
-	// supported. Only those item encoders read it: single-file fields (such as
-	// SendPhotoRequest.Photo) and InputFile.MarshalJSON ignore it, and Photo.Photo is
-	// never read. Set it with WithPhoto.
+	// multipart builder), and sendPaidMedia's media (InputPaidMedia). Use a file
+	// id or an upload; the spec says a URL is not supported. Only those item
+	// encoders read it: single-file fields (such as SendPhotoRequest.Photo) and
+	// InputFile.MarshalJSON ignore it, and Photo.Photo is never read. Set it with
+	// WithPhoto.
 	Photo *InputFile
 }
 

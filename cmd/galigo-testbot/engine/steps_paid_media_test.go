@@ -253,12 +253,15 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		server := testutil.NewMockServer(t)
+		branch := make(chan string, 1) // which way the handler ended (O-C1-02)
 		server.On("/bot"+testutil.TestToken+"/sendPaidMedia", func(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			select {
 			case <-r.Context().Done():
+				branch <- "cancelled"
 			case <-time.After(3 * time.Second): // the caller's cancel was lost: reply, so the row fails
 				paidReply(w)
+				branch <- "replied"
 			}
 		})
 		msg, err := NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())).SendPaidMedia(ctx, req)
@@ -266,6 +269,12 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Nil(t, msg)
 		assert.Equal(t, 1, server.CaptureCount())
+		select {
+		case b := <-branch:
+			assert.Equal(t, "cancelled", b, "the HTTP request itself must see the cancel; a returned context.Canceled alone is not proof")
+		case <-time.After(5 * time.Second):
+			t.Fatal("the handler did not end")
+		}
 	})
 	t.Run("error", func(t *testing.T) {
 		bad := func(w http.ResponseWriter) { testutil.ReplyServerError(w, http.StatusBadGateway, "Bad Gateway") }

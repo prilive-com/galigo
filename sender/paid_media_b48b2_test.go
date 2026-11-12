@@ -275,9 +275,9 @@ func TestB48B2_Wire(t *testing.T) {
 	})
 }
 
-// b48b2BadItems are the five item errors (AC3), each with its message. The
-// last three repeat a check on another Type: the checks apply whatever the
-// Type (A-T3-01).
+// b48b2BadItems are the item errors (AC3), each with its message: every file
+// check on every Type (photo, video, live_photo), since the checks apply
+// whatever the Type (A-T3-01, O-C1-01), and the live photo without its photo.
 func b48b2BadItems() []struct {
 	name string
 	item sender.InputPaidMedia
@@ -285,6 +285,7 @@ func b48b2BadItems() []struct {
 } {
 	empty := sender.InputFile{}
 	v := sender.FromFileID("V")
+	lv := sender.FromFileID("LV").WithPhoto(sender.FromFileID("LP")) // a valid live photo's files
 	return []struct {
 		name string
 		item sender.InputPaidMedia
@@ -298,6 +299,11 @@ func b48b2BadItems() []struct {
 		{"empty cover on photo", sender.InputPaidMedia{Type: "photo", Media: sender.FromFileID("P"), Cover: &empty}, "cover is empty"},
 		{"empty thumbnail on photo", sender.InputPaidMedia{Type: "photo", Media: sender.FromFileID("P"), Thumbnail: &empty}, "thumbnail is empty"},
 		{"empty photo on live photo", sender.InputPaidMedia{Type: "live_photo", Media: v.WithPhoto(empty)}, "photo is empty"},
+		{"empty media on video", sender.InputPaidMedia{Type: "video"}, "media is required"},
+		{"empty media on live photo", sender.InputPaidMedia{Type: "live_photo", Media: empty.WithPhoto(sender.FromFileID("LP"))}, "media is required"},
+		{"empty photo on video", sender.InputPaidMedia{Type: "video", Media: v.WithPhoto(empty)}, "photo is empty"},
+		{"empty thumbnail on live photo", sender.InputPaidMedia{Type: "live_photo", Media: lv, Thumbnail: &empty}, "thumbnail is empty"},
+		{"empty cover on live photo", sender.InputPaidMedia{Type: "live_photo", Media: lv, Cover: &empty}, "cover is empty"},
 	}
 }
 
@@ -363,8 +369,8 @@ func TestB48B2_Validation(t *testing.T) {
 	}
 }
 
-// b48b2BadRequests are the 12 bad rows of AC3 (8 classes; the chat id class has two rows;
-// three item classes are repeated on another Type, A-T3-01), each with its exact error.
+// b48b2BadRequests are the 17 bad rows of AC3: 4 request rows (the chat id class has two)
+// and the 13 item rows of b48b2BadItems, each with its exact error.
 func b48b2BadRequests() []struct {
 	req  sender.SendPaidMediaRequest
 	text string
@@ -424,6 +430,7 @@ func TestB48B2_BadCallsTouchNothing(t *testing.T) {
 		}
 		_, err = client.SendPaidMedia(context.Background(), good)
 		assert.ErrorIs(t, err, gobreaker.ErrOpenState, "control: the breaker opens after two 502s (no withRetry, so no ErrCircuitOpen wrap)")
+		assert.NotErrorIs(t, err, tg.ErrCircuitOpen, "the open breaker is not wrapped in ErrCircuitOpen (upgrade note; A-C1-01)")
 		assert.Equal(t, 3, server.CaptureCount())
 	})
 	t.Run("limiter", func(t *testing.T) {
@@ -457,14 +464,19 @@ func TestB48B2_Builder(t *testing.T) {
 		assert.Equal(t, "[]", mr.Params["media"])
 	})
 	builderText := map[string]string{
-		"empty media":               "field media: item 1: media: InputFile must have FileID, URL, or Reader set",
-		"live photo without photo":  "field media: item 1: live_photo requires Media.Photo",
-		"empty photo":               "field media: item 1: photo: InputFile must have FileID, URL, or Reader set",
-		"empty thumbnail":           "field media: item 1: thumbnail: InputFile must have FileID, URL, or Reader set",
-		"empty cover":               "field media: item 1: cover: InputFile must have FileID, URL, or Reader set",
-		"empty cover on photo":      "field media: item 1: cover: InputFile must have FileID, URL, or Reader set",
-		"empty thumbnail on photo":  "field media: item 1: thumbnail: InputFile must have FileID, URL, or Reader set",
-		"empty photo on live photo": "field media: item 1: photo: InputFile must have FileID, URL, or Reader set",
+		"empty media":                   "field media: item 1: media: InputFile must have FileID, URL, or Reader set",
+		"live photo without photo":      "field media: item 1: live_photo requires Media.Photo",
+		"empty photo":                   "field media: item 1: photo: InputFile must have FileID, URL, or Reader set",
+		"empty thumbnail":               "field media: item 1: thumbnail: InputFile must have FileID, URL, or Reader set",
+		"empty cover":                   "field media: item 1: cover: InputFile must have FileID, URL, or Reader set",
+		"empty cover on photo":          "field media: item 1: cover: InputFile must have FileID, URL, or Reader set",
+		"empty thumbnail on photo":      "field media: item 1: thumbnail: InputFile must have FileID, URL, or Reader set",
+		"empty photo on live photo":     "field media: item 1: photo: InputFile must have FileID, URL, or Reader set",
+		"empty media on video":          "field media: item 1: media: InputFile must have FileID, URL, or Reader set",
+		"empty media on live photo":     "field media: item 1: media: InputFile must have FileID, URL, or Reader set",
+		"empty photo on video":          "field media: item 1: photo: InputFile must have FileID, URL, or Reader set",
+		"empty thumbnail on live photo": "field media: item 1: thumbnail: InputFile must have FileID, URL, or Reader set",
+		"empty cover on live photo":     "field media: item 1: cover: InputFile must have FileID, URL, or Reader set",
 	}
 	good := sender.NewInputPaidMediaPhoto(sender.FromFileID("P"))
 	for _, b := range b48b2BadItems() {

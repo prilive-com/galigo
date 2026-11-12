@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"mime/multipart"
 	"reflect"
 	"slices"
@@ -17,7 +18,7 @@ import (
 type FilePart struct {
 	FieldName string    // e.g., "photo", "document", "thumbnail"
 	FileName  string    // e.g., "photo.jpg"
-	Reader    io.Reader // File content
+	Reader    io.Reader // File content; nil or a nil pointer is a *tg.ValidationError
 }
 
 // MultipartRequest represents a request with files and parameters.
@@ -50,6 +51,10 @@ func (e *MultipartEncoder) Close() error {
 
 // Encode writes the multipart request.
 func (e *MultipartEncoder) Encode(req MultipartRequest) error {
+	if err := checkFileParts(req.Files, req.Params); err != nil {
+		return err
+	}
+
 	// 1. Write all file parts (explicit, type-safe)
 	for _, file := range req.Files {
 		if err := e.writeFile(file); err != nil {
@@ -197,7 +202,69 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 		}
 	}
 
+	if err := checkFileParts(result.Files, result.Params); err != nil {
+		return result, false, err
+	}
 	return result, formOnly, nil
+}
+
+// checkFileParts returns a *tg.ValidationError for the first part whose reader
+// is nil (B-63): an InputFile.Source that returned nil, or a nil pointer held
+// in the io.Reader. io.Copy would panic on it in the encoder goroutine. The
+// error names the field that refers to the part (see partField).
+func checkFileParts(parts []FilePart, params map[string]string) error {
+	for _, part := range parts {
+		if !isNilReader(part.Reader) {
+			continue
+		}
+		name := partField(part.FieldName, params)
+		return fmt.Errorf("field %s: %w", name, tg.NewValidationError(name,
+			"part "+part.FieldName+": upload reader is nil (InputFile.Source returned nil, or the reader is a nil pointer)"))
+	}
+	return nil
+}
+
+// partField names the request field of a file part: the first field, in key
+// order, whose value is a JSON object or array holding the string
+// "attach://<part>" (media groups, edit media, poll, rich message and paid
+// media items, stories, profile photos, stickers), else the part's own name,
+// which is the field name for a single-file field (handleInputFile).
+func partField(part string, params map[string]string) string {
+	ref := "attach://" + part
+	for _, key := range slices.Sorted(maps.Keys(params)) {
+		var v any
+		if json.Unmarshal([]byte(params[key]), &v) == nil && holdsRef(v, ref, false) {
+			return key
+		}
+	}
+	return part
+}
+
+// holdsRef reports whether v holds the string ref as a value nested in a JSON
+// object or array. Object keys and a top-level string do not count.
+func holdsRef(v any, ref string, nested bool) bool {
+	switch v := v.(type) {
+	case string:
+		return nested && v == ref
+	case []any:
+		return slices.ContainsFunc(v, func(e any) bool { return holdsRef(e, ref, true) })
+	case map[string]any:
+		for _, e := range v {
+			if holdsRef(e, ref, true) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isNilReader reports whether r is nil or holds a nil pointer.
+func isNilReader(r io.Reader) bool {
+	if r == nil {
+		return true
+	}
+	v := reflect.ValueOf(r)
+	return v.Kind() == reflect.Pointer && v.IsNil()
 }
 
 // handlePollField writes a poll media field (Bot API 10.0) and reports whether

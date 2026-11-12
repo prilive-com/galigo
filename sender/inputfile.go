@@ -28,12 +28,15 @@ type InputFile struct {
 	// Content is streamed directly - not buffered in memory.
 	// WARNING: io.Reader can only be consumed once. If the request is retried
 	// (e.g., on 429/5xx), the retry will send an empty file. Prefer FromBytes
-	// for retry-safe uploads, or set Source instead.
+	// for retry-safe uploads, or set Source instead. When it is used for an
+	// upload, a nil pointer here returns a *tg.ValidationError and that
+	// attempt is not sent.
 	Reader io.Reader
 
 	// Source is a factory that returns a fresh io.Reader for each attempt.
 	// When set, this takes priority over Reader for multipart uploads,
-	// making the request retry-safe.
+	// making the request retry-safe. It must return a non-nil reader: nil, or a
+	// nil pointer, returns a *tg.ValidationError and that attempt is not sent.
 	Source func() io.Reader
 
 	// FileName is required when Reader or Source is set.

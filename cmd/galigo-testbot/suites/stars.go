@@ -41,10 +41,26 @@ func S22_Invoice() engine.Scenario {
 	}
 }
 
+// S70_PaidMedia sends paid media (Bot API 7.6) priced at one Star: a photo, a video and a live photo (10.0), each
+// uploaded, and checks the returned message's paid_media. Nobody buys it; the cleanup deletes it.
+func S70_PaidMedia() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S70-PaidMedia",
+		ScenarioDescription: "sendPaidMedia with a photo, a video and a live photo (7.6, 10.0)",
+		CoveredMethods:      []string{"sendPaidMedia"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendPaidMediaStep{},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllStarsScenarios returns all Stars/payment scenarios.
 func AllStarsScenarios() []engine.Scenario {
 	return []engine.Scenario{
 		S21_Stars(),
 		S22_Invoice(),
+		S70_PaidMedia(),
 	}
 }

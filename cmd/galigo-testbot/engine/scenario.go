@@ -368,6 +368,7 @@ type SenderClient interface {
 
 	// Polls and prepared keyboard buttons (9.6)
 	SendPoll(ctx context.Context, req sender.SendPollRequest) (*tg.Message, error)
+	SendPaidMedia(ctx context.Context, req sender.SendPaidMediaRequest) (*tg.Message, error) // 7.6
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
 
 	// Reactions and administrators (10.0)

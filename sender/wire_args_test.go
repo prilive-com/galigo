@@ -570,6 +570,11 @@ func fileCalls() []fileCall {
 	pollPhoto, optionPhoto := sender.NewInputMediaPhoto(sender.FromFileID("A")), sender.NewInputMediaPhoto(sender.FromFileID("B"))
 	poll := sender.SendPollRequest{ChatID: id, Question: "Q", Media: &pollPhoto,
 		Options: []sender.InputPollOption{{Text: "a", Media: &optionPhoto}, {Text: "b"}}}
+	// B-48b2: sendPaidMedia by file ids (always a form).
+	paid := sender.SendPaidMediaRequest{ChatID: id, StarCount: 1, Media: []sender.InputPaidMedia{
+		sender.NewInputPaidMediaPhoto(sender.FromFileID("A")),
+		sender.NewInputPaidMediaLivePhoto(sender.FromFileID("B"), sender.FromFileID("C")),
+	}}
 
 	msg := func(f func() (*tg.Message, error)) error { _, err := f(); return err }
 	return []fileCall{
@@ -609,6 +614,9 @@ func fileCalls() []fileCall {
 		}},
 		{"sendPoll", "sendPoll", poll, mp, func(ctx context.Context, c *sender.Client) error { // API100D T-s-14
 			return msg(func() (*tg.Message, error) { return c.SendPoll(ctx, poll) })
+		}},
+		{"sendPaidMedia", "sendPaidMedia", paid, mp, func(ctx context.Context, c *sender.Client) error { // B-48b2
+			return msg(func() (*tg.Message, error) { return c.SendPaidMedia(ctx, paid) })
 		}},
 		{"sendLivePhoto", "sendLivePhoto", live, js, func(ctx context.Context, c *sender.Client) error {
 			return msg(func() (*tg.Message, error) { return c.SendLivePhoto(ctx, live) })
@@ -683,12 +691,12 @@ func TestWire_W7_Routing(t *testing.T) {
 			assertFiles(t, map[string]wireFile{}, files)
 		})
 	}
-	assert.Equal(t, 18, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia; B-46: - setMyProfilePhoto (builder payload)
+	assert.Equal(t, 19, n, "W7 rows") // API100B T-s-19: 14 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia; B-46: - setMyProfilePhoto (builder payload); B-48b2: + sendPaidMedia
 }
 
 func TestWire_W8_ContentType(t *testing.T) {
 	calls := fileCalls()
-	require.Len(t, calls, 25) // API100B T-s-19: 20 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia
+	require.Len(t, calls, 26) // API100B T-s-19: 20 + 3 live-photo rows; API100D T-s-14: + sendPoll; API102C T-w7: + editEphemeralMessageMedia; B-48b2: + sendPaidMedia
 	for _, fc := range calls {
 		t.Run(fc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
@@ -717,6 +725,7 @@ var guardPartA = []string{
 	"SendLivePhotoRequest",             // API100B T-s-19
 	"SendPollRequest",                  // API100D T-s-14
 	"EditEphemeralMessageMediaRequest", // API102C T-w7
+	"SendPaidMediaRequest",             // B-48b2
 }
 
 var guardPartB = []string{
@@ -727,6 +736,7 @@ var guardPartB = []string{
 	"InputStoryContentPhoto", "InputStoryContentVideo",
 	"InputFile",       // API100B T-s-19: InputFile.Photo is a nested *InputFile
 	"InputPollOption", // API100D T-s-14: InputPollOption.Media is a nested *InputMedia
+	"InputPaidMedia",  // B-48b2: sendPaidMedia's items, built by handlePaidMedia
 }
 
 // guardTypes returns the union of set 1 (exported structs with a field of a
@@ -767,7 +777,7 @@ func guardTypes(t *testing.T, sources map[string]string) []string {
 		})
 	}
 
-	fileTypes := map[string]bool{"InputFile": true, "InputMedia": true, "InputSticker": true}
+	fileTypes := map[string]bool{"InputFile": true, "InputMedia": true, "InputSticker": true, "InputPaidMedia": true} // B-48b2: InputPaidMedia
 	isFileType := func(e ast.Expr) bool {
 		switch x := e.(type) {
 		case *ast.Ident:
@@ -822,7 +832,7 @@ func senderSources(t *testing.T) map[string]string {
 func TestWire_W7_Guard(t *testing.T) {
 	want := append(append([]string{}, guardPartA...), guardPartB...)
 	sort.Strings(want)
-	require.Len(t, want, 31) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile; API100D T-s-14: + SendPollRequest + InputPollOption; API102C T-w7: + EditEphemeralMessageMediaRequest
+	require.Len(t, want, 33) // API100B T-s-19: 26 + SendLivePhotoRequest + InputFile; API100D T-s-14: + SendPollRequest + InputPollOption; API102C T-w7: + EditEphemeralMessageMediaRequest; B-48b2: + SendPaidMediaRequest + InputPaidMedia
 
 	assert.Equal(t, want, guardTypes(t, senderSources(t)))
 

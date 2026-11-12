@@ -150,8 +150,8 @@ func buildMultipartRequest(req any) (MultipartRequest, bool, error) {
 				return result, false, fmt.Errorf("field %s: %w", fieldName, err)
 			}
 
-		case *InputMedia, []InputPollOption, tg.InputRichMessage, *tg.InputRichMessage:
-			// poll media (Bot API 10.0) and rich message media (Bot API 10.2); a nil pointer field is skipped above,
+		case *InputMedia, []InputPollOption, tg.InputRichMessage, *tg.InputRichMessage, []InputPaidMedia:
+			// poll media (Bot API 10.0), rich message media (Bot API 10.2) and paid media (Bot API 7.6); a nil pointer field is skipped above,
 			// a nil pointer held in an `any` field is handled in handleMediaField
 			needsForm, err := handleMediaField(&result, fieldName, v, &attachIdx)
 			if err != nil {

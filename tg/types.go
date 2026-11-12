@@ -40,10 +40,12 @@ type Message struct {
 	ViaBot                *User                 `json:"via_bot,omitempty"`
 	EditDate              int64                 `json:"edit_date,omitempty"`
 	HasProtectedContent   bool                  `json:"has_protected_content,omitempty"`
+	IsPaidPost            bool                  `json:"is_paid_post,omitempty"` // a paid post: do not delete it for 24 hours or edit it (Bot API 9.2)
 	MediaGroupID          string                `json:"media_group_id,omitempty"`
 	AuthorSignature       string                `json:"author_signature,omitempty"`
 	Text                  string                `json:"text,omitempty"`
 	Entities              []MessageEntity       `json:"entities,omitempty"`
+	SuggestedPostInfo     *SuggestedPostInfo    `json:"suggested_post_info,omitempty"`
 	RichMessage           *RichMessage          `json:"rich_message,omitempty"` // 10.1
 	Caption               string                `json:"caption,omitempty"`
 	CaptionEntities       []MessageEntity       `json:"caption_entities,omitempty"`
@@ -86,6 +88,14 @@ type Message struct {
 	// Client.AnswerGuestQuery; do not use its chat id as a normal chat, and do not edit the message through
 	// Editable or MessageSig, because they would target that chat id.
 	GuestQueryID string `json:"guest_query_id,omitempty"`
+
+	// Suggested post service messages (Bot API 9.2), in a channel direct messages chat. SuggestedPostInfo (above)
+	// is set on the suggested post itself.
+	SuggestedPostApproved       *SuggestedPostApproved       `json:"suggested_post_approved,omitempty"`
+	SuggestedPostApprovalFailed *SuggestedPostApprovalFailed `json:"suggested_post_approval_failed,omitempty"`
+	SuggestedPostDeclined       *SuggestedPostDeclined       `json:"suggested_post_declined,omitempty"`
+	SuggestedPostPaid           *SuggestedPostPaid           `json:"suggested_post_paid,omitempty"`
+	SuggestedPostRefunded       *SuggestedPostRefunded       `json:"suggested_post_refunded,omitempty"`
 }
 
 // MessageSig implements Editable.

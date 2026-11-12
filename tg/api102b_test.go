@@ -132,7 +132,7 @@ func TestAPI102B_ZeroEncode(t *testing.T) {
 }
 
 // T-shape: each planned field exists with its type and tag, is not embedded, and the holders have exactly the
-// planned number of fields (Message 62 at B-48b1; ReplyParameters 8 + 1; BotCommand 2 + 1).
+// planned number of fields (Message 62 at B-48b1, 69 at B-48c2; ReplyParameters 8 + 1; BotCommand 2 + 1).
 func TestAPI102B_Shapes(t *testing.T) {
 	for _, tc := range []struct {
 		v               any
@@ -157,7 +157,7 @@ func TestAPI102B_Shapes(t *testing.T) {
 	for _, tc := range []struct {
 		v    any
 		want int
-	}{{tg.BotCommand{}, 3}, {tg.ReplyParameters{}, 9}, {tg.Message{}, 62}} {
+	}{{tg.BotCommand{}, 3}, {tg.ReplyParameters{}, 9}, {tg.Message{}, 69}} {
 		t.Run(fmt.Sprintf("NumField %T", tc.v), func(t *testing.T) {
 			assert.Equal(t, tc.want, reflect.TypeOf(tc.v).NumField())
 		})

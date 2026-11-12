@@ -352,13 +352,15 @@ func TestB48B1_Shapes(t *testing.T) {
 		}
 	})
 	// T1-05, T3-02: the full field order of the holders without another full-order row (ExternalReplyInfo: the
-	// TestB48A_Shapes rows). Base order plus the one planned field (Message: 61 base names, PaidMedia after Document).
+	// TestB48A_Shapes rows). Base order plus the one planned field (Message: 61 base names, PaidMedia after Document;
+	// B-48c2: IsPaidPost after HasProtectedContent, SuggestedPostInfo after Entities, the five service fields at the end).
 	t.Run("holder_order", func(t *testing.T) {
 		for _, h := range []struct {
 			v     any
 			names []string
 		}{
-			{tg.Message{}, []string{"MessageID", "MessageThreadID", "From", "SenderChat", "ReceiverUser", "EphemeralMessageID", "Date", "Chat", "ForwardFrom", "ForwardFromChat", "ForwardDate", "ForwardOrigin", "IsTopicMessage", "IsAutomaticForward", "ReplyToMessage", "ExternalReply", "Quote", "ViaBot", "EditDate", "HasProtectedContent", "MediaGroupID", "AuthorSignature", "Text", "Entities", "RichMessage", "Caption", "CaptionEntities", "Photo", "Document", "PaidMedia", "Animation", "Video", "LivePhoto", "Audio", "Voice", "Sticker", "VideoNote", "Contact", "Location", "Venue", "Poll", "NewChatMembers", "LeftChatMember", "NewChatTitle", "NewChatPhoto", "DeleteChatPhoto", "GroupChatCreated", "SupergroupChatCreated", "ChannelChatCreated", "ChatOwnerLeft", "ChatOwnerChanged", "SenderTag", "ManagedBotCreated", "PollOptionAdded", "PollOptionDeleted", "ReplyToPollOptionID", "GuestBotCallerUser", "GuestBotCallerChat", "CommunityChatAdded", "CommunityChatRemoved", "ReplyMarkup", "GuestQueryID"}},
+			{tg.Message{}, []string{"MessageID", "MessageThreadID", "From", "SenderChat", "ReceiverUser", "EphemeralMessageID", "Date", "Chat", "ForwardFrom", "ForwardFromChat", "ForwardDate", "ForwardOrigin", "IsTopicMessage", "IsAutomaticForward", "ReplyToMessage", "ExternalReply", "Quote", "ViaBot", "EditDate", "HasProtectedContent", "IsPaidPost", "MediaGroupID", "AuthorSignature", "Text", "Entities", "SuggestedPostInfo", "RichMessage", "Caption", "CaptionEntities", "Photo", "Document", "PaidMedia", "Animation", "Video", "LivePhoto", "Audio", "Voice", "Sticker", "VideoNote", "Contact", "Location", "Venue", "Poll", "NewChatMembers", "LeftChatMember", "NewChatTitle", "NewChatPhoto", "DeleteChatPhoto", "GroupChatCreated", "SupergroupChatCreated", "ChannelChatCreated", "ChatOwnerLeft", "ChatOwnerChanged", "SenderTag", "ManagedBotCreated", "PollOptionAdded", "PollOptionDeleted", "ReplyToPollOptionID", "GuestBotCallerUser", "GuestBotCallerChat", "CommunityChatAdded", "CommunityChatRemoved", "ReplyMarkup", "GuestQueryID",
+				"SuggestedPostApproved", "SuggestedPostApprovalFailed", "SuggestedPostDeclined", "SuggestedPostPaid", "SuggestedPostRefunded"}},
 			{tg.TransactionPartnerUser{}, []string{"Type", "User", "InvoicePayload", "PaidMediaPayload", "SubscriptionPeriod", "PaidMedia", "Gift"}},
 			{tg.Update{}, []string{"UpdateID", "Message", "EditedMessage", "ChannelPost", "EditedChannelPost", "CallbackQuery",
 				"InlineQuery", "ChosenInlineResult", "ShippingQuery", "PreCheckoutQuery", "PurchasedPaidMedia", "Poll", "PollAnswer",

@@ -339,8 +339,16 @@ func TestB63_Builder(t *testing.T) {
 		{"nested_bools_ignored", "file1", "media", payload{A: `[true,false]`, Media: `{"media":"attach://file1"}`}},
 		{"nested_number_ignored", "file1", "media", payload{A: `{"n":0}`, Media: `{"media":"attach://file1"}`}},
 		{"object_without_ref_ignored", "file1", "media", payload{A: `[{"n":"x"}]`, Media: `{"media":"attach://file1"}`}},
-		// JSON allows white space before the value (change round c1, Claude A-C1-01).
-		{"leading_space_value", "file1", "media", payload{Media: ` [{"type":"photo","media":"attach://file1"}]`}},
+		// Empty containers and nested strings shorter than the reference
+		// never count (change round c2, Codex O-C2-02 = Claude A-C2-03, and
+		// Claude A-C2-01).
+		{"empty_object_ignored", "file1", "media", payload{A: `{}`, Media: `{"media":"attach://file1"}`}},
+		{"empty_containers_ignored", "file1", "media", payload{A: `[[],{}]`, Media: `{"media":"attach://file1"}`}},
+		{"nested_ref_prefix_ignored", "file1", "media", payload{A: `["","attach://","attach://file"]`, Media: `{"media":"attach://file1"}`}},
+		// JSON allows any of its four white space bytes before the value
+		// (change round c1, Claude A-C1-01; all four since round c2, Codex
+		// O-C2-01 = Claude A-C2-02).
+		{"leading_whitespace_value", "file1", "media", payload{Media: " \t\r\n" + `[{"type":"photo","media":"attach://file1"}]`}},
 	}
 	require.Equal(t, []byte{0x5c, 'u', '0', '0', '6', '1'}, []byte(b63EscA), "the escape must be bytes, not the letter")
 	for _, row := range rows {

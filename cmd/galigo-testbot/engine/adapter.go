@@ -57,6 +57,8 @@ func (a *SenderAdapter) SendMessage(ctx context.Context, chatID int64, text stri
 		ParseMode:          tg.ParseMode(options.ParseMode),
 		LinkPreviewOptions: options.LinkPreviewOptions,
 		ReplyParameters:    options.ReplyParameters,
+
+		SuggestedPostParameters: options.SuggestedPostParameters,
 	}
 
 	if options.ReplyMarkup != nil {
@@ -132,6 +134,8 @@ func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo Media
 		Photo:     mediaInputToInputFile(photo),
 		Caption:   options.Caption,
 		ParseMode: tg.ParseMode(options.ParseMode),
+
+		SuggestedPostParameters: options.SuggestedPostParameters,
 	})
 }
 

@@ -19,6 +19,11 @@ type SendMessageRequest struct {
 
 	// Deprecated: Use LinkPreviewOptions.IsDisabled instead.
 	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendPhotoRequest represents a request to send a photo.
@@ -31,6 +36,11 @@ type SendPhotoRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // EditMessageTextRequest represents a request to edit message text.
@@ -88,6 +98,11 @@ type ForwardMessageRequest struct {
 	MessageID           int       `json:"message_id"`
 	DisableNotification bool      `json:"disable_notification,omitempty"`
 	ProtectContent      bool      `json:"protect_content,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // CopyMessageRequest represents a request to copy a message.
@@ -101,6 +116,11 @@ type CopyMessageRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // AnswerCallbackQueryRequest represents a request to answer a callback query.
@@ -150,6 +170,11 @@ type SendDocumentRequest struct {
 	ProtectContent              bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID            int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup                 any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendVideoRequest represents a request to send a video.
@@ -167,6 +192,11 @@ type SendVideoRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendAudioRequest represents a request to send an audio file.
@@ -183,6 +213,11 @@ type SendAudioRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendVoiceRequest represents a request to send a voice message.
@@ -196,6 +231,11 @@ type SendVoiceRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendAnimationRequest represents a request to send an animation.
@@ -212,6 +252,11 @@ type SendAnimationRequest struct {
 	ProtectContent      bool         `json:"protect_content,omitempty"`
 	ReplyToMessageID    int          `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any          `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendVideoNoteRequest represents a request to send a video note.
@@ -225,6 +270,11 @@ type SendVideoNoteRequest struct {
 	ProtectContent      bool       `json:"protect_content,omitempty"`
 	ReplyToMessageID    int        `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any        `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendStickerRequest represents a request to send a sticker.
@@ -236,6 +286,11 @@ type SendStickerRequest struct {
 	ProtectContent      bool      `json:"protect_content,omitempty"`
 	ReplyToMessageID    int       `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any       `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendMediaGroupRequest represents a request to send a media group.
@@ -299,6 +354,11 @@ type SendLocationRequest struct {
 	ProtectContent       bool      `json:"protect_content,omitempty"`
 	ReplyToMessageID     int       `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup          any       `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendVenueRequest represents a request to send a venue.
@@ -316,6 +376,11 @@ type SendVenueRequest struct {
 	ProtectContent      bool      `json:"protect_content,omitempty"`
 	ReplyToMessageID    int       `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any       `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendContactRequest represents a request to send a contact.
@@ -329,6 +394,11 @@ type SendContactRequest struct {
 	ProtectContent      bool      `json:"protect_content,omitempty"`
 	ReplyToMessageID    int       `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any       `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // SendDiceRequest represents a request to send a dice.
@@ -339,6 +409,11 @@ type SendDiceRequest struct {
 	ProtectContent      bool      `json:"protect_content,omitempty"`
 	ReplyToMessageID    int       `json:"reply_to_message_id,omitempty"`
 	ReplyMarkup         any       `json:"reply_markup,omitempty"`
+
+	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
+	// posts are refused in any other chat).
+	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
+	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
 // ================== Bulk Operations ==================

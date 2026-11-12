@@ -410,7 +410,7 @@ func TestB48C1_Wire(t *testing.T) {
 				spp   *tg.SuggestedPostParameters
 				topic int64  // 0 = the key is absent
 				want  string // the parameter's JSON; "" = the key is absent
-				chat  int64  // 0 = testutil.TestChatID
+				chat  int64  // zero: the shared test chat id
 			}{
 				{"full", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON, 0},
 				{"empty", &tg.SuggestedPostParameters{}, 7, `{}`, 0},

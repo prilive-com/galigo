@@ -349,6 +349,13 @@ func TestB63_Builder(t *testing.T) {
 		// (change round c1, Claude A-C1-01; all four since round c2, Codex
 		// O-C2-01 = Claude A-C2-02).
 		{"leading_whitespace_value", "file1", "media", payload{Media: " \t\r\n" + `[{"type":"photo","media":"attach://file1"}]`}},
+		// White space on one side of the reference only, each JSON white
+		// space byte, and a nested string that is itself JSON holding the
+		// reference: none of them counts (change round c3, Codex O-C3-01,
+		// Claude A-C3-02).
+		{"leading_only_whitespace_ignored", "file1", "media", payload{A: `[" attach://file1","\tattach://file1","\rattach://file1","\nattach://file1"]`, Media: `{"media":"attach://file1"}`}},
+		{"trailing_only_whitespace_ignored", "file1", "media", payload{A: `["attach://file1 ","attach://file1\t","attach://file1\r","attach://file1\n"]`, Media: `{"media":"attach://file1"}`}},
+		{"nested_json_string_ignored", "file1", "media", payload{A: `{"cb":"{\"media\":\"attach://file1\"}"}`, Media: `{"media":"attach://file1"}`}},
 	}
 	require.Equal(t, []byte{0x5c, 'u', '0', '0', '6', '1'}, []byte(b63EscA), "the escape must be bytes, not the letter")
 	for _, row := range rows {
@@ -410,6 +417,9 @@ func TestB63_Encode(t *testing.T) {
 		// An empty field name, with a file name, so the two name fields are
 		// tested apart (test round t3, A-T3-01 = O-T3-01 = LT3-01).
 		{"empty_field_name", "", "", sender.MultipartRequest{Files: []sender.FilePart{{FileName: "x"}}}},
+		// A blank part: no field name and no file name at once (change
+		// round c3, Claude A-C3-01).
+		{"blank_part", "", "", sender.MultipartRequest{Files: []sender.FilePart{{}}}},
 		{"typed_nil_scalar", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{{FieldName: "a", FileName: "x", Reader: (*b63Scalar)(nil)}}}},
 		{"typed_nil", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{{FieldName: "a", FileName: "x", Reader: typedNil}}}},
 		{"referring_param", "media", "file1", sender.MultipartRequest{

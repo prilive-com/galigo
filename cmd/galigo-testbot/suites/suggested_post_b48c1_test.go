@@ -17,7 +17,7 @@ func TestB48C1_Scenario(t *testing.T) {
 	for _, sc := range AllSuggestedPostScenarios() {
 		names = append(names, sc.Name())
 	}
-	assert.Equal(t, []string{"S71-SuggestedPostParameters"}, names)
+	assert.Equal(t, []string{"S71-SuggestedPostParameters", "S72-DecideSuggestedPost"}, names)
 
 	s := S71_SuggestedPostParameters()
 	assert.Equal(t, "S71-SuggestedPostParameters", s.Name())

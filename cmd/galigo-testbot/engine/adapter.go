@@ -801,6 +801,16 @@ func (a *SenderAdapter) SendPaidMedia(ctx context.Context, req sender.SendPaidMe
 	return a.client.SendPaidMedia(ctx, req)
 }
 
+// ApproveSuggestedPost approves a suggested post (Bot API 9.2).
+func (a *SenderAdapter) ApproveSuggestedPost(ctx context.Context, req sender.ApproveSuggestedPostRequest) error {
+	return a.client.ApproveSuggestedPost(ctx, req)
+}
+
+// DeclineSuggestedPost declines a suggested post (Bot API 9.2).
+func (a *SenderAdapter) DeclineSuggestedPost(ctx context.Context, req sender.DeclineSuggestedPostRequest) error {
+	return a.client.DeclineSuggestedPost(ctx, req)
+}
+
 // SavePreparedKeyboardButton stores a keyboard button for a user (9.6).
 func (a *SenderAdapter) SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error) {
 	return a.client.SavePreparedKeyboardButton(ctx, sender.SavePreparedKeyboardButtonRequest{UserID: userID, Button: button})

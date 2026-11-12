@@ -682,8 +682,8 @@ go run ./cmd/galigo-testbot --run api101                 # All 10.1 tests
 # Bot API 10.2 scenarios (S68, S69)
 go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 
-# Suggested posts (S71; Bot API 9.2)
-go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters reaches the server (JSON and form)
+# Suggested posts (S71, S72; Bot API 9.2)
+go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters, approve and decline reach the server
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -838,13 +838,14 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S68-RichBlocks | sendRichMessage, sendRichMessageDraft | Rich message made of blocks (`InputRichMessage.Blocks`): heading, paragraph, preformatted, divider, mathematical expression, anchor, list, block quotation, pull quotation, table, details, map and footer, with blocks nested in a list item, a quotation and details; the block kinds of the reply are checked; cleaned up, then a draft with a thinking block (private chats only, so in a group the step is skipped). Collage and slideshow are sent by S69: the server refuses them with text blocks only (`RICH_MESSAGE_BLOCK_UNEXPECTED`) |
 | S69-RichMedia | sendRichMessage, editMessageText | Rich message from markdown whose `tg://` links name the media list (`InputRichMessage.Media`), with one upload of each kind (photo, video, audio, animation, voice note; multipart): the reply has a paragraph and the five media blocks; then the five media blocks (`InputRichBlockPhoto` … `InputRichBlockVoiceNote`, each with a caption), a collage and a slideshow of two photo blocks, by the file_ids of that reply; then that message is edited to markdown with a new photo upload; cleaned up. The server takes `tg://photo`, `tg://video` (also an animation) and `tg://audio` (also a voice note) links, and refuses `tg://animation`, `tg://voice_note`, `tg://voice`; S69's animation is the MP4 fixture (the GIF fixture was refused in the live trial). Not live-proved: a draft with media (private chats only), uploads in inline results and in media blocks (galigo refuses them locally: mock tests) |
 
-#### Suggested posts (S71)
+#### Suggested posts (S71, S72)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
 | S71-SuggestedPostParameters | sendMessage, sendPhoto | `suggested_post_parameters` (Bot API 9.2) on the JSON path (`sendMessage`) and the form path (`sendPhoto` upload), unpaid and with a price. The test chat is not a channel direct messages chat, so the server must refuse each call with 400 and a text that shows what it parsed (wrong chat; invalid Stars amount); a call the server takes fails the step, and the cleanup deletes the message |
+| S72-DecideSuggestedPost | sendMessage, approveSuggestedPost, declineSuggestedPost | `approveSuggestedPost` (with `send_date`) and `declineSuggestedPost` (with `comment`) (Bot API 9.2) on a plain message the scenario sends, and on a message id after it that holds no message. The test chat is not a channel direct messages chat, so the server must refuse each call with 400: `message can't be used in the method` for the plain message, `suggested post not found` for the missing one. The two texts show that `message_id` reached the server; a call the server takes fails the step; the cleanup deletes the message |
 
-S71 runs in `--run suggested-posts` and `--run all`. A successful suggested post needs a channel direct messages chat, which the testbot does not have.
+S71 and S72 run in `--run suggested-posts` and `--run all`. A successful suggested post, approval or decline needs a channel direct messages chat, which the testbot does not have: approve and decline count as covered through S72's refusal-only run, and a successful call is proved by the mock tests only (`sender/suggested_post_b48c2_test.go`).
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -865,9 +866,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **99 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **101 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 85 covered methods and 15 missing. 84 of the 99 registry methods have a scenario; the 85th covered method, `getUserProfileAudios` (S39), is not in the registry. The 15 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the five 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption`, `editEphemeralMessageReplyMarkup` and `deleteEphemeralMessage` need an ephemeral message (10.3 send parameter, B-57) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 87 covered methods and 15 missing. 86 of the 101 registry methods have a scenario; the 87th covered method, `getUserProfileAudios` (S39), is not in the registry. The 15 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the five 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption`, `editEphemeralMessageReplyMarkup` and `deleteEphemeralMessage` need an ephemeral message (10.3 send parameter, B-57) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -940,7 +941,7 @@ cmd/galigo-testbot/
 │   ├── steps_api96.go         # Bot API 9.6 steps (polls, quizzes, poll option replies, prepared buttons)
 │   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
-│   ├── steps_suggested_post.go # Suggested post parameters step (sendMessage, sendPhoto; S71)
+│   ├── steps_suggested_post.go # Suggested post steps: parameters (sendMessage, sendPhoto; S71), approve and decline (S72)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -963,7 +964,7 @@ cmd/galigo-testbot/
 │   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
 │   ├── api102.go      # Bot API 10.2 (S68: rich message blocks, S69: rich message media)
-│   ├── suggested_post.go # Suggested posts, Bot API 9.2 (S71)
+│   ├── suggested_post.go # Suggested posts, Bot API 9.2 (S71, S72)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/
@@ -971,7 +972,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (99 methods)
+├── registry/       # Target method list and coverage checking (101 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

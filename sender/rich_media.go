@@ -57,8 +57,9 @@ func (r richMediaItem) InputRichMediaType() string {
 }
 
 // handleMediaField writes a field whose media the builder resolves: a rich message (Bot API 10.2, handleRichMessage;
-// it needs no form of its own: an upload adds a file part) or poll media (Bot API 10.0, handlePollField). It reports
-// whether the field needs multipart/form-data. One builder case for both keeps buildMultipartRequest's complexity.
+// it needs no form of its own: an upload adds a file part), paid media (Bot API 7.6, handlePaidMedia; always a form,
+// like sendMediaGroup) or poll media (Bot API 10.0, handlePollField). It reports whether the field needs
+// multipart/form-data. One builder case for all keeps buildMultipartRequest's complexity.
 func handleMediaField(req *MultipartRequest, fieldName string, v any, attachIdx *int) (bool, error) {
 	switch m := v.(type) {
 	case tg.InputRichMessage:
@@ -69,6 +70,8 @@ func handleMediaField(req *MultipartRequest, fieldName string, v any, attachIdx 
 			return false, nil
 		}
 		return false, handleRichMessage(req, fieldName, *m, attachIdx)
+	case []InputPaidMedia:
+		return true, handlePaidMedia(req, fieldName, m, attachIdx)
 	}
 	return handlePollField(req, fieldName, v, attachIdx)
 }

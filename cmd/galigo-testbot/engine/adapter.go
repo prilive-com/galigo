@@ -792,6 +792,11 @@ func (a *SenderAdapter) SendPoll(ctx context.Context, req sender.SendPollRequest
 	return a.client.SendPoll(ctx, req)
 }
 
+// SendPaidMedia sends paid media (Bot API 7.6).
+func (a *SenderAdapter) SendPaidMedia(ctx context.Context, req sender.SendPaidMediaRequest) (*tg.Message, error) {
+	return a.client.SendPaidMedia(ctx, req)
+}
+
 // SavePreparedKeyboardButton stores a keyboard button for a user (9.6).
 func (a *SenderAdapter) SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error) {
 	return a.client.SavePreparedKeyboardButton(ctx, sender.SavePreparedKeyboardButtonRequest{UserID: userID, Button: button})

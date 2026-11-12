@@ -57,4 +57,8 @@ func TestHandleHelp_Text(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"  api102 - All 10.2 tests (rich message blocks and media)"}, api102) // API102D T-tb-4, API102E
+
+	// B-48b2 T-help: the stars and paid-media lines.
+	assert.Contains(t, lines, "  stars             - Star balance + transactions, invoice, paid media (S21, S22, S70)")
+	assert.Contains(t, lines, "  paid-media        - Send paid media: photo, video, live photo (S70)")
 }

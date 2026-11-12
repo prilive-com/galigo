@@ -607,7 +607,7 @@ go run ./cmd/galigo-testbot --run media       # Phase B: media (S6-S9, S11, S36,
 go run ./cmd/galigo-testbot --run keyboards   # Phase C: keyboards (S10)
 go run ./cmd/galigo-testbot --run chat-admin  # Phase D: chat administration (S15-S19)
 go run ./cmd/galigo-testbot --run stickers    # Phase E: sticker lifecycle (S20)
-go run ./cmd/galigo-testbot --run stars       # Phase E: star balance + transactions (S21-S22)
+go run ./cmd/galigo-testbot --run stars       # Phase E: star balance + transactions (S21-S22), paid media (S70)
 go run ./cmd/galigo-testbot --run gifts       # Phase E: gift catalog (S23)
 go run ./cmd/galigo-testbot --run checklists  # Phase E: checklist lifecycle (S24, requires Premium)
 go run ./cmd/galigo-testbot --run bot-config  # Phase G: bot identity (S33-S35)
@@ -634,6 +634,7 @@ go run ./cmd/galigo-testbot --run forum-stickers       # S19: Forum stickers
 go run ./cmd/galigo-testbot --run sticker-lifecycle    # S20: Full sticker lifecycle
 go run ./cmd/galigo-testbot --run star-balance         # S21: Star balance
 go run ./cmd/galigo-testbot --run invoice              # S22: Invoice
+go run ./cmd/galigo-testbot --run paid-media           # S70: Paid media
 
 # Interactive scenarios (requires user interaction, excluded from "all")
 go run ./cmd/galigo-testbot --run interactive           # S12: Callback query (click button)
@@ -738,7 +739,7 @@ Run without `--run` to start interactive mode. The bot listens for Telegram comm
 
 Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "not modified" 400 errors.
 
-#### Phase E: Extended (S20-S24)
+#### Phase E: Extended (S20-S24, S70)
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
@@ -747,8 +748,9 @@ Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "no
 | S22-Invoice | sendInvoice | Send a star invoice |
 | S23-Gifts | getAvailableGifts | Gift catalog |
 | S24-Checklists | sendChecklist, editMessageChecklist | Checklist lifecycle (requires Premium) |
+| S70-PaidMedia | sendPaidMedia | Paid media (photo, video, live photo) for 1 Star; checks the reply's price, kinds and caption, then deletes the message |
 
-S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 requires Telegram Premium and is excluded from `--run all`.
+S20 requires `TESTBOT_ADMINS` (human user_id for `createNewStickerSet`). S24 requires Telegram Premium and is excluded from `--run all`. S70 runs in `--run stars` and `--run all`, so both also post and delete a priced (1 Star) message.
 
 #### Phase F: Extras (S25-S32)
 
@@ -852,9 +854,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **98 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **99 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 84 covered methods and 15 missing. 83 of the 98 registry methods have a scenario; the 84th covered method, `getUserProfileAudios` (S39), is not in the registry. The 15 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the five 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption`, `editEphemeralMessageReplyMarkup` and `deleteEphemeralMessage` need an ephemeral message (10.3 send parameter, B-57) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 85 covered methods and 15 missing. 84 of the 99 registry methods have a scenario; the 85th covered method, `getUserProfileAudios` (S39), is not in the registry. The 15 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the five 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption`, `editEphemeralMessageReplyMarkup` and `deleteEphemeralMessage` need an ephemeral message (10.3 send parameter, B-57) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -926,6 +928,7 @@ cmd/galigo-testbot/
 │   ├── steps_api95.go         # Bot API 9.5 steps (date_time entity, member tags, message streaming)
 │   ├── steps_api96.go         # Bot API 9.6 steps (polls, quizzes, poll option replies, prepared buttons)
 │   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
+│   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -937,7 +940,7 @@ cmd/galigo-testbot/
 │   ├── keyboards.go   # Phase C scenarios (S10+)
 │   ├── chat_admin.go  # Phase D scenarios (S15-S19)
 │   ├── stickers.go    # Phase E: Sticker lifecycle (S20)
-│   ├── stars.go       # Phase E: Stars + Invoice (S21-S22)
+│   ├── stars.go       # Phase E: Stars + Invoice (S21-S22), Paid media (S70)
 │   ├── gifts.go       # Phase E: Gifts (S23)
 │   ├── checklists.go  # Phase E: Checklists (S24, Premium)
 │   ├── extras.go      # Phase F: Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
@@ -955,7 +958,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (98 methods)
+├── registry/       # Target method list and coverage checking (99 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

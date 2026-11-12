@@ -107,7 +107,7 @@ func TestB48C2_Step_Outcomes(t *testing.T) {
 			{"", false, SuggestedPostNotUsable, SuggestedPostNotFound, 70},
 			{"missing_", true, SuggestedPostNotFound, SuggestedPostNotUsable, 1000070},
 		} {
-			inText := &tg.APIError{Code: 400, Description: "Bad Request: x " + mode.want + " (y)"} // A-T3-02 = O-T3-03
+			inText := &tg.APIError{Code: 400, Description: "Bad Request: x " + mode.want + " (y)"} // review findings A-T3-02 and O-T3-03
 			for _, tc := range []struct {
 				name    string
 				err     error

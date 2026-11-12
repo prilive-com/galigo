@@ -71,7 +71,7 @@ func b48c2OnlySentinel(t *testing.T, err, want error) {
 		require.Contains(t, b48c2Sentinels, want, "the expected sentinel is in the list (A-T3-03)")
 	}
 	for _, s := range b48c2Sentinels {
-		if s == want {
+		if errors.Is(s, want) { // the sentinels are distinct errors.New values, so this is identity
 			assert.ErrorIs(t, err, s)
 		} else {
 			assert.NotErrorIs(t, err, s)

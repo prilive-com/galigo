@@ -15,7 +15,7 @@ import (
 // B-48c2: the Bot API 9.2 suggested post read side (SuggestedPostInfo and the five service messages), the six
 // Message fields and Message.IsPaidPost. No test builds a new type with a keyed composite literal (only zero values): values come from decoded
 // JSON and are read by selectors, so a field mutant compiles and fails by assertion. Ids are fake. Fixtures hold only
-// keys galigo models (no is_direct_messages, B-83), so a strict decode tests the new keys. The helpers api96Strict
+// keys galigo models, so a strict decode tests the new keys. The helpers api96Strict
 // (tg/api96_test.go), api102aMarshal and api102aKeys (tg/api102a_test.go) are reused.
 const (
 	b48c2Chat   = `"chat":{"id":-1001234567890,"type":"supergroup","title":"Test Chat"}`

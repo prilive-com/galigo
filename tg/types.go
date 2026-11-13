@@ -22,6 +22,7 @@ type Editable interface {
 type Message struct {
 	MessageID             int                   `json:"message_id"`
 	MessageThreadID       int                   `json:"message_thread_id,omitempty"`
+	DirectMessagesTopic   *DirectMessagesTopic  `json:"direct_messages_topic,omitempty"` // 9.2: in a channel direct messages chat
 	From                  *User                 `json:"from,omitempty"`
 	SenderChat            *Chat                 `json:"sender_chat,omitempty"`
 	ReceiverUser          *User                 `json:"receiver_user,omitempty"`        // 10.2: for ephemeral messages, the user who received the message
@@ -140,6 +141,7 @@ type Chat struct {
 	FirstName                          string     `json:"first_name,omitempty"`
 	LastName                           string     `json:"last_name,omitempty"`
 	IsForum                            bool       `json:"is_forum,omitempty"`
+	IsDirectMessages                   bool       `json:"is_direct_messages,omitempty"` // 9.2: the direct messages chat of a channel
 	Photo                              *ChatPhoto `json:"photo,omitempty"`
 	ActiveUsernames                    []string   `json:"active_usernames,omitempty"`
 	Bio                                string     `json:"bio,omitempty"`

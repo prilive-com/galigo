@@ -165,36 +165,50 @@ func TestB82_PromoteWire(t *testing.T) {
 		{sender.WithCanPinMessages, "can_pin_messages"}, {sender.WithCanManageTopics, "can_manage_topics"},
 		{sender.WithCanManageTags, "can_manage_tags"},
 	}
-	// rightsNilOthers sets every right of tg.ChatAdministratorRights except the new one by reflection (the i-th other
-	// right gets val(i); a pointer right points to that value), leaves the new one nil, and returns the rights with the
-	// whole body WithRights must send: a WithRights copy that falls back to any other right, or to a mix of them, when
-	// the new one is nil sends the key (E-0132, E-0143)
-	rightsNilOthers := func(val func(i int) bool) (tg.ChatAdministratorRights, map[string]string, []string) {
+	// rightsNilOthers sets every right of tg.ChatAdministratorRights except the new one by reflection: the i-th other
+	// right gets val(i, isPointer); a pointer right points to that value, or stays nil when val returns nil (a plain bool
+	// right must get a value). The new right stays nil. It returns the rights, the whole body WithRights must send (no
+	// key for a nil pointer right, never the new key), the keys of the other rights and which of them are pointers.
+	// So a WithRights copy that, for a nil new right, derives a value from other rights fails in a pass where that
+	// derivation fires (E-0132, E-0143); which passes run is the leaf's choice ("rights nil others each").
+	rightsNilOthers := func(t *testing.T, val func(i int, isPointer bool) *bool) (tg.ChatAdministratorRights, map[string]string, []string, []bool) {
 		var rights tg.ChatAdministratorRights
 		body := map[string]string{"chat_id": wireChatID, "user_id": "456"}
 		var keys []string
+		var pointer []bool
 		rv := reflect.ValueOf(&rights).Elem()
 		for i := range rv.NumField() {
 			sf := rv.Type().Field(i)
 			if sf.Name == "CanManageDirectMessages" {
 				continue
 			}
-			v := val(len(keys))
-			switch f := rv.Field(i); f.Kind() {
-			case reflect.Bool:
-				f.SetBool(v)
-			case reflect.Pointer:
-				f.Set(reflect.ValueOf(&v))
-			default:
+			f := rv.Field(i)
+			isPointer := f.Kind() == reflect.Pointer
+			if !isPointer && f.Kind() != reflect.Bool {
 				t.Fatalf("field %s has kind %s", sf.Name, f.Kind())
 			}
+			v := val(len(keys), isPointer)
 			k, _, _ := strings.Cut(sf.Tag.Get("json"), ",")
-			body[k] = strconv.FormatBool(v)
+			switch {
+			case v == nil && !isPointer:
+				t.Fatalf("plain bool right %s needs a value", sf.Name)
+			case v == nil:
+				// pointer right left nil: no key
+			case isPointer:
+				b := *v
+				f.Set(reflect.ValueOf(&b))
+				body[k] = strconv.FormatBool(b)
+			default:
+				f.SetBool(*v)
+				body[k] = strconv.FormatBool(*v)
+			}
 			keys = append(keys, k)
+			pointer = append(pointer, isPointer)
 		}
-		return rights, body, keys
+		return rights, body, keys, pointer
 	}
-	othersTrue, othersTrueBody, otherRightKeys := rightsNilOthers(func(int) bool { return true })
+	boolPtr := func(b bool) *bool { return &b }
+	othersTrue, othersTrueBody, otherRightKeys, otherRightIsPointer := rightsNilOthers(t, func(int, bool) *bool { return boolPtr(true) })
 	for _, r := range []struct {
 		name string
 		call func(ctx context.Context, c *sender.Client) error
@@ -214,6 +228,12 @@ func TestB82_PromoteWire(t *testing.T) {
 		{"option twice false true", func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(true))
 		}, "true", true, nil},
+		{"option twice true true", func(ctx context.Context, c *sender.Client) error {
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(true), sender.WithCanManageDirectMessages(true))
+		}, "true", true, nil},
+		{"option twice false false", func(ctx context.Context, c *sender.Client) error {
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(false))
+		}, "false", true, nil},
 		{"option unset", func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageTopics(true))
 		}, "", false, nil},
@@ -314,19 +334,52 @@ func TestB82_PromoteWire(t *testing.T) {
 		})
 	}
 
-	// The nil-right leaf (change round c1, A-C1-01): WithRights with the new right nil and the 16 other rights in the
-	// passes "others all true", "others all false" and one pass per other right with only that one true. A WithRights
-	// copy that, for a nil new right, derives a value from any other right being true or false, or from a mix of them,
-	// sends the key; every pass compares the whole body, as arguments and as raw JSON.
+	// The nil-right leaf (change rounds c1 and c2: A-C1-01; O-C2-02, A-C2-01, A-C2-02): WithRights with the new right
+	// nil and the 16 other rights (8 plain bools, 8 pointers) in these passes: all true; all false; exactly one true
+	// (16); exactly one false (16); every pointer right nil with the plain rights all true, and all false (the second is
+	// tg.ChatAdministratorRights{}); exactly one pointer right nil, the others true (8). Every pass compares the whole
+	// body, as arguments and as raw JSON. So a fallback for a nil new right that fires in one of these input classes
+	// fails (one right, a right being false, two or more true with one false, a nil pointer right). Not every one of
+	// the 2^16 combinations is run.
 	t.Run("rights nil others each", func(t *testing.T) {
 		// in this leaf, not in the parent: a failure here must not stop the other leaves (mutant MC-new-right-in-tg)
 		require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")
-		passes := []otherPass{{"others all true", func(int) bool { return true }}, {"others all false", func(int) bool { return false }}}
-		for j := range otherRightKeys {
-			passes = append(passes, otherPass{"only " + otherRightKeys[j], func(i int) bool { return i == j }})
+		type nilPass struct {
+			name string
+			val  func(i int, isPointer bool) *bool
 		}
+		passes := []nilPass{
+			{"others all true", func(int, bool) *bool { return boolPtr(true) }},
+			{"others all false", func(int, bool) *bool { return boolPtr(false) }},
+			{"pointers nil plain true", func(_ int, p bool) *bool {
+				if p {
+					return nil
+				}
+				return boolPtr(true)
+			}},
+			{"pointers nil plain false", func(_ int, p bool) *bool {
+				if p {
+					return nil
+				}
+				return boolPtr(false)
+			}},
+		}
+		for j := range otherRightKeys {
+			passes = append(passes,
+				nilPass{"only " + otherRightKeys[j], func(i int, _ bool) *bool { return boolPtr(i == j) }},
+				nilPass{"all but " + otherRightKeys[j], func(i int, _ bool) *bool { return boolPtr(i != j) }})
+			if otherRightIsPointer[j] {
+				passes = append(passes, nilPass{"nil " + otherRightKeys[j], func(i int, _ bool) *bool {
+					if i == j {
+						return nil
+					}
+					return boolPtr(true)
+				}})
+			}
+		}
+		require.Len(t, passes, 44)
 		for _, p := range passes {
-			rights, want, _ := rightsNilOthers(p.val)
+			rights, want, _, _ := rightsNilOthers(t, p.val)
 			mediaType, args, _, raw, err := b48c1WireCall(t, "promoteChatMember", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, true) },
 				func(ctx context.Context, c *sender.Client) error {
 					return c.PromoteChatMemberWithRights(ctx, testutil.TestChatID, 456, rights)

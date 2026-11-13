@@ -229,10 +229,14 @@ func TestB82_PromoteWire(t *testing.T) {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(true))
 		}, "true", true, nil},
 		{"option twice true true", func(ctx context.Context, c *sender.Client) error {
-			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(true), sender.WithCanManageDirectMessages(true))
+			// a slice, so the linter (gocritic dupOption) accepts the same option given twice on purpose
+			twice := []sender.PromoteOption{sender.WithCanManageDirectMessages(true), sender.WithCanManageDirectMessages(true)}
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, twice...)
 		}, "true", true, nil},
 		{"option twice false false", func(ctx context.Context, c *sender.Client) error {
-			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(false))
+			// a slice, so the linter (gocritic dupOption) accepts the same option given twice on purpose
+			twice := []sender.PromoteOption{sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(false)}
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, twice...)
 		}, "false", true, nil},
 		{"option unset", func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageTopics(true))

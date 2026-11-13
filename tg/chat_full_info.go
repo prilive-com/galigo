@@ -13,6 +13,7 @@ type ChatFullInfo struct {
 
 	// Optional fields
 	IsForum                            bool              `json:"is_forum,omitempty"`
+	IsDirectMessages                   bool              `json:"is_direct_messages,omitempty"` // 9.2: the direct messages chat of a channel
 	AccentColorID                      int               `json:"accent_color_id,omitempty"`
 	MaxReactionCount                   int               `json:"max_reaction_count,omitempty"`
 	Photo                              *ChatPhoto        `json:"photo,omitempty"`
@@ -23,6 +24,7 @@ type ChatFullInfo struct {
 	BusinessLocation                   *BusinessLocation `json:"business_location,omitempty"`
 	BusinessOpeningHours               *BusinessHours    `json:"business_opening_hours,omitempty"`
 	PersonalChat                       *Chat             `json:"personal_chat,omitempty"`
+	ParentChat                         *Chat             `json:"parent_chat,omitempty"` // 9.2: the channel of a direct messages chat
 	AvailableReactions                 []ReactionType    `json:"available_reactions,omitempty"`
 	BackgroundCustomEmojiID            string            `json:"background_custom_emoji_id,omitempty"`
 	ProfileAccentColorID               *int              `json:"profile_accent_color_id,omitempty"`

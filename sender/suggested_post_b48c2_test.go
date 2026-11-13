@@ -132,6 +132,10 @@ func TestB48C2_U1b_Optional(t *testing.T) {
 			func(ctx context.Context, c *sender.Client) error { // C2-02: a comment of spaces only is sent as given, not dropped
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "   "})
 			}},
+		{"comment_markup", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"<b>a & b</b>"}`, "",
+			func(ctx context.Context, c *sender.Client) error { // A-C3-01: markup characters are sent as given, not HTML-escaped
+				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "<b>a & b</b>"})
+			}},
 		{"comment_long", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"` + strings.Repeat("x", 129) + `"}`, "",
 			func(ctx context.Context, c *sender.Client) error {
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: strings.Repeat("x", 129)})

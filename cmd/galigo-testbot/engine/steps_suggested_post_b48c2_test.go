@@ -109,6 +109,36 @@ func TestB48C2_Step_Requests(t *testing.T) {
 	}, f.declines)
 }
 
+// b48c2Markup is a comment with HTML markup characters: an HTML-escaping layer would change it (A-C3-01).
+const b48c2Markup = "<b>a & b</b>"
+
+// S1b: the step passes a negative send date, a comment of spaces only and a comment with markup on unchanged
+// (O-C3-01, A-C3-01).
+func TestB48C2_Step_OptionalValues(t *testing.T) {
+	tgt := b48c2Target()
+	for _, tc := range []struct {
+		name    string
+		step    *DecideSuggestedPostStep
+		approve []sender.ApproveSuggestedPostRequest
+		decline []sender.DeclineSuggestedPostRequest
+	}{
+		{"negative_date", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: -1, WantError: SuggestedPostNotUsable},
+			[]sender.ApproveSuggestedPostRequest{{ChatID: b48c2Chat, MessageID: tgt, SendDate: -1}}, nil},
+		{"blank_comment", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "   ", WantError: SuggestedPostNotUsable},
+			nil, []sender.DeclineSuggestedPostRequest{{ChatID: b48c2Chat, MessageID: tgt, Comment: "   "}}},
+		{"markup_comment", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: b48c2Markup, WantError: SuggestedPostNotUsable},
+			nil, []sender.DeclineSuggestedPostRequest{{ChatID: b48c2Chat, MessageID: tgt, Comment: b48c2Markup}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeDecide{err: b48c2Refusal(SuggestedPostNotUsable)}
+			_, err := tc.step.Execute(context.Background(), b48c2Runtime(f, tgt))
+			require.NoError(t, err)
+			assert.Equal(t, tc.approve, f.approves)
+			assert.Equal(t, tc.decline, f.declines)
+		})
+	}
+}
+
 // S2: the step passes only on a 400 whose own text holds WantError (anywhere in it), also inside a wrapper, and records
 // the server's own text; it fails on another text,
 // another code, a non-API error, the wanted text only in a wrapper around an unrelated 400, and on success (the server
@@ -206,6 +236,13 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
 		{"decline_missing", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},
 			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
+		// O-C3-01, A-C3-01: a negative date, a comment of spaces only and a comment with markup reach the server unchanged
+		{"approve_negative_date", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: -1, WantError: SuggestedPostNotUsable},
+			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"send_date":-1}`, tgt)},
+		{"decline_blank", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "   ", WantError: SuggestedPostNotUsable},
+			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"comment":"   "}`, tgt)},
+		{"decline_markup", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: b48c2Markup, WantError: SuggestedPostNotUsable},
+			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"comment":"<b>a & b</b>"}`, tgt)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)

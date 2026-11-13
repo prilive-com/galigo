@@ -165,28 +165,37 @@ func TestB82_PromoteWire(t *testing.T) {
 		{sender.WithCanPinMessages, "can_pin_messages"}, {sender.WithCanManageTopics, "can_manage_topics"},
 		{sender.WithCanManageTags, "can_manage_tags"},
 	}
-	// every right of tg.ChatAdministratorRights except the new one set true by reflection, the new one nil: a WithRights
-	// copy that falls back to any other right when the new one is nil sends the key (E-0132)
-	var othersTrue tg.ChatAdministratorRights
-	othersTrueBody := map[string]string{"chat_id": wireChatID, "user_id": "456"}
-	ov := reflect.ValueOf(&othersTrue).Elem()
-	for i := range ov.NumField() {
-		sf := ov.Type().Field(i)
-		if sf.Name == "CanManageDirectMessages" {
-			continue
+	// rightsNilOthers sets every right of tg.ChatAdministratorRights except the new one by reflection (the i-th other
+	// right gets val(i); a pointer right points to that value), leaves the new one nil, and returns the rights with the
+	// whole body WithRights must send: a WithRights copy that falls back to any other right, or to a mix of them, when
+	// the new one is nil sends the key (E-0132, E-0143)
+	rightsNilOthers := func(val func(i int) bool) (tg.ChatAdministratorRights, map[string]string, []string) {
+		var rights tg.ChatAdministratorRights
+		body := map[string]string{"chat_id": wireChatID, "user_id": "456"}
+		var keys []string
+		rv := reflect.ValueOf(&rights).Elem()
+		for i := range rv.NumField() {
+			sf := rv.Type().Field(i)
+			if sf.Name == "CanManageDirectMessages" {
+				continue
+			}
+			v := val(len(keys))
+			switch f := rv.Field(i); f.Kind() {
+			case reflect.Bool:
+				f.SetBool(v)
+			case reflect.Pointer:
+				f.Set(reflect.ValueOf(&v))
+			default:
+				t.Fatalf("field %s has kind %s", sf.Name, f.Kind())
+			}
+			k, _, _ := strings.Cut(sf.Tag.Get("json"), ",")
+			body[k] = strconv.FormatBool(v)
+			keys = append(keys, k)
 		}
-		v := true
-		switch f := ov.Field(i); f.Kind() {
-		case reflect.Bool:
-			f.SetBool(v)
-		case reflect.Pointer:
-			f.Set(reflect.ValueOf(&v))
-		default:
-			t.Fatalf("field %s has kind %s", sf.Name, f.Kind())
-		}
-		k, _, _ := strings.Cut(sf.Tag.Get("json"), ",")
-		othersTrueBody[k] = "true"
+		return rights, body, keys
 	}
+	othersTrue, othersTrueBody, otherRightKeys := rightsNilOthers(func(int) bool { return true })
+	require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")
 	for _, r := range []struct {
 		name string
 		call func(ctx context.Context, c *sender.Client) error
@@ -200,6 +209,12 @@ func TestB82_PromoteWire(t *testing.T) {
 		{"option false", func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false))
 		}, "false", true, nil},
+		{"option twice true false", func(ctx context.Context, c *sender.Client) error {
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(true), sender.WithCanManageDirectMessages(false))
+		}, "false", true, nil},
+		{"option twice false true", func(ctx context.Context, c *sender.Client) error {
+			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageDirectMessages(false), sender.WithCanManageDirectMessages(true))
+		}, "true", true, nil},
 		{"option unset", func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMember(ctx, testutil.TestChatID, 456, sender.WithCanManageTopics(true))
 		}, "", false, nil},
@@ -299,6 +314,34 @@ func TestB82_PromoteWire(t *testing.T) {
 			}
 		})
 	}
+
+	// The nil-right leaf (change round c1, A-C1-01): WithRights with the new right nil and the 16 other rights in the
+	// passes "others all true", "others all false" and one pass per other right with only that one true. A WithRights
+	// copy that, for a nil new right, derives a value from any other right being true or false, or from a mix of them,
+	// sends the key; every pass compares the whole body, as arguments and as raw JSON.
+	t.Run("rights nil others each", func(t *testing.T) {
+		passes := []otherPass{{"others all true", func(int) bool { return true }}, {"others all false", func(int) bool { return false }}}
+		for j := range otherRightKeys {
+			passes = append(passes, otherPass{"only " + otherRightKeys[j], func(i int) bool { return i == j }})
+		}
+		for _, p := range passes {
+			rights, want, _ := rightsNilOthers(p.val)
+			mediaType, args, _, raw, err := b48c1WireCall(t, "promoteChatMember", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, true) },
+				func(ctx context.Context, c *sender.Client) error {
+					return c.PromoteChatMemberWithRights(ctx, testutil.TestChatID, 456, rights)
+				})
+			require.NoError(t, err, p.name)
+			assert.Equal(t, "application/json", mediaType, p.name)
+			for _, d := range argsDiff(want, args) {
+				t.Errorf("%s: args: %s", p.name, d)
+			}
+			gotRaw := map[string]string{}
+			for k, v := range raw {
+				gotRaw[k] = string(v)
+			}
+			assert.Equal(t, want, gotRaw, "%s: raw JSON values", p.name)
+		}
+	})
 }
 
 // T5: the whole class of B-88 (a right that PromoteChatMemberWithRights drops; 9.5 dropped can_manage_tags the same

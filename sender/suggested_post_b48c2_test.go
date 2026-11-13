@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -192,6 +193,13 @@ func TestB48C2_U3_ValidEdges(t *testing.T) {
 		{5000000001, 2, `{"chat_id":5000000001,"message_id":2}`},
 		{api100Chat, 1, `{"chat_id":-1001234567890,"message_id":1}`},
 	}
+	if strconv.IntSize == 64 { // a message id above 2^31 (A-C1-01); int is 32 bits on 386, where no such id fits
+		cases = append(cases, struct {
+			chat int64
+			msg  int
+			want string
+		}{1, int(b48c2BigMessageID), `{"chat_id":1,"message_id":3000000000}`})
+	}
 	for _, m := range b48c2Methods {
 		for _, c := range cases {
 			server := testutil.NewMockServer(t)
@@ -203,6 +211,9 @@ func TestB48C2_U3_ValidEdges(t *testing.T) {
 		}
 	}
 }
+
+// b48c2BigMessageID is a message id above 2^31; a variable, so the file still builds where int has 32 bits.
+var b48c2BigMessageID int64 = 3000000000
 
 // U4: an API error is the *tg.APIError with its code, text and method, and keeps its sentinel and no other.
 func TestB48C2_U4_APIError(t *testing.T) {

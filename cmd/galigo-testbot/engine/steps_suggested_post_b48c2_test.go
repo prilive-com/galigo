@@ -56,15 +56,19 @@ func b48c2Refusal(text string) error {
 
 type b48c2CtxKey struct{}
 
+// b48c2Comment and the send dates of 2200000000 (above 2^31) in S1 and S5 show that the step and the adapter pass the
+// values on unchanged: no trimming, no case change, no int32 narrowing (O-C1-01).
+const b48c2Comment = "  OK Привет  "
+
 // S1: each step sends one request with the target id (or the target id + 1000000 with Missing) and its own value,
 // passes the caller's context on, and records the id it sent.
 func TestB48C2_Step_Requests(t *testing.T) {
 	f := &fakeDecide{err: b48c2Refusal(SuggestedPostNotUsable)}
 	rt := b48c2Runtime(f, 70)
 	ctx := context.WithValue(context.Background(), b48c2CtxKey{}, "s1")
-	_, err := (&DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 1900000000, WantError: SuggestedPostNotUsable}).Execute(ctx, rt)
+	_, err := (&DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 2200000000, WantError: SuggestedPostNotUsable}).Execute(ctx, rt)
 	require.NoError(t, err)
-	_, err = (&DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "c", WantError: SuggestedPostNotUsable}).Execute(ctx, rt)
+	_, err = (&DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: b48c2Comment, WantError: SuggestedPostNotUsable}).Execute(ctx, rt)
 	require.NoError(t, err)
 	f.err = b48c2Refusal(SuggestedPostNotFound)
 	resA, err := (&DecideSuggestedPostStep{Method: "approveSuggestedPost", Missing: true, WantError: SuggestedPostNotFound}).Execute(ctx, rt)
@@ -82,11 +86,11 @@ func TestB48C2_Step_Requests(t *testing.T) {
 		assert.Equal(t, "s1", c.Value(b48c2CtxKey{}), "call %d got the caller's context", i)
 	}
 	assert.Equal(t, []sender.ApproveSuggestedPostRequest{
-		{ChatID: b48c2Chat, MessageID: 70, SendDate: 1900000000},
+		{ChatID: b48c2Chat, MessageID: 70, SendDate: 2200000000},
 		{ChatID: b48c2Chat, MessageID: 1000070},
 	}, f.approves)
 	assert.Equal(t, []sender.DeclineSuggestedPostRequest{
-		{ChatID: b48c2Chat, MessageID: 70, Comment: "c"},
+		{ChatID: b48c2Chat, MessageID: 70, Comment: b48c2Comment},
 		{ChatID: b48c2Chat, MessageID: 1000070},
 	}, f.declines)
 }
@@ -179,10 +183,10 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 		path string
 		body string
 	}{
-		{"approve", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 1900000000, WantError: SuggestedPostNotUsable},
-			"approveSuggestedPost", `{"chat_id":123456789,"message_id":70,"send_date":1900000000}`},
-		{"decline", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "c", WantError: SuggestedPostNotUsable},
-			"declineSuggestedPost", `{"chat_id":123456789,"message_id":70,"comment":"c"}`},
+		{"approve", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 2200000000, WantError: SuggestedPostNotUsable},
+			"approveSuggestedPost", `{"chat_id":123456789,"message_id":70,"send_date":2200000000}`},
+		{"decline", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: b48c2Comment, WantError: SuggestedPostNotUsable},
+			"declineSuggestedPost", `{"chat_id":123456789,"message_id":70,"comment":"  OK Привет  "}`},
 		{"approve_missing", &DecideSuggestedPostStep{Method: "approveSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},
 			"approveSuggestedPost", `{"chat_id":123456789,"message_id":1000070}`},
 		{"decline_missing", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},

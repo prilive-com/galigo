@@ -195,7 +195,6 @@ func TestB82_PromoteWire(t *testing.T) {
 		return rights, body, keys
 	}
 	othersTrue, othersTrueBody, otherRightKeys := rightsNilOthers(func(int) bool { return true })
-	require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")
 	for _, r := range []struct {
 		name string
 		call func(ctx context.Context, c *sender.Client) error
@@ -320,6 +319,8 @@ func TestB82_PromoteWire(t *testing.T) {
 	// copy that, for a nil new right, derives a value from any other right being true or false, or from a mix of them,
 	// sends the key; every pass compares the whole body, as arguments and as raw JSON.
 	t.Run("rights nil others each", func(t *testing.T) {
+		// in this leaf, not in the parent: a failure here must not stop the other leaves (mutant MC-new-right-in-tg)
+		require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")
 		passes := []otherPass{{"others all true", func(int) bool { return true }}, {"others all false", func(int) bool { return false }}}
 		for j := range otherRightKeys {
 			passes = append(passes, otherPass{"only " + otherRightKeys[j], func(i int) bool { return i == j }})

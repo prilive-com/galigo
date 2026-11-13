@@ -342,9 +342,10 @@ func TestB82_PromoteWire(t *testing.T) {
 	// nil and the 16 other rights (8 plain bools, 8 pointers) in these passes: all true; all false; exactly one true
 	// (16); exactly one false (16); every pointer right nil with the plain rights all true, and all false (the second is
 	// tg.ChatAdministratorRights{}); exactly one pointer right nil, the others true (8). Every pass compares the whole
-	// body, as arguments and as raw JSON. So a fallback for a nil new right that fires in one of these input classes
-	// fails (one right, a right being false, two or more true with one false, a nil pointer right). Not every one of
-	// the 2^16 combinations is run.
+	// body, as arguments and as raw JSON. So a fallback for a nil new right fails when it fires in one of these 44
+	// passes. Not run: the other true/false combinations of the 16 rights, nil patterns other than all pointer rights
+	// nil or one pointer right nil with the others true, and their crosses (for example one pointer right nil and
+	// another false); a fallback that fires only there passes.
 	t.Run("rights nil others each", func(t *testing.T) {
 		// in this leaf, not in the parent: a failure here must not stop the other leaves (mutant MC-new-right-in-tg)
 		require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")

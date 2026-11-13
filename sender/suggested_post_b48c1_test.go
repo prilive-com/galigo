@@ -245,15 +245,24 @@ func TestB48C1_RequestFields(t *testing.T) {
 	}
 }
 
-// T-census: in the sender package source, exactly the 19 request types carry each of the two keys (E-0105: the
-// whole class, not the instances a reviewer named). A type also carries a key that it gets through an embedded field
-// or from the type it is defined as (type X Y), so a key promoted into another request type fails too.
+// T-census: in the sender package source, each key is carried by exactly its listed request types (E-0105: the
+// whole class, not the instances a reviewer named): suggested_post_parameters by the 19 B-48c1 types,
+// direct_messages_topic_id by those 19 plus the three of B-82 (22), can_manage_direct_messages only by
+// PromoteChatMemberRequest (B-88). A type also carries a key that it gets through an embedded field or from the type
+// it is defined as (type X Y), so a key promoted into another request type fails too.
 func TestB48C1_Census(t *testing.T) {
 	want := make([]string, 0, 19)
 	for _, c := range b48c1Calls() {
 		want = append(want, reflect.TypeOf(c.req).Name())
 	}
 	slices.Sort(want)
+	// B-82: three more types carry direct_messages_topic_id; B-88: can_manage_direct_messages is on one type only.
+	topic := slices.Sorted(slices.Values(append(slices.Clone(want), "CopyMessagesRequest", "ForwardMessagesRequest", "SendMediaGroupRequest")))
+	wantByKey := map[string][]string{
+		"suggested_post_parameters":  want,
+		"direct_messages_topic_id":   topic,
+		"can_manage_direct_messages": {"PromoteChatMemberRequest"},
+	}
 	direct := map[string]map[string]bool{} // type -> keys written on it
 	from := map[string][]string{}          // type -> the sender types it embeds or is defined as
 	entries, err := os.ReadDir(".")
@@ -296,7 +305,7 @@ func TestB48C1_Census(t *testing.T) {
 				tag, err := strconv.Unquote(fl.Tag.Value)
 				require.NoError(t, err)
 				key, _, _ := strings.Cut(reflect.StructTag(tag).Get("json"), ",")
-				if key == "suggested_post_parameters" || key == "direct_messages_topic_id" {
+				if _, ok := wantByKey[key]; ok {
 					direct[name][key] = true
 				}
 			}
@@ -316,7 +325,7 @@ func TestB48C1_Census(t *testing.T) {
 			}
 		}
 	}
-	for _, key := range []string{"suggested_post_parameters", "direct_messages_topic_id"} {
+	for _, key := range []string{"suggested_post_parameters", "direct_messages_topic_id", "can_manage_direct_messages"} {
 		var got []string
 		for name, keys := range direct {
 			if keys[key] {
@@ -324,7 +333,7 @@ func TestB48C1_Census(t *testing.T) {
 			}
 		}
 		slices.Sort(got)
-		assert.Equal(t, want, got, "types with %s", key)
+		assert.Equal(t, wantByKey[key], got, "types with %s", key)
 	}
 }
 

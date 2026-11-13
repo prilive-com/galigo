@@ -29,6 +29,9 @@ type PromoteChatMemberRequest struct {
 	CanDeleteStories    *bool     `json:"can_delete_stories,omitempty"`
 	CanManageTopics     *bool     `json:"can_manage_topics,omitempty"`
 	CanManageTags       *bool     `json:"can_manage_tags,omitempty"` // 9.5
+
+	// Bot API 9.2; for channels only.
+	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
 }
 
 // SetChatAdministratorCustomTitleRequest represents a setChatAdministratorCustomTitle request.
@@ -90,6 +93,8 @@ func (c *Client) PromoteChatMemberWithRights(ctx context.Context, chatID tg.Chat
 		CanDeleteStories:    rights.CanDeleteStories,
 		CanManageTopics:     rights.CanManageTopics,
 		CanManageTags:       rights.CanManageTags,
+
+		CanManageDirectMessages: rights.CanManageDirectMessages,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -119,6 +124,8 @@ func (c *Client) DemoteChatMember(ctx context.Context, chatID tg.ChatID, userID 
 		CanEditMessages:     &f,
 		CanPinMessages:      &f,
 		CanManageTags:       &f,
+
+		CanManageDirectMessages: &f,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -230,6 +237,14 @@ func WithCanPinMessages(can bool) PromoteOption {
 func WithCanManageTopics(can bool) PromoteOption {
 	return func(r *PromoteChatMemberRequest) {
 		r.CanManageTopics = &can
+	}
+}
+
+// WithCanManageDirectMessages grants ability to manage the channel direct messages chat and decline suggested posts.
+// Added in Bot API 9.2; for channels only.
+func WithCanManageDirectMessages(can bool) PromoteOption {
+	return func(r *PromoteChatMemberRequest) {
+		r.CanManageDirectMessages = &can
 	}
 }
 

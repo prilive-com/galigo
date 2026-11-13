@@ -300,6 +300,8 @@ type SendMediaGroupRequest struct {
 	DisableNotification bool        `json:"disable_notification,omitempty"`
 	ProtectContent      bool        `json:"protect_content,omitempty"`
 	ReplyToMessageID    int         `json:"reply_to_message_id,omitempty"`
+	// Bot API 9.2; required in a direct messages chat.
+	DirectMessagesTopicID int64 `json:"direct_messages_topic_id,omitempty"`
 }
 
 // ================== Utility Methods ==================
@@ -425,6 +427,8 @@ type ForwardMessagesRequest struct {
 	MessageIDs          []int     `json:"message_ids"`
 	DisableNotification bool      `json:"disable_notification,omitempty"`
 	ProtectContent      bool      `json:"protect_content,omitempty"`
+	// Bot API 9.2; required in a direct messages chat.
+	DirectMessagesTopicID int64 `json:"direct_messages_topic_id,omitempty"`
 }
 
 // CopyMessagesRequest represents a request to copy multiple messages.
@@ -435,6 +439,8 @@ type CopyMessagesRequest struct {
 	DisableNotification bool      `json:"disable_notification,omitempty"`
 	ProtectContent      bool      `json:"protect_content,omitempty"`
 	RemoveCaption       bool      `json:"remove_caption,omitempty"`
+	// Bot API 9.2; required in a direct messages chat.
+	DirectMessagesTopicID int64 `json:"direct_messages_topic_id,omitempty"`
 }
 
 // DeleteMessagesRequest represents a request to delete multiple messages.

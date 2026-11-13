@@ -111,6 +111,10 @@ var AllMethods = []Method{
 	{Name: "approveChatJoinRequest", Category: CategoryChatAdmin, Notes: "needs a pending join request (second account)"},
 	{Name: "declineChatJoinRequest", Category: CategoryChatAdmin, Notes: "needs a pending join request (second account)"},
 
+	// Suggested posts (Bot API 9.2)
+	{Name: "approveSuggestedPost", Category: CategoryChatAdmin},
+	{Name: "declineSuggestedPost", Category: CategoryChatAdmin},
+
 	// === Extended: Stickers ===
 	{Name: "createNewStickerSet", Category: CategoryExtended},
 	{Name: "getStickerSet", Category: CategoryExtended},

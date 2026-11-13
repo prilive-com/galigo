@@ -61,6 +61,6 @@ func TestHandleHelp_Text(t *testing.T) {
 	// B-48b2 T-help: the stars and paid-media lines.
 	assert.Contains(t, lines, "  stars             - Star balance + transactions, invoice, paid media (S21, S22, S70)")
 	assert.Contains(t, lines, "  paid-media        - Send paid media: photo, video, live photo (S70)")
-	// B-48c1 T-help: the suggested-posts line.
-	assert.Contains(t, lines, "  suggested-posts   - Suggested post parameters reach the server: JSON and form (S71)")
+	// B-48c1 T-help, B-48c2: the suggested-posts line.
+	assert.Contains(t, lines, "  suggested-posts   - Suggested post parameters, approve and decline reach the server (S71, S72)")
 }

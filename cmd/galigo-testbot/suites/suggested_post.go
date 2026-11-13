@@ -31,7 +31,28 @@ func S71_SuggestedPostParameters() engine.Scenario {
 	}
 }
 
+// S72_DecideSuggestedPost proves that approveSuggestedPost and declineSuggestedPost (Bot API 9.2) reach the server
+// and that their message_id is read. The test chat is not a channel direct messages chat, so every call must be
+// refused: a plain message gives SuggestedPostNotUsable and a message id with no message gives SuggestedPostNotFound.
+// The approve call also sends a send_date one hour ahead, and the decline call a comment.
+func S72_DecideSuggestedPost() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S72-DecideSuggestedPost",
+		ScenarioDescription: "approveSuggestedPost and declineSuggestedPost reach the server and read message_id (9.2)",
+		CoveredMethods:      []string{"approveSuggestedPost", "declineSuggestedPost"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendMessageStep{Text: "galigo suggested post target"},
+			&engine.DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: time.Now().Add(time.Hour).Unix(), WantError: engine.SuggestedPostNotUsable},
+			&engine.DecideSuggestedPostStep{Method: "approveSuggestedPost", Missing: true, WantError: engine.SuggestedPostNotFound},
+			&engine.DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "galigo test", WantError: engine.SuggestedPostNotUsable},
+			&engine.DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true, WantError: engine.SuggestedPostNotFound},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
 // AllSuggestedPostScenarios returns the suggested post scenarios (Bot API 9.2).
 func AllSuggestedPostScenarios() []engine.Scenario {
-	return []engine.Scenario{S71_SuggestedPostParameters()}
+	return []engine.Scenario{S71_SuggestedPostParameters(), S72_DecideSuggestedPost()}
 }

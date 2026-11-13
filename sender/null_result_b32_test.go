@@ -373,7 +373,7 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 		})
 		var trips atomic.Int32
 		client := b32Client(t, server, b32CountingBreaker(&trips))
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			_, err := client.GetManagedBotToken(context.Background(), 42)
 			var apiErr *tg.APIError
 			require.True(t, errors.As(err, &apiErr), "call %d: %v", i+1, err)

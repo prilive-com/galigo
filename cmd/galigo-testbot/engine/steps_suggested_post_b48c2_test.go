@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,6 +43,18 @@ func (f *fakeDecide) DeclineSuggestedPost(ctx context.Context, req sender.Declin
 
 const b48c2Chat = int64(-1001234567890)
 
+// b48c2BigTarget is above 2^31; a variable, so the file still builds where int has 32 bits.
+var b48c2BigTarget int64 = 3000000000
+
+// b48c2Target is the target message id of S1 and S5: above 2^31 where int has 64 bits, so a step or an adapter that
+// narrows message_id through int32 fails (C2-01); 70 where int has 32 bits.
+func b48c2Target() int {
+	if strconv.IntSize == 64 {
+		return int(b48c2BigTarget)
+	}
+	return 70
+}
+
 func b48c2Runtime(f *fakeDecide, target int) *Runtime {
 	rt := NewRuntime(f, b48c2Chat, 1)
 	if target != 0 {
@@ -64,7 +77,8 @@ const b48c2Comment = "  OK Привет  "
 // passes the caller's context on, and records the id it sent.
 func TestB48C2_Step_Requests(t *testing.T) {
 	f := &fakeDecide{err: b48c2Refusal(SuggestedPostNotUsable)}
-	rt := b48c2Runtime(f, 70)
+	tgt := b48c2Target()
+	rt := b48c2Runtime(f, tgt)
 	ctx := context.WithValue(context.Background(), b48c2CtxKey{}, "s1")
 	_, err := (&DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 2200000000, WantError: SuggestedPostNotUsable}).Execute(ctx, rt)
 	require.NoError(t, err)
@@ -79,19 +93,19 @@ func TestB48C2_Step_Requests(t *testing.T) {
 		require.NotNil(t, res)
 		ev, ok := res.Evidence.(map[string]any)
 		require.True(t, ok, "evidence %T", res.Evidence)
-		assert.Equal(t, 1000070, ev["message_id"])
+		assert.Equal(t, tgt+1000000, ev["message_id"])
 	}
 	require.Len(t, f.ctxs, 4)
 	for i, c := range f.ctxs {
 		assert.Equal(t, "s1", c.Value(b48c2CtxKey{}), "call %d got the caller's context", i)
 	}
 	assert.Equal(t, []sender.ApproveSuggestedPostRequest{
-		{ChatID: b48c2Chat, MessageID: 70, SendDate: 2200000000},
-		{ChatID: b48c2Chat, MessageID: 1000070},
+		{ChatID: b48c2Chat, MessageID: tgt, SendDate: 2200000000},
+		{ChatID: b48c2Chat, MessageID: tgt + 1000000},
 	}, f.approves)
 	assert.Equal(t, []sender.DeclineSuggestedPostRequest{
-		{ChatID: b48c2Chat, MessageID: 70, Comment: b48c2Comment},
-		{ChatID: b48c2Chat, MessageID: 1000070},
+		{ChatID: b48c2Chat, MessageID: tgt, Comment: b48c2Comment},
+		{ChatID: b48c2Chat, MessageID: tgt + 1000000},
 	}, f.declines)
 }
 
@@ -177,6 +191,7 @@ func TestB48C2_Step_Names(t *testing.T) {
 // S5: the step with the real adapter and sender over a fake server that answers as the live server does in the test
 // chat (MEASURED): NotFound when message_id is absent or names no message, NotUsable for the target.
 func TestB48C2_StepThroughAdapter(t *testing.T) {
+	tgt := b48c2Target() // C2-01: a large target id and a full-width chat id through the step and the real adapter
 	for _, tc := range []struct {
 		name string // fixed, not step.Name(): a mutant of Name() must not rename the leaves
 		step *DecideSuggestedPostStep
@@ -184,13 +199,13 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 		body string
 	}{
 		{"approve", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: 2200000000, WantError: SuggestedPostNotUsable},
-			"approveSuggestedPost", `{"chat_id":123456789,"message_id":70,"send_date":2200000000}`},
+			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"send_date":2200000000}`, tgt)},
 		{"decline", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: b48c2Comment, WantError: SuggestedPostNotUsable},
-			"declineSuggestedPost", `{"chat_id":123456789,"message_id":70,"comment":"  OK Привет  "}`},
+			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"comment":"  OK Привет  "}`, tgt)},
 		{"approve_missing", &DecideSuggestedPostStep{Method: "approveSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},
-			"approveSuggestedPost", `{"chat_id":123456789,"message_id":1000070}`},
+			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
 		{"decline_missing", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},
-			"declineSuggestedPost", `{"chat_id":123456789,"message_id":1000070}`},
+			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := testutil.NewMockServer(t)
@@ -199,14 +214,14 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 					MessageID int `json:"message_id"`
 				}
 				_ = json.NewDecoder(r.Body).Decode(&body)
-				if body.MessageID == 70 {
+				if body.MessageID == tgt {
 					testutil.ReplyError(w, 400, "Bad Request: "+SuggestedPostNotUsable, nil)
 					return
 				}
 				testutil.ReplyError(w, 400, "Bad Request: "+SuggestedPostNotFound, nil)
 			})
-			rt := NewRuntime(NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), testutil.TestChatID, testutil.TestUserID)
-			rt.LastMessage = &tg.Message{MessageID: 70, Chat: &tg.Chat{ID: testutil.TestChatID}}
+			rt := NewRuntime(NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), b48c2Chat, testutil.TestUserID)
+			rt.LastMessage = &tg.Message{MessageID: tgt, Chat: &tg.Chat{ID: b48c2Chat}}
 			_, err := tc.step.Execute(context.Background(), rt)
 			require.NoError(t, err)
 			require.Equal(t, 1, server.CaptureCount())

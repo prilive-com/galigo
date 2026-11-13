@@ -128,6 +128,10 @@ func TestB48C2_U1b_Optional(t *testing.T) {
 			func(ctx context.Context, c *sender.Client) error { // E-0117: a value a normaliser (trim, case fold; O-T3-01) would change is sent as given
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "  OK Привет  "})
 			}},
+		{"comment_blank", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"   "}`, `"comment":"   "`,
+			func(ctx context.Context, c *sender.Client) error { // C2-02: a comment of spaces only is sent as given, not dropped
+				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "   "})
+			}},
 		{"comment_long", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"` + strings.Repeat("x", 129) + `"}`, "",
 			func(ctx context.Context, c *sender.Client) error {
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: strings.Repeat("x", 129)})

@@ -335,8 +335,9 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 
 // Format implements fmt.Formatter, so fmt and slog's text handler do not print the bot token that sender.Client
 // holds in an unexported field: every verb fmt passes to it formats the text sender.Client{[REDACTED]} (<nil> for
-// a nil pointer) like a string, with the verb's flags, width and precision. The paths that still print the token
-// are in the tg.SecretToken doc.
+// a nil pointer) like a string, with the verb's flags, width and precision, except that %#v writes it unquoted and
+// an argument index just before the verb is not passed on (as in tg.SecretToken's Format). The paths that still
+// print the token are in the tg.SecretToken doc.
 func (c *Client) Format(f fmt.State, verb rune) {
 	scrub.FormatHolder(f, verb, "sender.Client", c == nil)
 }

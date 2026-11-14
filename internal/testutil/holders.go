@@ -155,8 +155,8 @@ func assertSameState(t *testing.T, v any, before []heldField, when string) {
 }
 
 // heldField is one piece of state reachable from a value, and the path of fields that reached it. value starts
-// with its kind: "s:" a string, "p:" the address of a pointer, channel, map, slice or func (or "nil"), "t:" the
-// dynamic type in an interface, "n:" a bool or number.
+// with its kind: "s:" a string, "p:" the address of a pointer, channel, map, slice or func (or "nil"; with " len:N"
+// for a channel, map or slice), "t:" the dynamic type in an interface, "n:" a bool or number.
 type heldField struct {
 	path, value string
 }
@@ -175,10 +175,10 @@ func heldFields(v any) []heldField {
 }
 
 // walkHeld appends the state reachable from v through pointers, interfaces and struct fields (exported or not;
-// reflect reads an unexported field with String, Int, Uint, Float, Bool and Pointer). A pointer seen before is
-// recorded but not followed again. The elements of maps, slices and channels are not followed (their addresses are
-// recorded, and the length of a map or slice). A sync.Mutex or sync.RWMutex is skipped (another goroutine may hold
-// it for a moment), and so is a sync.Pool (the GC empties it).
+// reflect reads an unexported field with String, Int, Uint, Float, Bool, Pointer and Len). A pointer seen before is
+// recorded but not followed again. The elements of maps, slices and channels are not followed (their addresses and
+// lengths are recorded). A sync.Mutex or sync.RWMutex is skipped (another goroutine may hold it for a moment); of a
+// sync.Pool only the New function is recorded (the GC empties the rest).
 func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldField) {
 	add := func(val string) { *out = append(*out, heldField{path, val}) }
 	switch v.Kind() {
@@ -197,7 +197,7 @@ func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldFi
 		switch {
 		case v.IsNil():
 			add("p:nil")
-		case v.Kind() == reflect.Map || v.Kind() == reflect.Slice:
+		case v.Kind() == reflect.Chan || v.Kind() == reflect.Map || v.Kind() == reflect.Slice:
 			add("p:" + strconv.FormatUint(uint64(v.Pointer()), 16) + " len:" + strconv.Itoa(v.Len()))
 		default:
 			add("p:" + strconv.FormatUint(uint64(v.Pointer()), 16))
@@ -210,7 +210,11 @@ func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldFi
 		add("t:" + v.Elem().Type().String())
 		walkHeld(v.Elem(), path, seen, out)
 	case reflect.Struct:
-		if v.Type() == mutexType || v.Type() == rwMutexType || v.Type() == poolType {
+		if v.Type() == mutexType || v.Type() == rwMutexType {
+			return
+		}
+		if v.Type() == poolType {
+			walkHeld(v.FieldByName("New"), path+".New", seen, out)
 			return
 		}
 		for i := range v.NumField() {

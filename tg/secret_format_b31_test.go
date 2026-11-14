@@ -170,7 +170,8 @@ type b31AuthErr struct {
 func (e b31AuthErr) Error() string { return "auth failed: " + e.Msg }
 
 // b31Custom has its own Format; b31Conflict embeds it and SecretToken at the same depth, so the two Format methods
-// cancel and b31Conflict has none (it had b31Custom's before B-31).
+// cancel and b31Conflict has none (it had b31Custom's before B-31). b31Deeper has b31Custom one level deeper than
+// SecretToken, so the promoted SecretToken.Format hides it (b31Deeper printed CUSTOM before B-31).
 type b31Custom struct{}
 
 func (b31Custom) Format(f fmt.State, _ rune) { fmt.Fprint(f, "CUSTOM") }
@@ -178,6 +179,13 @@ func (b31Custom) Format(f fmt.State, _ rune) { fmt.Fprint(f, "CUSTOM") }
 type b31Conflict struct {
 	tg.SecretToken
 	b31Custom
+}
+
+type b31Mid struct{ b31Custom }
+
+type b31Deeper struct {
+	tg.SecretToken
+	b31Mid
 }
 
 type b31EmbedPtr struct {
@@ -221,6 +229,7 @@ func TestB31_Containers(t *testing.T) {
 		{"embed_pointer_v", fmt.Sprintf("%v", b31EmbedPtr{&tok, "bob"}), "[REDACTED]"},
 		{"embed_nil_pointer_v", fmt.Sprintf("%v", b31EmbedPtr{nil, "bob"}), "%!v(PANIC=Format method: runtime error: invalid memory address or nil pointer dereference)"},
 		{"embed_gostring", fmt.Sprintf("%#v", b31EmbedGo{tok}), `tg.SecretToken("[REDACTED]")`},
+		{"embed_deeper_format", fmt.Sprintf("%v", b31Deeper{tok, b31Mid{}}), "[REDACTED]"},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) { assert.Equal(t, r.want, r.got) })
@@ -269,9 +278,10 @@ type b31HasPtr struct{ P *b31Exported }
 // reached through an unexported field; fmt's bad-verb text (%w of a non-error value, and of an error outside
 // fmt.Errorf; %p; a pointer below the top level with a verb a pointer does not support: in a struct field, a slice,
 // an array, a map element and an interface value); encoder paths that read the string itself (a JSON map key, an
-// XML comment field, an XML chardata or cdata field of type **SecretToken, gob). The doc's Go-version-dependent paths (a *SecretToken JSON map
-// key, an XML field of interface type) have no row: their output differs between the CI toolchains. If a Go release
-// changes one of the pinned paths, this fails and the doc comment must change with it.
+// XML comment field, an XML chardata or cdata field of type **SecretToken, gob). The doc's Go-version-dependent
+// paths (a *SecretToken JSON map key, an XML field of interface type) have no row: their output differs between the
+// CI toolchains. If a Go release changes one of the pinned paths, this fails and the doc comment must change with
+// it.
 func TestB31_DocumentedLimits(t *testing.T) {
 	tok := tg.SecretToken(b31Secret)
 	w, p, s := "x %w", "%p", "%s" // in variables: go vet rejects %w for this argument in a constant format

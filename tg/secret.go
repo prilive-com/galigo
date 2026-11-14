@@ -60,7 +60,8 @@ func (s SecretToken) MarshalText() ([]byte, error) {
 // SecretToken gets this method by Go's promotion rules, and fmt uses it before that type's own String, Error or
 // GoString; an embedded nil *SecretToken prints fmt's PANIC text. This Format and another promoted field or method
 // named Format at the same depth cancel each other, so such a type does not implement fmt.Formatter and its Format
-// selector does not compile. The paths fmt never sends here are in the SecretToken doc.
+// selector does not compile; a field or method named Format at a greater depth is hidden by this one. The paths fmt
+// never sends here are in the SecretToken doc.
 func (s SecretToken) Format(f fmt.State, verb rune) {
 	if verb == 'v' && f.Flag('#') {
 		fmt.Fprintf(f, fmt.FormatString(f, 's'), s.GoString())

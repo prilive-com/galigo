@@ -46,10 +46,13 @@ type Config struct {
 	BaseURL string
 
 	// Webhook configuration
-	WebhookPort   int
-	TLSCertPath   string
-	TLSKeyPath    string
-	WebhookSecret string
+	WebhookPort int
+	TLSCertPath string
+	TLSKeyPath  string
+	// WebhookSecret is a tg.SecretToken: fmt, slog and encoding/json print [REDACTED] for it, except on the paths
+	// listed in the tg.SecretToken doc (for example a Config value in an unexported field of your own type). Use
+	// WebhookSecret.Value() for the raw secret (a setWebhook call, a header, a config file you write).
+	WebhookSecret tg.SecretToken
 	AllowedDomain string
 	WebhookURL    string // Public URL for auto-registration
 
@@ -144,7 +147,7 @@ func LoadConfig() (*Config, error) {
 	}
 	cfg.TLSCertPath = getEnv("TLS_CERT_PATH", "")
 	cfg.TLSKeyPath = getEnv("TLS_KEY_PATH", "")
-	cfg.WebhookSecret = getEnv("WEBHOOK_SECRET", "")
+	cfg.WebhookSecret = tg.SecretToken(getEnv("WEBHOOK_SECRET", ""))
 	cfg.AllowedDomain = getEnv("ALLOWED_DOMAIN", "")
 	cfg.WebhookURL = getEnv("WEBHOOK_URL", "")
 

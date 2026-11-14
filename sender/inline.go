@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/prilive-com/galigo/tg"
 )
@@ -78,7 +79,10 @@ func (c *Client) AnswerWebAppQuery(ctx context.Context, req AnswerWebAppQueryReq
 }
 
 // AnswerGuestQuery sends a message in response to a guest query (Bot API 10.0); see tg.Message.GuestQueryID.
-// It is not retried: a repeat could post the message twice.
+// It is not retried: a repeat could post the message twice. An empty inline_message_id in the reply (a null result
+// included) is an error. Any error other than a 4xx *tg.APIError or a *tg.ValidationError (an empty
+// inline_message_id and a 5xx *tg.APIError included) may come after the message was sent: do not repeat the call
+// blindly.
 func (c *Client) AnswerGuestQuery(ctx context.Context, req AnswerGuestQueryRequest) (*tg.SentGuestMessage, error) {
 	if req.GuestQueryID == "" {
 		return nil, tg.NewValidationError("guest_query_id", "required")
@@ -90,6 +94,9 @@ func (c *Client) AnswerGuestQuery(ctx context.Context, req AnswerGuestQueryReque
 	var result tg.SentGuestMessage
 	if err := c.callJSON(ctx, "answerGuestQuery", req, &result); err != nil {
 		return nil, err
+	}
+	if result.InlineMessageID == "" {
+		return nil, fmt.Errorf("galigo: answerGuestQuery: empty inline_message_id in response")
 	}
 	return &result, nil
 }

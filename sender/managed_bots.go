@@ -33,11 +33,11 @@ func (c *Client) GetManagedBotToken(ctx context.Context, userID int64) (tg.Secre
 
 // ReplaceManagedBotToken revokes the current token of a managed bot and returns the new one (Bot API 9.6).
 //
-// It is not retried: a repeat after a lost reply would revoke the token the first call returned. The token was
-// surely not replaced only when the error is a *tg.APIError with a 4xx code (Telegram refused the call) or a
-// *tg.ValidationError (the call was not sent). After any other error (an empty token in the reply, a 5xx
-// *tg.APIError, a parse error, a timeout or cancel, a read error) the token may already be replaced: call
-// GetManagedBotToken to read the current one, and do not repeat the replace. The returned token is redacted in
+// It is not retried: a repeat after a lost reply would revoke the token the first call returned. Some errors show
+// that the token was not replaced, for example a *tg.APIError with a 4xx code (Telegram refused the call) or a
+// *tg.ValidationError (the call was not sent). After an error whose outcome is unknown (an empty token in the
+// reply, a 5xx *tg.APIError, a parse error, a timeout or cancel, a read error) the token may already be replaced:
+// call GetManagedBotToken to read the current one, and do not repeat the replace. The returned token is redacted in
 // output as GetManagedBotToken describes; call Value() to use or store it.
 func (c *Client) ReplaceManagedBotToken(ctx context.Context, userID int64) (tg.SecretToken, error) {
 	return c.managedBotToken(ctx, "replaceManagedBotToken", userID)

@@ -394,10 +394,11 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 	}
 	tokenSteps := func(method string) []step {
 		e := "galigo: " + method + ": empty token in response"
-		return []step{{b32Body(`null`), e}, {b32Body(`""`), e}, {b32Body(`"` + api96FakeToken + `"`), ""}}
+		return []step{{b32Body(`null`), e}, {b32Body(`""`), e}, {b32Body(`"` + api96FakeToken + `"`), ""}, {b32Body(`null`), e}}
 	}
 	const btn = "galigo: savePreparedKeyboardButton: empty id in response"
 	const gst = "galigo: answerGuestQuery: empty inline_message_id in response"
+	const acc = "galigo: getManagedBotAccessSettings: null result in response"
 	leaves := []struct {
 		method string
 		steps  []step
@@ -412,17 +413,18 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 			return err
 		}},
 		{"savePreparedKeyboardButton", []step{{b32Body(`null`), btn}, {b32Body(`{}`), btn}, {b32Body(`{"id":""}`), btn},
-			{b32Body(`{"id":null}`), btn}, {b32Body(`{"id":"Prep-B32"}`), ""}}, func(c *sender.Client) error {
+			{b32Body(`{"id":null}`), btn}, {b32Body(`{"id":"Prep-B32"}`), ""}, {b32Body(`null`), btn}}, func(c *sender.Client) error {
 			_, err := b32Button(c)
 			return err
 		}},
 		{"answerGuestQuery", []step{{b32Body(`null`), gst}, {b32Body(`{}`), gst}, {b32Body(`{"inline_message_id":""}`), gst},
-			{b32Body(`{"inline_message_id":null}`), gst}, {b32Body(`{"inline_message_id":"Im-B32"}`), ""}}, func(c *sender.Client) error {
+			{b32Body(`{"inline_message_id":null}`), gst}, {b32Body(`{"inline_message_id":"Im-B32"}`), ""},
+			{b32Body(`null`), gst}}, func(c *sender.Client) error {
 			_, err := b32Guest(c)
 			return err
 		}},
-		{"getManagedBotAccessSettings", []step{{b32Body(`null`), "galigo: getManagedBotAccessSettings: null result in response"},
-			{b32Body(`{"is_access_restricted":true}`), ""}}, func(c *sender.Client) error {
+		{"getManagedBotAccessSettings", []step{{b32Body(`null`), acc}, {b32Body(`{"is_access_restricted":true}`), ""},
+			{b32Body(`null`), acc}}, func(c *sender.Client) error {
 			_, err := b32Access(c)
 			return err
 		}},

@@ -164,6 +164,7 @@ type heldField struct {
 var (
 	mutexType   = reflect.TypeFor[sync.Mutex]()
 	rwMutexType = reflect.TypeFor[sync.RWMutex]()
+	poolType    = reflect.TypeFor[sync.Pool]()
 )
 
 // heldFields returns the state reachable from v, in walk order.
@@ -176,7 +177,8 @@ func heldFields(v any) []heldField {
 // walkHeld appends the state reachable from v through pointers, interfaces and struct fields (exported or not;
 // reflect reads an unexported field with String, Int, Uint, Float, Bool and Pointer). A pointer seen before is
 // recorded but not followed again. The elements of maps, slices and channels are not followed (their addresses are
-// recorded), and a sync.Mutex or sync.RWMutex is skipped (another goroutine may hold it for a moment).
+// recorded, and the length of a map or slice). A sync.Mutex or sync.RWMutex is skipped (another goroutine may hold
+// it for a moment), and so is a sync.Pool (the GC empties it).
 func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldField) {
 	add := func(val string) { *out = append(*out, heldField{path, val}) }
 	switch v.Kind() {
@@ -192,9 +194,12 @@ func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldFi
 		seen[v.Pointer()] = true
 		walkHeld(v.Elem(), path+"*", seen, out)
 	case reflect.Chan, reflect.Map, reflect.Slice, reflect.Func, reflect.UnsafePointer:
-		if v.IsNil() {
+		switch {
+		case v.IsNil():
 			add("p:nil")
-		} else {
+		case v.Kind() == reflect.Map || v.Kind() == reflect.Slice:
+			add("p:" + strconv.FormatUint(uint64(v.Pointer()), 16) + " len:" + strconv.Itoa(v.Len()))
+		default:
 			add("p:" + strconv.FormatUint(uint64(v.Pointer()), 16))
 		}
 	case reflect.Interface:
@@ -205,7 +210,7 @@ func walkHeld(v reflect.Value, path string, seen map[uintptr]bool, out *[]heldFi
 		add("t:" + v.Elem().Type().String())
 		walkHeld(v.Elem(), path, seen, out)
 	case reflect.Struct:
-		if v.Type() == mutexType || v.Type() == rwMutexType {
+		if v.Type() == mutexType || v.Type() == rwMutexType || v.Type() == poolType {
 			return
 		}
 		for i := range v.NumField() {

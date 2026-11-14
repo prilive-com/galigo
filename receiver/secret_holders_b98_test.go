@@ -3,6 +3,8 @@ package receiver_test
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"text/template"
@@ -37,6 +39,17 @@ func TestB98_WebhookHandler(t *testing.T) {
 	const text = "receiver.WebhookHandler{[REDACTED]}"
 	h := receiver.NewWebhookHandler(nil, make(chan tg.Update, 1), b98Config())
 	b98HolderRows(t, h, &receiver.WebhookHandler{}, (*receiver.WebhookHandler)(nil), text, b98Secret)
+	// A handler that has served a request has used its buffer pool, which the GC empties during the matrix (c1
+	// A-C1-02): a correct Format must still pass the state check.
+	t.Run("matrix_after_request", func(t *testing.T) {
+		hs := receiver.NewWebhookHandler(nil, make(chan tg.Update, 1), b98Config())
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"update_id":1}`))
+		req.Header.Set("X-Telegram-Bot-Api-Secret-Token", b98Secret)
+		rec := httptest.NewRecorder()
+		hs.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code)
+		testutil.AssertFormatsAs(t, hs, text, b98Secret)
+	})
 }
 
 // b98HolderRows runs the rows both receiver types share, one per subtest: the matrix for a live value (secret is

@@ -45,7 +45,8 @@
 //   - Per-chat and global rate limiting
 //   - Retry with exponential backoff and crypto jitter
 //   - TLS 1.2+ enforcement
-//   - Token redaction in fmt and slog (limits: the tg.SecretToken doc) and in request errors
+//   - Token and webhook secret redaction in fmt and slog (limits: the tg.SecretToken doc); bot-token scrubbing in
+//     request errors
 //   - Structured logging with slog
 //   - OpenTelemetry-ready
 //   - Go 1.22+ features: integer range loops, improved generics

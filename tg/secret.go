@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-// SecretToken wraps a bot token to prevent accidental logging.
+// SecretToken wraps a bot token or a webhook secret to prevent accidental logging.
 // Implements fmt.Formatter, fmt.Stringer, fmt.GoStringer, slog.LogValuer, and encoding.TextMarshaler.
 //
 // fmt (for the verbs it passes to these methods), slog, and encoders that call MarshalText (encoding/json for
@@ -33,18 +33,19 @@ import (
 // above (%w, and such a pointer in an unexported field printed with a verb other than v, p, b, o, d, x and X); a
 // copied struct value, such as *c (go vet reports the copy); text/template and html/template, which print {{.}} of
 // such a pointer through the struct value ({{printf "%v" .}} prints the redacted text); and the reflection readers
-// of the last bullet above (go-spew prints the webhook secret, a plain string, even with methods enabled). A type
+// of the last bullet above, which print the webhook secret the same way as the token. A type
 // that embeds one of these pointers (or one of these types, printed through a pointer to the outer value) gets this
 // Format by Go's promotion rules, unless it has its own Format or another Format at the same depth (the rules in
 // the Format method's doc): fmt then writes only that text for the whole value, before the type's own String, Error
 // or GoString.
 //
 // go vet does not report %p (or any verb but %w) on a SecretToken, because it implements fmt.Formatter.
-// Call Value() to use or store the token.
+// Call Value() to use or store the raw token or secret.
 type SecretToken string
 
-// Value returns the actual token value.
-// Only use this when sending to Telegram API.
+// Value returns the raw token or secret. Use it only where the raw value is needed (a request to Telegram,
+// comparing a webhook secret); fmt, slog and encoding/json print [REDACTED], except on the paths listed in the
+// SecretToken doc.
 func (s SecretToken) Value() string { return string(s) }
 
 // String returns a redacted placeholder (fmt.Stringer).

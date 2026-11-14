@@ -26,7 +26,7 @@ var _ http.Handler = (*WebhookHandler)(nil)
 // WebhookHandler implements http.Handler for Telegram webhook callbacks.
 type WebhookHandler struct {
 	logger        *slog.Logger
-	webhookSecret string
+	webhookSecret tg.SecretToken
 	allowedDomain string
 	updates       chan<- tg.Update
 	updatesBidi   chan tg.Update // bidirectional ref for DropOldest; may be nil
@@ -152,7 +152,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Secret validation (constant-time comparison)
 	if h.webhookSecret != "" {
 		secret := r.Header.Get("X-Telegram-Bot-Api-Secret-Token")
-		if subtle.ConstantTimeCompare([]byte(secret), []byte(h.webhookSecret)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(secret), []byte(h.webhookSecret.Value())) != 1 {
 			h.fail(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

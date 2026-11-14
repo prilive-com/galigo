@@ -40,7 +40,7 @@ type botConfig struct {
 
 	// Webhook settings
 	webhookPort   int
-	webhookSecret string
+	webhookSecret tg.SecretToken
 
 	// Sender settings
 	senderConfig sender.Config
@@ -72,7 +72,7 @@ func WithWebhook(port int, secret string) Option {
 	return func(c *botConfig) {
 		c.mode = receiver.ModeWebhook
 		c.webhookPort = port
-		c.webhookSecret = secret
+		c.webhookSecret = tg.SecretToken(secret)
 	}
 }
 

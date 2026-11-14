@@ -41,7 +41,7 @@ func TestAPI101C_WebhookPooledBuffer(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewBufferString(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Telegram-Bot-Api-Secret-Token", cfg.WebhookSecret)
+		req.Header.Set("X-Telegram-Bot-Api-Secret-Token", string(cfg.WebhookSecret))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)

@@ -61,7 +61,7 @@ func main() {
 
 	// Create sender client
 	senderClient, err := sender.New(
-		cfg.Token,
+		cfg.Token.Value(),
 		sender.WithLogger(logger),
 		sender.WithRetries(3),
 	)
@@ -122,7 +122,7 @@ func showCoverageStatus(logger *slog.Logger) {
 }
 
 func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
-	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
 	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
 	runner := engine.NewRunner(rt, engine.RunnerConfig{
 		BaseDelay:     cfg.SendInterval,
@@ -344,7 +344,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 	receiverCfg.PollingTimeout = 30
 
 	pollingClient := receiver.NewPollingClient(
-		tg.SecretToken(cfg.Token),
+		cfg.Token,
 		updates,
 		logger,
 		receiverCfg,
@@ -360,7 +360,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 	defer pollingClient.Stop()
 
 	// Create runtime with callback channel
-	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
 	callbackChan := make(chan *tg.CallbackQuery, 10)
 	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
 	rt.CallbackChan = callbackChan
@@ -430,7 +430,7 @@ func runInteractive(cfg *config.Config, senderClient *sender.Client, logger *slo
 	receiverCfg.PollingTimeout = 30
 
 	pollingClient := receiver.NewPollingClient(
-		tg.SecretToken(cfg.Token),
+		cfg.Token,
 		updates,
 		logger,
 		receiverCfg,
@@ -456,7 +456,7 @@ func runInteractive(cfg *config.Config, senderClient *sender.Client, logger *slo
 		os.Exit(1)
 	}
 
-	adapter := engine.NewSenderAdapter(senderClient).WithToken(tg.SecretToken(cfg.Token))
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
 	cleaner := cleanup.NewCleaner(adapter, logger)
 
 	logger.Info("listening for commands",

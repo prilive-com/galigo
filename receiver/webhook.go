@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"golang.org/x/time/rate"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -113,6 +115,15 @@ func NewWebhookHandler(
 	}
 
 	return h
+}
+
+// Format implements fmt.Formatter, so fmt and slog's text handler do not print the webhook secret that
+// receiver.WebhookHandler holds in an unexported field: every verb fmt passes to it formats the text
+// receiver.WebhookHandler{[REDACTED]} (<nil> for a nil pointer) like a string, with the verb's flags, width and
+// precision, except that %#v writes it unquoted and an argument index just before the verb is not passed on (as in
+// tg.SecretToken's Format). The paths that still print the secret are in the tg.SecretToken doc.
+func (h *WebhookHandler) Format(f fmt.State, verb rune) {
+	scrub.FormatHolder(f, verb, "receiver.WebhookHandler", h == nil)
 }
 
 // ServeHTTP implements http.Handler.

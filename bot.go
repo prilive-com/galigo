@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/internal/validate"
 	"github.com/prilive-com/galigo/receiver"
 	"github.com/prilive-com/galigo/sender"
@@ -213,6 +214,15 @@ func (b *Bot) Stop() {
 	if b.receiver != nil {
 		b.receiver.Stop()
 	}
+}
+
+// Format implements fmt.Formatter, so fmt and slog's text handler do not print the bot token and webhook secret
+// that galigo.Bot holds in unexported fields: every verb fmt passes to it formats the text galigo.Bot{[REDACTED]}
+// (<nil> for a nil pointer) like a string, with the verb's flags, width and precision, except that %#v writes it
+// unquoted and an argument index just before the verb is not passed on (as in tg.SecretToken's Format). The paths
+// that still print them are in the tg.SecretToken doc.
+func (b *Bot) Format(f fmt.State, verb rune) {
+	scrub.FormatHolder(f, verb, "galigo.Bot", b == nil)
 }
 
 // Close releases all resources.

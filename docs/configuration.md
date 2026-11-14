@@ -11,7 +11,7 @@ This document covers the configuration options, built-in resilience features, an
 | `WithPolling(timeout, limit)` | `WithPolling(30, 100)` | 30s long-poll timeout, 100 updates per batch |
 | `WithWebhook(port, secret)` | `WithWebhook(8443, "secret")` | Requires TLS termination + ingress |
 | `WithRetries(n)` | `WithRetries(3)` | Exponential backoff with jitter |
-| `WithLogger(logger)` | `WithLogger(slog.Default())` | Structured logging with token redaction |
+| `WithLogger(logger)` | `WithLogger(slog.Default())` | Structured logging with slog |
 | `WithAllowedUpdates(types...)` | `WithAllowedUpdates("message", "callback_query")` | Only receive specified update types |
 
 ### Rate Limiting Options
@@ -285,7 +285,7 @@ Also works with `EditMessageTextRequest` to update preview settings when editing
 
 | Feature | Details |
 |---------|---------|
-| Token redaction | Bot token automatically redacted from logs and error messages |
+| Token redaction | fmt and slog print `[REDACTED]` for the bot token (`tg.SecretToken`); fmt and slog's text handler print `sender.Client{[REDACTED]}` and the like for a `*sender.Client`, `*galigo.Bot`, `*receiver.PollingClient` or `*receiver.WebhookHandler`. Errors from `http.NewRequestWithContext` and `http.Client.Do` pass through a token scrubber. Some paths still print a secret (see [SECURITY.md](../.github/SECURITY.md) and the `tg.SecretToken` doc), and fmt prints the `WebhookSecret` field of `receiver.Config` (a plain string) |
 | TLS enforcement | TLS 1.2+ required for all API connections |
 | Webhook validation | Constant-time secret comparison for webhook requests |
 | HTTP timeouts | Response header timeout prevents hung connections |

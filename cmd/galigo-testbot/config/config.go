@@ -6,12 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prilive-com/galigo/tg"
 )
 
 // Config holds testbot configuration.
 type Config struct {
 	// Required
-	Token  string
+	Token  tg.SecretToken
 	ChatID int64
 	Admins []int64
 
@@ -30,7 +32,7 @@ type Config struct {
 
 	// Webhook (for future use)
 	WebhookPublicURL   string
-	WebhookSecretToken string
+	WebhookSecretToken tg.SecretToken
 	ListenAddr         string
 
 	// Derived
@@ -40,7 +42,7 @@ type Config struct {
 // Load loads configuration from environment variables.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Token:             os.Getenv("TESTBOT_TOKEN"),
+		Token:             tg.SecretToken(os.Getenv("TESTBOT_TOKEN")),
 		Mode:              getEnvDefault("TESTBOT_MODE", "polling"),
 		StorageDir:        getEnvDefault("TESTBOT_STORAGE_DIR", "./var"),
 		LogLevel:          getEnvDefault("TESTBOT_LOG_LEVEL", "info"),
@@ -87,7 +89,7 @@ func Load() (*Config, error) {
 
 	// Webhook config (optional)
 	cfg.WebhookPublicURL = os.Getenv("TESTBOT_WEBHOOK_PUBLIC_URL")
-	cfg.WebhookSecretToken = os.Getenv("TESTBOT_WEBHOOK_SECRET_TOKEN")
+	cfg.WebhookSecretToken = tg.SecretToken(os.Getenv("TESTBOT_WEBHOOK_SECRET_TOKEN"))
 
 	return cfg, nil
 }

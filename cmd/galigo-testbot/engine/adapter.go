@@ -27,6 +27,12 @@ func NewSenderAdapter(client *sender.Client) *SenderAdapter {
 	return &SenderAdapter{client: client}
 }
 
+// Format implements fmt.Formatter, so fmt does not print the bot token held in an unexported field. It has a value
+// receiver (the type holds no lock), so a SenderAdapter value is redacted too; a nil *SenderAdapter prints <nil>.
+func (a SenderAdapter) Format(f fmt.State, verb rune) {
+	scrub.FormatHolder(f, verb, "engine.SenderAdapter", false)
+}
+
 // WithToken sets the token for webhook/polling operations.
 func (a *SenderAdapter) WithToken(token tg.SecretToken) *SenderAdapter {
 	a.token = token

@@ -50,6 +50,19 @@ func TestB98_WebhookHandler(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code)
 		testutil.AssertFormatsAs(t, hs, text, b98Secret)
 	})
+	// The state check records a func by its code address, so it does not see a Format that replaces the buffer
+	// pool's New with a closure of the same literal and another size (c3 C3-01): the next request does.
+	t.Run("request_after_matrix", func(t *testing.T) {
+		updates := make(chan tg.Update, 1)
+		hf := receiver.NewWebhookHandler(nil, updates, b98Config())
+		testutil.AssertFormatsAs(t, hf, text, b98Secret)
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"update_id":1}`))
+		req.Header.Set("X-Telegram-Bot-Api-Secret-Token", b98Secret)
+		rec := httptest.NewRecorder()
+		hf.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Len(t, updates, 1)
+	})
 }
 
 // b98HolderRows runs the rows both receiver types share, one per subtest: the matrix for a live value (secret is

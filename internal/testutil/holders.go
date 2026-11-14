@@ -155,8 +155,9 @@ func assertSameState(t *testing.T, v any, before []heldField, when string) {
 }
 
 // heldField is one piece of state reachable from a value, and the path of fields that reached it. value starts
-// with its kind: "s:" a string, "p:" the address of a pointer, channel, map, slice or func (or "nil"; with " len:N"
-// for a channel, map or slice), "t:" the dynamic type in an interface, "n:" a bool or number.
+// with its kind: "s:" a string, "p:" the address of a pointer, channel, map or slice, or the code address of a func,
+// which does not tell closures of one function literal apart (or "nil"; with " len:N" for a channel, map or slice),
+// "t:" the dynamic type in an interface, "n:" a bool or number.
 type heldField struct {
 	path, value string
 }

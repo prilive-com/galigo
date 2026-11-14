@@ -17,13 +17,27 @@ import (
 //     that holds the token (an error too, in every function but fmt.Errorf), %p of such a value that is not a
 //     pointer, map, slice, channel or func, and a pointer below the top level (a struct field, a slice, array or
 //     map element, an interface value) printed with a verb other than v, p, b, o, d, x and X, when the pointed-to
-//     type has no method fmt uses for that verb (for example %s of a []*T where T holds the token);
+//     type has no method fmt uses for that verb (for example %s of a []*T where T holds the token), or when the
+//     pointer is in an unexported struct field, where fmt cannot call a method;
 //   - encoder paths that read the string itself: a SecretToken map key in encoding/json (and slog's JSON handler),
 //     and a *SecretToken map key depending on the Go version; in encoding/xml, a ",comment" field, a ",chardata"
 //     or ",cdata" field of type **SecretToken, and, depending on the Go version, a chardata, cdata or attribute
 //     field of interface type; encodings that never call MarshalText, such as encoding/gob;
 //   - other code that reads the value by reflection without calling these methods, such as go-spew with methods
 //     disabled (testify's failure diff).
+//
+// sender.Client, galigo.Bot and receiver.PollingClient hold the token, and galigo.Bot and receiver.WebhookHandler
+// hold the webhook secret, in unexported fields. A pointer to each of them has its own Format, so fmt and slog's
+// text handler write the type's name and {[REDACTED]} for it (slog's JSON handler and encoding/json write {} for a
+// non-nil pointer and null for a nil one). Among the paths that still print their secrets are the bad-verb paths
+// above (%w, and such a pointer in an unexported field printed with a verb other than v, p, b, o, d, x and X); a
+// copied struct value, such as *c (go vet reports the copy); text/template and html/template, which print {{.}} of
+// such a pointer through the struct value ({{printf "%v" .}} prints the redacted text); and the reflection readers
+// of the last bullet above (go-spew prints the webhook secret, a plain string, even with methods enabled). A type
+// that embeds one of these pointers (or one of these types, printed through a pointer to the outer value) gets this
+// Format by Go's promotion rules, unless it has its own Format or another Format at the same depth (the rules in
+// the Format method's doc): fmt then writes only that text for the whole value, before the type's own String, Error
+// or GoString.
 //
 // go vet does not report %p (or any verb but %w) on a SecretToken, because it implements fmt.Formatter.
 // Call Value() to use or store the token.

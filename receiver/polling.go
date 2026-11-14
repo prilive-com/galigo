@@ -242,6 +242,14 @@ func defaultPollingHTTPClient(timeoutSeconds int) *http.Client {
 	}
 }
 
+// Format implements fmt.Formatter, so fmt and slog's text handler do not print the bot token that
+// receiver.PollingClient holds in an unexported field: every verb fmt passes to it writes
+// receiver.PollingClient{[REDACTED]}, or <nil> for a nil pointer. The paths that still print it are in the
+// tg.SecretToken doc.
+func (c *PollingClient) Format(f fmt.State, verb rune) {
+	scrub.FormatHolder(f, verb, "receiver.PollingClient", c == nil)
+}
+
 // Start begins polling for updates.
 func (c *PollingClient) Start(ctx context.Context) error {
 	if !c.running.CompareAndSwap(false, true) {

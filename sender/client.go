@@ -333,6 +333,13 @@ func NewFromConfig(cfg Config, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
+// Format implements fmt.Formatter, so fmt and slog's text handler do not print the bot token that sender.Client
+// holds in an unexported field: every verb fmt passes to it writes sender.Client{[REDACTED]}, or <nil> for a nil
+// pointer. The paths that still print it are in the tg.SecretToken doc.
+func (c *Client) Format(f fmt.State, verb rune) {
+	scrub.FormatHolder(f, verb, "sender.Client", c == nil)
+}
+
 // Close releases resources used by the client.
 // It is safe to call Close concurrently with other methods;
 // in-flight requests will complete normally or with context errors.

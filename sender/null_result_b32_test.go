@@ -402,31 +402,31 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 	leaves := []struct {
 		method string
 		steps  []step
-		call   func(*sender.Client) error
+		call   func(*sender.Client) (zero bool, err error) // zero: the method returned the zero value
 	}{
-		{"getManagedBotToken", tokenSteps("getManagedBotToken"), func(c *sender.Client) error {
-			_, err := b32TokenCall("getManagedBotToken")(c)
-			return err
+		{"getManagedBotToken", tokenSteps("getManagedBotToken"), func(c *sender.Client) (bool, error) {
+			tok, err := b32TokenCall("getManagedBotToken")(c)
+			return tok == "", err
 		}},
-		{"replaceManagedBotToken", tokenSteps("replaceManagedBotToken"), func(c *sender.Client) error {
-			_, err := b32TokenCall("replaceManagedBotToken")(c)
-			return err
+		{"replaceManagedBotToken", tokenSteps("replaceManagedBotToken"), func(c *sender.Client) (bool, error) {
+			tok, err := b32TokenCall("replaceManagedBotToken")(c)
+			return tok == "", err
 		}},
 		{"savePreparedKeyboardButton", []step{{b32Body(`null`), btn}, {b32Body(`{}`), btn}, {b32Body(`{"id":""}`), btn},
-			{b32Body(`{"id":null}`), btn}, {b32Body(`{"id":"Prep-B32"}`), ""}, {b32Body(`null`), btn}}, func(c *sender.Client) error {
-			_, err := b32Button(c)
-			return err
+			{b32Body(`{"id":null}`), btn}, {b32Body(`{"id":"Prep-B32"}`), ""}, {b32Body(`null`), btn}}, func(c *sender.Client) (bool, error) {
+			got, err := b32Button(c)
+			return got == nil, err
 		}},
 		{"answerGuestQuery", []step{{b32Body(`null`), gst}, {b32Body(`{}`), gst}, {b32Body(`{"inline_message_id":""}`), gst},
 			{b32Body(`{"inline_message_id":null}`), gst}, {b32Body(`{"inline_message_id":"Im-B32"}`), ""},
-			{b32Body(`null`), gst}}, func(c *sender.Client) error {
-			_, err := b32Guest(c)
-			return err
+			{b32Body(`null`), gst}}, func(c *sender.Client) (bool, error) {
+			got, err := b32Guest(c)
+			return got == nil, err
 		}},
 		{"getManagedBotAccessSettings", []step{{b32Body(`null`), acc}, {b32Body(`{"is_access_restricted":true}`), ""},
-			{b32Body(`null`), acc}}, func(c *sender.Client) error {
-			_, err := b32Access(c)
-			return err
+			{b32Body(`null`), acc}}, func(c *sender.Client) (bool, error) {
+			got, err := b32Access(c)
+			return got == nil, err
 		}},
 	}
 	for _, l := range leaves {
@@ -439,11 +439,13 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 			var trips atomic.Int32
 			client := b32Client(t, server, b32CountingBreaker(&trips))
 			for i, s := range l.steps {
-				err := l.call(client)
+				zero, err := l.call(client)
 				if s.want == "" {
 					require.NoError(t, err, "step %d", i+1)
+					assert.False(t, zero, "step %d: a real value", i+1)
 				} else {
 					require.EqualError(t, err, s.want, "step %d", i+1)
+					assert.True(t, zero, "step %d: the zero value with the error (no stale value)", i+1)
 				}
 			}
 			assert.Equal(t, int32(0), trips.Load(), "breaker failures")

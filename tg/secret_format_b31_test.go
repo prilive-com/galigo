@@ -43,7 +43,7 @@ func b31Flags() []string {
 	return out
 }
 
-// b31Verbs: every ASCII rune that fmt does not read as directive syntax (so it reaches Format as the verb), except p
+// b31Verbs: every ASCII rune that fmt does not read as directive syntax (so fmt reads it as the verb), except p
 // and w, plus a rune below 256 and a rune above 255 that are not ASCII. %p and %w are limits
 // (TestB31_DocumentedLimits). The string verbs are v s q x X; %T prints the type; every other rune is a verb a
 // string does not fit, one fmt knows (such as d, O, U) or one it does not know (such as k, z, !, a control rune).
@@ -266,9 +266,10 @@ type b31Unexported struct{ token tg.SecretToken }
 type b31HasPtr struct{ P *b31Exported }
 
 // TestB31_DocumentedLimits pins the paths the SecretToken doc names as limits, with their exact output: a value
-// reached through an unexported field; fmt's bad-verb text (%w, %p, a pointer below the top level with a verb a
-// pointer does not support: in a struct field, a slice, an array, a map element and an interface value); encoder paths that read the string itself (a JSON map key, an XML comment field, an XML
-// chardata or cdata field of type **SecretToken, gob). The doc's Go-version-dependent paths (a *SecretToken JSON map
+// reached through an unexported field; fmt's bad-verb text (%w of a non-error value, and of an error outside
+// fmt.Errorf; %p; a pointer below the top level with a verb a pointer does not support: in a struct field, a slice,
+// an array, a map element and an interface value); encoder paths that read the string itself (a JSON map key, an
+// XML comment field, an XML chardata or cdata field of type **SecretToken, gob). The doc's Go-version-dependent paths (a *SecretToken JSON map
 // key, an XML field of interface type) have no row: their output differs between the CI toolchains. If a Go release
 // changes one of the pinned paths, this fails and the doc comment must change with it.
 func TestB31_DocumentedLimits(t *testing.T) {
@@ -289,6 +290,9 @@ func TestB31_DocumentedLimits(t *testing.T) {
 		err := fmt.Errorf(w, tok)
 		assert.Equal(t, "x %!w(tg.SecretToken="+b31Secret+")", err.Error())
 		assert.Nil(t, errors.Unwrap(err))
+	})
+	t.Run("w_sprintf_error", func(t *testing.T) {
+		assert.Equal(t, "x %!w(tg_test.b31AuthErr={"+b31Secret+" bad})", fmt.Sprintf(w, b31AuthErr{tok, "bad"}))
 	})
 	t.Run("w_struct", func(t *testing.T) {
 		assert.Equal(t, "x %!w(tg_test.b31Exported={"+b31Secret+"})", fmt.Errorf(w, b31Exported{tok}).Error())

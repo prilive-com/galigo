@@ -14,10 +14,10 @@ import (
 //   - a value reached through an unexported struct field, at any depth (fmt, and slog's text handler, which
 //     formats such a struct with fmt);
 //   - fmt's bad-verb text %!verb(type=value), which prints its value without methods at any depth: %w of a value
-//     that holds the token and is not an error, %p of such a value that is not a pointer, map, slice, channel or
-//     func, and a pointer below the top level (a struct field, a slice, array or map element, an interface value)
-//     printed with a verb other than v, p, b, o, d, x and X, when the pointed-to type has no method fmt uses for
-//     that verb (for example %s of a []*T where T holds the token);
+//     that holds the token (an error too, in every function but fmt.Errorf), %p of such a value that is not a
+//     pointer, map, slice, channel or func, and a pointer below the top level (a struct field, a slice, array or
+//     map element, an interface value) printed with a verb other than v, p, b, o, d, x and X, when the pointed-to
+//     type has no method fmt uses for that verb (for example %s of a []*T where T holds the token);
 //   - encoder paths that read the string itself: a SecretToken map key in encoding/json (and slog's JSON handler),
 //     and a *SecretToken map key depending on the Go version; in encoding/xml, a ",comment" field, a ",chardata"
 //     or ",cdata" field of type **SecretToken, and, depending on the Go version, a chardata, cdata or attribute
@@ -58,9 +58,9 @@ func (s SecretToken) MarshalText() ([]byte, error) {
 // not passed on, so a verb that is directive syntax there (a flag character with no width or precision before the
 // index, a digit after a width or precision, or '[') prints fmt's %!(NOVERB) text instead. A type that embeds
 // SecretToken gets this method by Go's promotion rules, and fmt uses it before that type's own String, Error or
-// GoString; an embedded nil *SecretToken prints fmt's PANIC text. Two promoted Format methods at the same depth
-// cancel each other, so such a type does not implement fmt.Formatter. The paths fmt never sends here are in the
-// SecretToken doc.
+// GoString; an embedded nil *SecretToken prints fmt's PANIC text. This Format and another promoted field or method
+// named Format at the same depth cancel each other, so such a type does not implement fmt.Formatter and its Format
+// selector does not compile. The paths fmt never sends here are in the SecretToken doc.
 func (s SecretToken) Format(f fmt.State, verb rune) {
 	if verb == 'v' && f.Flag('#') {
 		fmt.Fprintf(f, fmt.FormatString(f, 's'), s.GoString())

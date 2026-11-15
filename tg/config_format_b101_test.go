@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -146,16 +147,33 @@ func TestB101_TgTopLevel(t *testing.T) {
 	}
 }
 
-// TestB101_TgFlagMatrix: each flag, a width and a precision, alone and mixed, with each verb class, equal to the
-// method-less copy, so a Format that drops one of them for one verb fails (round c2 C-C2-01).
+// b101Matrix: every verb of b101Directives with each flag, a width, a zero and a non-zero precision, alone and mixed
+// (rounds c2, c3).
+var b101Matrix = func() (m []string) {
+	for _, verb := range "vsqxXdoObcUteEfFgG" {
+		for _, mod := range []string{"", "+", "-", " ", "#", "0", "8", "08", ".0", ".2", "#.0", "-8.2", "+#08.2"} {
+			m = append(m, "%"+mod+string(verb)+"|")
+		}
+	}
+	return m
+}()
+
+// b101AllDirectives: b101Directives and b101Matrix, for the rows that check printing changes nothing (round c3).
+func b101AllDirectives() []string {
+	all := slices.Clone(b101Matrix)
+	for _, dd := range b101Directives {
+		all = append(all, dd.d)
+	}
+	return all
+}
+
+// TestB101_TgFlagMatrix: b101Matrix equal to the method-less copy, so a Format that drops a flag, the width or the
+// precision for one of these verbs fails (rounds c2, c3).
 func TestB101_TgFlagMatrix(t *testing.T) {
 	for _, cc := range b101Configs() {
 		t.Run(cc.name, func(t *testing.T) {
-			for _, verb := range "vsqdxef" {
-				for _, m := range []string{"", "+", "-", " ", "#", "0", "8", ".2", "-8.2", "+#08.2"} {
-					d := "%" + m + string(verb) + "|"
-					assert.Equal(t, fmt.Sprintf(d, b101Plain(cc.c)), fmt.Sprintf(d, cc.c), d)
-				}
+			for _, d := range b101Matrix {
+				assert.Equal(t, fmt.Sprintf(d, b101Plain(cc.c)), fmt.Sprintf(d, cc.c), d)
 			}
 		})
 	}
@@ -334,8 +352,8 @@ func TestB101_TgReadOnly(t *testing.T) {
 		t.Run(cc.name, func(t *testing.T) {
 			c := cc.c
 			tok, before := c.Token.Value(), fmt.Sprintf("%#v", b101Plain(c))
-			for _, dd := range b101Directives {
-				_ = fmt.Sprintf(dd.d, c)
+			for _, d := range b101AllDirectives() {
+				_ = fmt.Sprintf(d, c)
 			}
 			for _, sh := range b101Shapes {
 				for _, v := range b101Verbs {
@@ -347,11 +365,11 @@ func TestB101_TgReadOnly(t *testing.T) {
 		})
 	}
 	t.Run("print_change_print", func(t *testing.T) {
-		for _, dd := range b101Directives { // every directive, so a memo behind one verb shows (round t2 C-T2-01)
+		for _, d := range b101AllDirectives() { // every directive, so a memo behind one verb shows (round t2 C-T2-01)
 			c := b101Configs()[0].c
-			_ = fmt.Sprintf(dd.d, c)
+			_ = fmt.Sprintf(d, c)
 			c.BaseURL = "changed"
-			assert.Equal(t, fmt.Sprintf(dd.d, b101Plain(c)), fmt.Sprintf(dd.d, c), "Format keeps no state (round t1 C-T1-01): %s", dd.name)
+			assert.Equal(t, fmt.Sprintf(d, b101Plain(c)), fmt.Sprintf(d, c), "Format keeps no state (round t1 C-T1-01): %s", d)
 		}
 	})
 }
@@ -364,9 +382,9 @@ func TestB101_TgReadOnly(t *testing.T) {
 func TestB101_TgConcurrent(t *testing.T) {
 	c, z := b101Configs()[0].c, b101Configs()[1].c
 	want := map[string]string{}
-	for _, dd := range b101Directives {
-		if dd.name != "p" {
-			want[dd.d] = fmt.Sprintf(dd.d, []*Config{c, z})
+	for _, d := range b101AllDirectives() {
+		if d != "%p" {
+			want[d] = fmt.Sprintf(d, []*Config{c, z})
 		}
 	}
 	assert.Equal(t, "["+fmt.Sprintf("%v", b101Plain(c))+" "+fmt.Sprintf("%v", b101Plain(z))+"]", want["%v"],

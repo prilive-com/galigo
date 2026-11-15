@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -268,4 +269,21 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// Format implements [fmt.Formatter]. It prints c as fmt prints a *Config without this
+// method: the same fields, each through its own methods, so the secret fields print
+// [REDACTED]. fmt also calls it below the top level (a struct field, a slice or map
+// element, an embedded pointer), so the fields print there too, where fmt would print an
+// address or, for a verb other than v, p, b, o, d, x and X, the secrets. Limits, and the
+// effect on types that embed a config: the [tg.SecretToken] doc.
+func (c *Config) Format(f fmt.State, verb rune) {
+	// A local type's scope starts at its name: plain is the package Config, and the
+	// local Config has its name and fields but no methods.
+	type plain = Config
+	type Config plain
+	// FormatString keeps the flags, width and precision. The [1] before the verb makes
+	// fmt read a flag character or [ after an argument index as the verb (%[1]+).
+	d := fmt.FormatString(f, 'v')
+	fmt.Fprintf(f, d[:len(d)-1]+"[1]"+string(verb), (*Config)(c))
 }

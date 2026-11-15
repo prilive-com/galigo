@@ -39,6 +39,24 @@ import (
 // the Format method's doc): fmt then writes only that text for the whole value, before the type's own String, Error
 // or GoString.
 //
+// sender.Config, receiver.Config and tg.Config hold the token (receiver.Config also the webhook secret) in exported
+// fields. A pointer to each has its own Format, which prints the config as fmt prints it without that method: the
+// same fields, each through its own methods, so the secrets print [REDACTED]. fmt also calls it below the top level
+// (a struct field, a slice, array or map element, a map key, an interface value, an embedded pointer), where fmt
+// would print an address, or, for a verb other than v, p, b, o, d, x and X, the secrets. One top-level output
+// differs from fmt's: a digit or * verb after an argument index when fmt holds no width other than 0 and no
+// precision (no width, a * width of 0, or a * width or precision that fmt rejects) prints %!(NOVERB) in place of
+// fmt's bad-verb text; no secret prints there. The bad-verb paths above still print the secrets of a config: %w;
+// %p of a value that holds a config value and is not a pointer, map, slice, channel or func; and a config value in
+// a field of your type that does not promote this Format (a named field, or an embedded config whose Format
+// another Format cancels or hides), printed through a pointer to your type below the top level with a verb other
+// than v, p, b, o, d, x and X. A type that embeds a config pointer, or embeds a config value and is printed through
+// a pointer to the outer value, gets this Format by Go's promotion rules, unless it has its own Format or another
+// Format at the same depth: fmt then prints only the config's fields, before the type's own String, Error or
+// GoString, and %#v names the config type. Because the method is on the pointer, a config embedded by value also
+// cancels or hides another Format (method or field) of the outer type at the same or a greater depth, for the outer
+// value too.
+//
 // go vet does not report %p (or any verb but %w) on a SecretToken, because it implements fmt.Formatter.
 // Call Value() to use or store the raw token or secret.
 type SecretToken string

@@ -58,8 +58,9 @@ func b101Configs() []b101Case {
 // b101Fill sets every exported field of *c that is a string, number or []string to a value no other field has, and
 // every bool to true, so a wrong Format that drops or swaps a field changes the output (round t1 O-T1-01); a list
 // has two items in descending order, so a lost tail or a sort shows (rounds t2, t3); every string ends in an invalid
-// UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows (round t3). Two
-// bools can still be swapped unseen here: TestB101_ReceiverBools sets each one alone. The caller sets the secrets and funcs.
+// UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows (round t3); every
+// string has a space at each end and every float a fraction that float32 cannot hold, so a trim or a narrowing shows
+// (round c1). The caller sets the secrets and funcs.
 // Another kind panics, so a new field type cannot go untested.
 func b101Fill(c *Config) {
 	v := reflect.ValueOf(c).Elem()
@@ -67,7 +68,7 @@ func b101Fill(c *Config) {
 		f := v.Field(i)
 		switch f.Kind() {
 		case reflect.String:
-			f.SetString(fmt.Sprintf("f%d\xff", i))
+			f.SetString(fmt.Sprintf(" f%d\xff ", i))
 		case reflect.Bool:
 			f.SetBool(true)
 		case reflect.Int, reflect.Int64:
@@ -79,7 +80,7 @@ func b101Fill(c *Config) {
 		case reflect.Uint32:
 			f.SetUint(uint64(i + 1))
 		case reflect.Float64:
-			f.SetFloat(float64(i) + 0.5)
+			f.SetFloat(float64(i) + 0.1)
 		case reflect.Slice:
 			f.Set(reflect.ValueOf([]string{fmt.Sprintf("f%d-b", i), fmt.Sprintf("f%d-a", i)}))
 		case reflect.Func:
@@ -107,6 +108,8 @@ var b101Directives = []struct{ name, d string }{
 	{"g", "%g"}, {"dot_verb", "%.."}, {"invalid_rune", "%\xff"}, {"index_invalid_rune", "%[1]\xff"},
 	// round t2: the other float verbs (O-T2-03)
 	{"f", "%f"}, {"F", "%F"}, {"E", "%E"}, {"G", "%G"},
+	// round c1: the space flag with v, and the minus flag with verbs other than v (C-C1-01)
+	{"space_v", "% v"}, {"minus_s", "%-12s|"}, {"minus_d", "%-8d|"},
 }
 
 func TestB101_ReceiverFormatter(t *testing.T) {

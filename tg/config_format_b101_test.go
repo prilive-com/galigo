@@ -53,10 +53,10 @@ func b101Configs() []b101Case {
 
 // b101Fill sets every exported field of *c that is a string, number or []string to a value no other field has, and
 // every bool to true, so a wrong Format that drops or swaps a field changes the output (round t1 O-T1-01); a list
-// has two items in descending order, so a lost tail or a sort shows (rounds t2, t3); every string ends in an invalid
-// UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows (round t3); every
-// string has a space at each end and every float a fraction that float32 cannot hold, so a trim or a narrowing shows
-// (round c1). Two bools can still be swapped unseen here: TestB101_TgBools sets each one alone. The caller sets the secrets and funcs.
+// has two items in descending order, so a lost tail or a sort shows (rounds t2, t3); every string field holds an
+// invalid UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows (round t3);
+// every string field has a space at each end and every float a fraction that float32 cannot hold, so a trim or a
+// narrowing shows (rounds c1, c2). Two bools can still be swapped unseen here: TestB101_TgBools sets each one alone. The caller sets the secrets and funcs.
 // Another kind panics, so a new field type cannot go untested.
 func b101Fill(c *Config) {
 	v := reflect.ValueOf(c).Elem()
@@ -142,6 +142,21 @@ func TestB101_TgTopLevel(t *testing.T) {
 			t.Run("sprintln", func(t *testing.T) {
 				assert.Equal(t, fmt.Sprintln(b101Plain(cc.c)), fmt.Sprintln(cc.c))
 			})
+		})
+	}
+}
+
+// TestB101_TgFlagMatrix: each flag, a width and a precision, alone and mixed, with each verb class, equal to the
+// method-less copy, so a Format that drops one of them for one verb fails (round c2 C-C2-01).
+func TestB101_TgFlagMatrix(t *testing.T) {
+	for _, cc := range b101Configs() {
+		t.Run(cc.name, func(t *testing.T) {
+			for _, verb := range "vsqdxef" {
+				for _, m := range []string{"", "+", "-", " ", "#", "0", "8", ".2", "-8.2", "+#08.2"} {
+					d := "%" + m + string(verb) + "|"
+					assert.Equal(t, fmt.Sprintf(d, b101Plain(cc.c)), fmt.Sprintf(d, cc.c), d)
+				}
+			}
 		})
 	}
 }

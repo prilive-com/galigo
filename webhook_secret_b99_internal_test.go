@@ -26,7 +26,7 @@ func b99NewBot(t *testing.T, secret string) *Bot {
 }
 
 // TestB99_BotSecretFields: botConfig keeps the secret as a tg.SecretToken; WithWebhook stores it and New copies it
-// to the receiver Config unchanged, for every value class (AC3). reflect and string(), so the file builds while the
+// to the receiver Config unchanged, for every value Telegram accepts (AC3; New refuses the others, B-103). reflect and string(), so the file builds while the
 // fields are strings.
 func TestB99_BotSecretFields(t *testing.T) {
 	t.Run("type", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestB99_BotSecretFields(t *testing.T) {
 }
 
 // TestB99_BotWebhookAuth: the handler of a Bot made with WithWebhook(port, secret) accepts only the secret and rejects
-// every other header, for every value class; with WithWebhook(port, "") it accepts every request (AC4). A new Bot per
+// every other header, for every value Telegram accepts; with WithWebhook(port, "") it accepts every request (AC4). A new Bot per
 // request. It passes on the baseline too: behaviour kept. An accepted request delivers its update and a refused one
 // delivers nothing (round t3 O-T3-01).
 func TestB99_BotWebhookAuth(t *testing.T) {

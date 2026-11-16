@@ -8,17 +8,24 @@ import (
 // WebhookSecretValue is a named fake webhook secret (B-99).
 type WebhookSecretValue struct{ Name, Secret string }
 
-// WebhookSecretValues returns secrets that every copy of the webhook secret must keep unchanged: normal, one
-// character, 256 characters (Telegram's maximum, so a copy that cuts the value fails), hyphens at both ends, and
-// three values outside Telegram's alphabet that galigo still stores as they are (it does not check the value):
-// spaces at both ends, only a space, and non-ASCII text. An empty secret is not in the list: it turns the check off,
-// and the auth rows cover it.
+// WebhookSecretValues returns secrets that follow Telegram's rule (1-256 characters, only A-Z, a-z, 0-9, _ and -)
+// and that every copy of the webhook secret must keep unchanged: normal, one character, 256 characters (Telegram's
+// maximum, so a copy that cuts the value fails) and hyphens at both ends. An empty secret is not in the list: it
+// turns the check off, and the auth rows cover it.
 func WebhookSecretValues(normal string) []WebhookSecretValue {
 	return []WebhookSecretValue{
 		{"normal", normal},
 		{"one_char", "A"},
 		{"max_256", strings.Repeat("Az9_", 64)},
 		{"edge_hyphen", "-Az9_-"},
+	}
+}
+
+// WebhookSecretOutside returns three secrets outside Telegram's rule: spaces at both ends, only a space, and
+// non-ASCII text. receiver.LoadConfig and galigo.New refuse them (B-103); receiver.NewWebhookHandler logs a warning
+// and still keeps and compares them unchanged.
+func WebhookSecretOutside() []WebhookSecretValue {
+	return []WebhookSecretValue{
 		{"spaces_kept", " B99 FAKE spaced secret "},
 		{"blank_kept", " "},
 		{"non_ascii", "B99-é-秘密"},

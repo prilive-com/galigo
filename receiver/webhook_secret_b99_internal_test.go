@@ -19,7 +19,7 @@ func TestB99_HandlerSecretField(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "tg.SecretToken", f.Type.String())
 	})
-	for _, v := range testutil.WebhookSecretValues("B99-FAKE-webhook-secret-internal") {
+	for _, v := range append(testutil.WebhookSecretValues("B99-FAKE-webhook-secret-internal"), testutil.WebhookSecretOutside()...) {
 		t.Run(v.Name, func(t *testing.T) {
 			cfg := DefaultConfig()
 			reflect.ValueOf(&cfg).Elem().FieldByName("WebhookSecret").SetString(v.Secret)

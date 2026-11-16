@@ -9,7 +9,7 @@ This document covers the configuration options, built-in resilience features, an
 | Option | Example | Notes |
 |--------|---------|-------|
 | `WithPolling(timeout, limit)` | `WithPolling(30, 100)` | 30s long-poll timeout, 100 updates per batch |
-| `WithWebhook(port, secret)` | `WithWebhook(8443, "secret")` | Requires TLS termination + ingress |
+| `WithWebhook(port, secret)` | `WithWebhook(8443, "secret")` | Requires TLS termination + ingress. A non-empty secret must be 1-256 characters, only `A-Z`, `a-z`, `0-9`, `_` and `-` (Telegram's rule); otherwise `New` returns a `*tg.ValidationError`. `""` turns the secret check off |
 | `WithRetries(n)` | `WithRetries(3)` | Exponential backoff with jitter |
 | `WithLogger(logger)` | `WithLogger(slog.Default())` | Structured logging with slog |
 | `WithAllowedUpdates(types...)` | `WithAllowedUpdates("message", "callback_query")` | Only receive specified update types |

@@ -56,6 +56,26 @@ func Token(token string) error {
 	return nil
 }
 
+// WebhookSecretRule is Telegram's rule for setWebhook's secret_token: "1-256 characters. Only characters A-Z, a-z,
+// 0-9, _ and - are allowed" (Bot API, setWebhook).
+const WebhookSecretRule = "must be 1-256 characters, only A-Z, a-z, 0-9, _ and -"
+
+// WebhookSecretOK reports whether secret is empty (no secret: the check is off) or follows WebhookSecretRule. Every
+// allowed character is one ASCII byte, so the byte length is the character length.
+func WebhookSecretOK(secret string) bool {
+	if len(secret) > 256 {
+		return false
+	}
+	for i := range len(secret) {
+		switch c := secret[i]; {
+		case 'A' <= c && c <= 'Z', 'a' <= c && c <= 'z', '0' <= c && c <= '9', c == '_', c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // ChatID validates a chat identifier.
 // Valid: int64 (numeric ID) or string starting with @.
 func ChatID(chatID any) error {

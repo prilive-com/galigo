@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/prilive-com/galigo/internal/scrub"
+	"github.com/prilive-com/galigo/internal/validate"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -72,6 +73,8 @@ func WithWebhookMaxBodySize(size int64) WebhookOption {
 }
 
 // NewWebhookHandler creates a new webhook handler.
+// If cfg.WebhookSecret is not empty and is outside Telegram's rule (1-256 characters, only A-Z, a-z, 0-9, _ and -),
+// it logs one warning without the secret and still builds the handler, which compares requests with that secret.
 // The updates channel must be bidirectional (chan tg.Update) if using DeliveryPolicyDropOldest.
 func NewWebhookHandler(
 	logger *slog.Logger,
@@ -81,6 +84,9 @@ func NewWebhookHandler(
 ) *WebhookHandler {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if !validate.WebhookSecretOK(cfg.WebhookSecret.Value()) {
+		logger.Warn("webhook secret must be 1-256 characters, only A-Z, a-z, 0-9, _ and -; Telegram refuses it in setWebhook")
 	}
 
 	h := &WebhookHandler{

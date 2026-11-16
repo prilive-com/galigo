@@ -67,7 +67,11 @@ func WithPolling(timeout, limit int) Option {
 	}
 }
 
-// WithWebhook configures webhook mode.
+// WithWebhook configures webhook mode. If it is given more than once, the last one wins.
+//
+// New returns a *tg.ValidationError (field webhook_secret) when the secret left after all options is not empty and
+// is outside Telegram's rule: 1-256 characters, only A-Z, a-z, 0-9, _ and -. It checks the secret in every mode,
+// before it starts anything. An empty secret turns the check off.
 func WithWebhook(port int, secret string) Option {
 	return func(c *botConfig) {
 		c.mode = receiver.ModeWebhook
@@ -145,6 +149,9 @@ func New(token string, opts ...Option) (*Bot, error) {
 
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+	if !validate.WebhookSecretOK(cfg.webhookSecret.Value()) {
+		return nil, tg.NewValidationError("webhook_secret", validate.WebhookSecretRule)
 	}
 
 	secretToken := tg.SecretToken(token)

@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/prilive-com/galigo/tg"
 )
@@ -44,6 +45,23 @@ type SendInvoiceRequest struct {
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
 }
 
+// Format implements [fmt.Formatter]. It prints r as fmt prints a SendInvoiceRequest without this
+// method, except that a non-empty ProviderToken prints as [REDACTED]. The JSON sent to
+// Telegram is unchanged. Limits: the [tg.SecretToken] doc.
+func (r SendInvoiceRequest) Format(f fmt.State, verb rune) {
+	// A local type's scope starts at its name: plain is the package SendInvoiceRequest, and the
+	// local SendInvoiceRequest has its name and fields but no methods.
+	type plain = SendInvoiceRequest
+	type SendInvoiceRequest plain
+	if r.ProviderToken != "" {
+		r.ProviderToken = tg.SecretToken(r.ProviderToken).String()
+	}
+	// FormatString keeps the flags, width and precision. The [1] before the verb makes
+	// fmt read a flag character or [ after an argument index as the verb (%[1]+).
+	d := fmt.FormatString(f, 'v')
+	fmt.Fprintf(f, d[:len(d)-1]+"[1]"+string(verb), SendInvoiceRequest(r))
+}
+
 // CreateInvoiceLinkRequest represents a createInvoiceLink request.
 type CreateInvoiceLinkRequest struct {
 	Title               string            `json:"title"`
@@ -65,6 +83,23 @@ type CreateInvoiceLinkRequest struct {
 	NeedShippingAddress bool              `json:"need_shipping_address,omitempty"`
 	IsFlexible          bool              `json:"is_flexible,omitempty"`
 	SubscriptionPeriod  int               `json:"subscription_period,omitempty"`
+}
+
+// Format implements [fmt.Formatter]. It prints r as fmt prints a CreateInvoiceLinkRequest without this
+// method, except that a non-empty ProviderToken prints as [REDACTED]. The JSON sent to
+// Telegram is unchanged. Limits: the [tg.SecretToken] doc.
+func (r CreateInvoiceLinkRequest) Format(f fmt.State, verb rune) {
+	// A local type's scope starts at its name: plain is the package CreateInvoiceLinkRequest, and the
+	// local CreateInvoiceLinkRequest has its name and fields but no methods.
+	type plain = CreateInvoiceLinkRequest
+	type CreateInvoiceLinkRequest plain
+	if r.ProviderToken != "" {
+		r.ProviderToken = tg.SecretToken(r.ProviderToken).String()
+	}
+	// FormatString keeps the flags, width and precision. The [1] before the verb makes
+	// fmt read a flag character or [ after an argument index as the verb (%[1]+).
+	d := fmt.FormatString(f, 'v')
+	fmt.Fprintf(f, d[:len(d)-1]+"[1]"+string(verb), CreateInvoiceLinkRequest(r))
 }
 
 // AnswerShippingQueryRequest represents an answerShippingQuery request.

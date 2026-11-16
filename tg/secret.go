@@ -57,6 +57,29 @@ import (
 // cancels or hides another Format (method or field) of the outer type at the same or a greater depth, for the outer
 // value too.
 //
+// sender.SendInvoiceRequest, sender.CreateInvoiceLinkRequest and InputInvoiceMessageContent hold the payment provider
+// token in the exported string field ProviderToken (not a SecretToken: it is sent in the request JSON). Each has its
+// own Format on the value, which prints the request as fmt prints it without that method, with a non-empty
+// ProviderToken as [REDACTED] (an empty one, as for Telegram Stars, prints as before). fmt also calls it below the
+// top level (a struct field, a slice, array or map element, an interface value, an embedded request, fmt.Errorf with
+// %v, %s or %#v) and for {{.}} in text/template and html/template; a pointer prints as its value (no &), and a nil
+// pointer prints <nil> for every verb, without width or precision. encoding/json, slog's JSON handler and
+// encoding/xml print the token: they write the request sent to Telegram. As for a config, a digit or * verb after an
+// argument index when fmt holds no width other than 0 and no precision prints %!(NOVERB) in place of fmt's bad-verb
+// text, and no token prints there: %*[2]0 prints %!(NOVERB), %*[2]* prints %!(BADWIDTH)%!(NOVERB), and %.*[2]5 with
+// a precision fmt rejects prints %!(BADPREC)%!(NOVERB). These paths still print the token: %w, and %p of a value
+// that is not a pointer, map, slice, channel or func, for every request value they reach, outer fields included
+// (fmt.Errorf("%w", e) of an error e prints e as %v and redacts); a request value in a field of your type that does
+// not promote this Format (a named field, or an embedded request whose Format another Format cancels or hides),
+// printed through a pointer to your type below the top level with a verb other than v, p, b, o, d, x and X; a
+// request value in an unexported field of your type reached without an outer formatting method (fmt calls no method
+// there; %x and %X print the token's hex), or a request pointer there printed with a verb such as %s or %q; and
+// code that reads the field. A type that embeds a request, by value or by pointer, gets this Format by Go's
+// promotion rules, unless it has its own Format or another Format at the same depth: for the verbs fmt passes to
+// Format, fmt prints only the request's fields, before the type's own String, Error or GoString, %#v names the
+// request type, and a nil embedded pointer prints fmt's panic text. The request's Format also cancels or hides
+// another Format (method or field) of the type at the same or a greater depth.
+//
 // go vet does not report %p (or any verb but %w) on a SecretToken, because it implements fmt.Formatter.
 // Call Value() to use or store the raw token or secret.
 type SecretToken string

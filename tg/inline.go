@@ -1,6 +1,9 @@
 package tg
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // --- InlineQueryResult Union (Partial Implementation) ---
 //
@@ -169,6 +172,23 @@ type InputInvoiceMessageContent struct {
 }
 
 func (InputInvoiceMessageContent) inputMessageContentTag() {}
+
+// Format implements [fmt.Formatter]. It prints r as fmt prints an InputInvoiceMessageContent without this
+// method, except that a non-empty ProviderToken prints as [REDACTED]. The JSON sent to
+// Telegram is unchanged. Limits: the [SecretToken] doc.
+func (r InputInvoiceMessageContent) Format(f fmt.State, verb rune) {
+	// A local type's scope starts at its name: plain is the package InputInvoiceMessageContent, and the
+	// local InputInvoiceMessageContent has its name and fields but no methods.
+	type plain = InputInvoiceMessageContent
+	type InputInvoiceMessageContent plain
+	if r.ProviderToken != "" {
+		r.ProviderToken = SecretToken(r.ProviderToken).String()
+	}
+	// FormatString keeps the flags, width and precision. The [1] before the verb makes
+	// fmt read a flag character or [ after an argument index as the verb (%[1]+).
+	d := fmt.FormatString(f, 'v')
+	fmt.Fprintf(f, d[:len(d)-1]+"[1]"+string(verb), InputInvoiceMessageContent(r))
+}
 
 // --- Other Inline Types ---
 

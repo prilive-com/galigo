@@ -56,6 +56,7 @@ When using galigo:
 
 2. **Use Webhook Secrets**
    - Always configure `X-Telegram-Bot-Api-Secret-Token` for webhooks
+   - Telegram accepts only 1-256 characters, only `A-Z`, `a-z`, `0-9`, `_` and `-`. `galigo.New` and `receiver.LoadConfig` return a validation error for a non-empty secret outside this rule; `receiver.NewWebhookHandler` logs a warning and keeps it
    - galigo uses constant-time comparison to prevent timing attacks
 
 3. **Enable TLS**

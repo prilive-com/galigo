@@ -31,7 +31,7 @@ func TestB99_ConfigFieldType(t *testing.T) {
 	assert.Equal(t, "tg.SecretToken", f.Type.String())
 }
 
-// TestB99_LoadConfig: LoadConfig stores WEBHOOK_SECRET unchanged (every value class, empty, and "" when the variable
+// TestB99_LoadConfig: LoadConfig stores WEBHOOK_SECRET unchanged (every value Telegram accepts, empty, and "" when the variable
 // is absent), and the field prints [REDACTED] (AC1, AC2). The other variables LoadConfig validates are set to valid
 // values, so the caller's environment cannot fail the test.
 func TestB99_LoadConfig(t *testing.T) {
@@ -138,8 +138,9 @@ func TestB99_SaveAndReload(t *testing.T) {
 	forged.Header.Set("X-Telegram-Bot-Api-Secret-Token", "[REDACTED]")
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, forged)
-	// A pin, not a property (no wrong version can fail only this line): the upgrade-note hazard. Invert it together
-	// with the note if the webhook secret's characters are ever checked (PLAN §13 backlog).
+	// A pin, not a property (no wrong version can fail only this line): the upgrade-note hazard. Since B-103,
+	// LoadConfig and galigo.New refuse the secret [REDACTED] and NewWebhookHandler logs a warning for it, but the
+	// handler still keeps and compares it, so this request is still accepted.
 	assert.Equal(t, http.StatusOK, rec.Code, "pin of the upgrade-note hazard: a reloaded [REDACTED] secret accepts the header [REDACTED]")
 	assert.Equal(t, 1, len(updates), "pin of the upgrade-note hazard: the forged update is delivered")
 }
@@ -176,7 +177,8 @@ func TestB99_HandlerAuth(t *testing.T) {
 		h.ServeHTTP(rec, req)
 		return rec.Code, len(updates)
 	}
-	for _, v := range append(testutil.WebhookSecretValues(b99Secret), testutil.WebhookSecretValue{Name: "empty"}) {
+	values := append(testutil.WebhookSecretValues(b99Secret), testutil.WebhookSecretOutside()...)
+	for _, v := range append(values, testutil.WebhookSecretValue{Name: "empty"}) {
 		t.Run(v.Name, func(t *testing.T) {
 			for _, c := range testutil.WebhookAuthCases(v.Secret) {
 				code, delivered := serve(v.Secret, c.Header)

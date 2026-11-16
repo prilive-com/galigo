@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prilive-com/galigo/internal/validate"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -53,6 +54,10 @@ type Config struct {
 	// WebhookSecret is a tg.SecretToken: fmt, slog and encoding/json print [REDACTED] for it, except on the paths
 	// listed in the tg.SecretToken doc (for example a Config value in an unexported field of your own type). Use
 	// WebhookSecret.Value() for the raw secret (a setWebhook call, a header, a config file you write).
+	//
+	// Telegram's rule for the secret: 1-256 characters, only A-Z, a-z, 0-9, _ and -. An empty secret turns the
+	// check off. LoadConfig refuses a non-empty WEBHOOK_SECRET outside the rule; NewWebhookHandler only logs a
+	// warning for one.
 	WebhookSecret tg.SecretToken
 	AllowedDomain string
 	WebhookURL    string // Public URL for auto-registration
@@ -125,6 +130,9 @@ func DefaultConfig() Config {
 }
 
 // LoadConfig loads configuration from environment variables.
+//
+// In every RECEIVER_MODE, a non-empty WEBHOOK_SECRET outside Telegram's rule (1-256 characters, only A-Z, a-z,
+// 0-9, _ and -) returns a *tg.ValidationError with the field WEBHOOK_SECRET. The error does not contain the secret.
 func LoadConfig() (*Config, error) {
 	cfg := DefaultConfig()
 
@@ -149,6 +157,9 @@ func LoadConfig() (*Config, error) {
 	cfg.TLSCertPath = getEnv("TLS_CERT_PATH", "")
 	cfg.TLSKeyPath = getEnv("TLS_KEY_PATH", "")
 	cfg.WebhookSecret = tg.SecretToken(getEnv("WEBHOOK_SECRET", ""))
+	if !validate.WebhookSecretOK(cfg.WebhookSecret.Value()) {
+		return nil, tg.NewValidationError("WEBHOOK_SECRET", validate.WebhookSecretRule)
+	}
 	cfg.AllowedDomain = getEnv("ALLOWED_DOMAIN", "")
 	cfg.WebhookURL = getEnv("WEBHOOK_URL", "")
 

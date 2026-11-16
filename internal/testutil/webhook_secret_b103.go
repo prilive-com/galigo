@@ -42,8 +42,9 @@ func webhookSecretOK(s string) bool {
 	return true
 }
 
-// WebhookSecretMatrix returns every byte 0x00-0xFF alone, first, in the middle and last of a valid secret, the
-// length edges, non-ASCII digits, and named cases. The empty secret is not in the list: it means "no secret" (the
+// WebhookSecretMatrix returns every byte 0x00-0xFF alone, first, in the middle and last of a valid secret, a "." at
+// every offset of a 256-byte valid secret (so a check that skips one index is caught), the length edges, non-ASCII
+// digits, and named cases. The empty secret is not in the list: it means "no secret" (the
 // check is off), and each test has its own empty row.
 func WebhookSecretMatrix() []WebhookSecretCase {
 	var m []WebhookSecretCase
@@ -62,6 +63,9 @@ func WebhookSecretMatrix() []WebhookSecretCase {
 	add("len257", full+"Z")
 	add("len300", strings.Repeat("a", 300))
 	add("len256_last_bad", full[:255]+".")
+	for i := range 255 {
+		add(fmt.Sprintf("len256_dot_at_%03d", i), full[:i]+"."+full[i+1:])
+	}
 	add("all_ends", "09AZaz_-")
 	add("redacted", "[REDACTED]")
 	add("spaced", " B103 spaced ")

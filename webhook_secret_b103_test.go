@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ const (
 	b103Token  = "123456789:B103-FAKE-token-root-AAAAAAAAAAAAA"
 	b103NewErr = "galigo: validation: webhook_secret - must be 1-256 characters, only A-Z, a-z, 0-9, _ and -"
 	b103Good   = "Az9_-ok"
+	b103Good2  = "B103-other_9"
 	b103Child  = "GALIGO_B103_CHILD" // names the test that runs as a child process
 )
 
@@ -103,7 +105,7 @@ func TestB103_New(t *testing.T) {
 }
 
 // TestB103_NewOptionOrder: New checks the secret left after all options: the last WithWebhook wins (also an empty
-// one), and WithPolling does not clear it (AC2).
+// one, also after an empty one, also between two good ones), and WithPolling does not clear it (AC2).
 func TestB103_NewOptionOrder(t *testing.T) {
 	for _, bad := range []string{"[REDACTED]", strings.Repeat("Az9_", 64) + "Z"} {
 		t.Run(bad[:3], func(t *testing.T) {
@@ -123,11 +125,23 @@ func TestB103_NewOptionOrder(t *testing.T) {
 				b, err := galigo.New(b103Token, galigo.WithWebhook(8443, bad), galigo.WithWebhook(8443, ""))
 				b103Built(t, b, err, "")
 			})
+			t.Run("empty_then_bad", func(t *testing.T) {
+				b, err := galigo.New(b103Token, galigo.WithWebhook(8443, ""), galigo.WithWebhook(8443, bad))
+				b103Refused(t, b, err)
+			})
 		})
 	}
 	t.Run("good_then_empty", func(t *testing.T) {
 		b, err := galigo.New(b103Token, galigo.WithWebhook(8443, b103Good), galigo.WithWebhook(8443, ""))
 		b103Built(t, b, err, "")
+	})
+	t.Run("empty_then_good", func(t *testing.T) {
+		b, err := galigo.New(b103Token, galigo.WithWebhook(8443, ""), galigo.WithWebhook(8443, b103Good))
+		b103Built(t, b, err, b103Good)
+	})
+	t.Run("good_then_other_good", func(t *testing.T) {
+		b, err := galigo.New(b103Token, galigo.WithWebhook(8443, b103Good), galigo.WithWebhook(8443, b103Good2))
+		b103Built(t, b, err, b103Good2)
 	})
 }
 
@@ -281,10 +295,12 @@ func b103Handlers(logger *slog.Logger, secret string) func(bool, chan tg.Update)
 // whole output, not a list of forbidden strings; E-0129: every path). In a child process, with slog.Default() replaced
 // by a recorder and os.Stdout and os.Stderr replaced by pipes, it runs over the matrix: receiver.LoadConfig in both
 // modes; the testbot's config.Load (it keeps the value as the environment returns it); New in both final modes, with a
-// later good or empty WithWebhook, after a good one, and with three bad tokens, each with no logger, WithLogger first
-// and WithLogger last; NewWebhookHandler with a custom logger. The default recorder must stay empty. Then
-// NewWebhookHandler with a nil logger, with a fresh default recorder per secret. Both handler kinds also get the
-// requests and the whole-record checks of testutil.AssertWebhookHandlerLog. The pipes must stay empty, and the parent
+// later good or empty WithWebhook, after a good one, and with three bad tokens (with no logger and with WithLogger),
+// each with no logger, WithLogger first and WithLogger last; NewWebhookHandler with a custom logger. The default
+// recorder must stay empty. Then, with a fresh default recorder per secret: NewWebhookHandler with a nil logger, and,
+// for an accepted secret, a Bot built without WithLogger, whose handler gets the requests of testutil.AssertWebhookAuth
+// and whose whole record list must be testutil.WebhookAuthLog. Both handler kinds also get the requests and the
+// whole-record checks of testutil.AssertWebhookHandlerLog. The pipes must stay empty, and the parent
 // accepts only empty child stderr and the test framework's own stdout lines.
 func TestB103_NoOtherOutput(t *testing.T) {
 	const marker = "B103 child output checked"
@@ -312,9 +328,13 @@ func TestB103_NoOtherOutput(t *testing.T) {
 			t.Setenv("TESTBOT_CHAT_ID", "-1001")
 			t.Setenv("TESTBOT_ADMINS", "1")
 			t.Setenv("TESTBOT_WEBHOOK_SECRET_TOKEN", c.Secret)
+			want := os.Getenv("TESTBOT_WEBHOOK_SECRET_TOKEN") // read before Load, so Load cannot change what is compared
+			if utf8.ValidString(c.Secret) {
+				assert.Equal(t, c.Secret, want, "environment round trip %s", c.Name)
+			}
 			cfg, err := config.Load()
 			if assert.NoError(t, err, "testbot Load %s", c.Name) {
-				assert.Equal(t, os.Getenv("TESTBOT_WEBHOOK_SECRET_TOKEN"), cfg.WebhookSecretToken.Value(), "testbot Load %s", c.Name)
+				assert.Equal(t, want, cfg.WebhookSecretToken.Value(), "testbot Load %s", c.Name)
 			}
 		}
 		for _, c := range rows {
@@ -323,12 +343,16 @@ func TestB103_NoOtherOutput(t *testing.T) {
 			b103NewQuiet(t, true, galigo.WithWebhook(8443, c.Secret), galigo.WithWebhook(8443, b103Good))
 			b103NewQuiet(t, c.OK, galigo.WithWebhook(8443, b103Good), galigo.WithWebhook(8443, c.Secret))
 			b103NewQuiet(t, true, galigo.WithWebhook(8443, c.Secret), galigo.WithWebhook(8443, ""))
-			for _, token := range []string{"", "no-colon", "abc:def"} {
-				b, err := galigo.New(token, galigo.WithWebhook(8443, c.Secret))
-				assert.Nil(t, b)
-				assert.ErrorIs(t, err, tg.ErrInvalidToken, "token %q, secret %s", token, c.Name)
-			}
 			custom := testutil.NewLogRecorder()
+			for _, token := range []string{"", "no-colon", "abc:def"} {
+				for _, opts := range [][]galigo.Option{{galigo.WithWebhook(8443, c.Secret)},
+					{galigo.WithWebhook(8443, c.Secret), galigo.WithLogger(slog.New(custom))}} {
+					b, err := galigo.New(token, opts...)
+					assert.Nil(t, b)
+					assert.ErrorIs(t, err, tg.ErrInvalidToken, "token %q, secret %s", token, c.Name)
+				}
+			}
+			assert.Nil(t, custom.Records(), "bad token, custom logger, secret %s", c.Name)
 			testutil.AssertWebhookHandlerLog(t, custom, b103Handlers(slog.New(custom), c.Secret), c)
 		}
 		assert.Nil(t, def.Records(), "slog.Default() received a record")
@@ -336,6 +360,13 @@ func TestB103_NoOtherOutput(t *testing.T) {
 			d := testutil.NewLogRecorder()
 			slog.SetDefault(slog.New(d))
 			testutil.AssertWebhookHandlerLog(t, d, b103Handlers(nil, c.Secret), c)
+			if c.OK {
+				d = testutil.NewLogRecorder()
+				slog.SetDefault(slog.New(d))
+				b, err := galigo.New(b103Token, galigo.WithWebhook(8443, c.Secret))
+				b103Built(t, b, err, c.Secret)
+				assert.Equal(t, testutil.WebhookAuthLog(c.Secret), d.Records(), "Bot without WithLogger, secret %s", c.Name)
+			}
 		}
 	})
 	assert.Empty(t, stdout, "stdout of the calls")

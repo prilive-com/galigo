@@ -190,7 +190,7 @@ var b100Directives = []struct{ name, d string }{
 
 // b100Matrix is the one generated cross product of the directive axes (E-0162; round t1 O-T1-03): every ASCII letter
 // as the verb (known and unknown verbs; not T, p and w, which never reach Format: TestB100_SenderLimits) × every subset
-// of the five flags × no width or precision, width 10, precision .2, both × no argument index or [1]. TopLevel, Pointer
+// of the five flags × no width or precision, width 10, precision .0 or .2, 10.2 × no argument index or [1]. TopLevel, Pointer
 // and Concurrent use it (with b100Directives: b100AllDirectives), and Bools and ReadOnly except in a race build
 // (b100ValueDirectives), for all three types; Nested uses the short verb list b100Verbs over its shapes (rounds t2 T2-03,
 // t3 G-T3-03). The other test file holds the same list; the twin gate checks it.
@@ -203,7 +203,7 @@ var b100Matrix = func() (m []string) {
 					mod += string(c)
 				}
 			}
-			for _, wp := range []string{"", "10", ".2", "10.2"} {
+			for _, wp := range []string{"", "10", ".0", ".2", "10.2"} { // .0: round c1 C1-01
 				for _, idx := range []string{"", "[1]"} {
 					m = append(m, "%"+mod+wp+idx+string(verb)+"|")
 				}
@@ -523,13 +523,13 @@ func b100Bools[T any](t *testing.T, k b100Kind[T]) {
 	}
 }
 
-// b100BoolValues: for each bool field, the zero request with the fake token and only that bool true, named by the field.
+// b100BoolValues: each bool field alone true in the zero request, named by the field; the fake token, " \t" every 2nd row (C1-02).
 func b100BoolValues[T any](k b100Kind[T]) (vs []b100Val[T]) {
 	typ := reflect.TypeFor[T]()
 	for i := range typ.NumField() {
 		if typ.Field(i).Type.Kind() == reflect.Bool {
 			var v T
-			*k.token(&v) = b100Token
+			*k.token(&v) = []string{b100Token, " \t"}[len(vs)%2]
 			reflect.ValueOf(&v).Elem().Field(i).SetBool(true)
 			vs = append(vs, b100Val[T]{typ.Field(i).Name, v})
 		}

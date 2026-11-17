@@ -1239,13 +1239,17 @@ func (tt tagTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 const (
 	b112DeleteOK  = `{"ok":true,"result":true}`
 	b112Delete401 = `{"ok":false,"error_code":401,"description":"Unauthorized"}`
+	// b112Delete401Echo is a 401 whose description repeats the request path,
+	// token included, as a proxy or server may do.
+	b112Delete401Echo = `{"ok":false,"error_code":401,"description":"Unauthorized: ` + b112DeletePath + `"}`
 
-	// b112BaseURL is the main Config.BaseURL. Its path is not "/bot", so a
-	// fix that swaps only the host of the default URL is visible, and it ends
-	// in "/", so a fix that trims the base is visible too.
-	b112BaseURL    = "http://" + b112Host + "/custom/bot/"
-	b112DeletePath = "/custom/bot/" + b112Token + "/deleteWebhook"
-	b112UpdatePath = "/custom/bot/" + b112Token + "/getUpdates"
+	// b112BaseURL is the main Config.BaseURL, used as given. Its path is not
+	// "/bot" and has no "bot" segment, so a fix that swaps only the host of the
+	// default URL, or adds "bot", is visible; it ends in "/", so a fix that
+	// trims the base is visible too.
+	b112BaseURL    = "http://" + b112Host + "/custom/"
+	b112DeletePath = "/custom/" + b112Token + "/deleteWebhook"
+	b112UpdatePath = "/custom/" + b112Token + "/getUpdates"
 
 	// b112TLSBaseURL is a second Config.BaseURL: another scheme, a port and
 	// an escaped slash, which only the URL's raw path keeps.
@@ -1361,6 +1365,10 @@ func TestPolling_Start_DeleteWebhookTarget(t *testing.T) {
 			wantRedir: &recordedRequest{Scheme: "http", URLHost: b112Host, Method: http.MethodGet, Host: b112Host,
 				Path: "/redirected", Cookie: "b112=jar", Tag: "polling-client"},
 			wantCalls: b112RedirectCalls},
+		{name: "D12 option on 401 description repeats the token", opts: on, baseURL: b112BaseURL, timeout: b112Timeout,
+			deleteBody: b112Delete401Echo, wantErrTxt: "failed to delete webhook: telegram API error 401: Unauthorized: /custom/[REDACTED]/deleteWebhook", wantAPI: 401,
+			wantDelete: &recordedRequest{Scheme: "http", URLHost: b112Host, Method: http.MethodGet, Host: b112Host,
+				Path: b112DeletePath, RawQuery: "drop_pending_updates=false", Cookie: "b112=jar", Tag: "polling-client"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

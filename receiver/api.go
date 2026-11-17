@@ -134,7 +134,8 @@ func deleteWebhookAt(ctx context.Context, client *http.Client, baseURL string, t
 
 	var result apiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		// A body-read error can quote what the server sent (a trailer line).
+		return fmt.Errorf("failed to decode response: %w", scrub.TokenFromError(err, token))
 	}
 
 	if !result.OK {

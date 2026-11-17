@@ -146,7 +146,7 @@ func TestAPI102C_EditMediaFileID(t *testing.T) {
 	assertFiles(t, map[string]wireFile{}, files)
 }
 
-// T-med-3 (O-T3-02): a media by URL is sent as the URL; an upload by FromReader or FromBytes is a file part
+// T-med-3: a media by URL is sent as the URL; an upload by FromReader or FromBytes is a file part
 // named in media with attach://.
 func TestAPI102C_EditMediaSources(t *testing.T) {
 	rows := []struct {
@@ -533,7 +533,7 @@ func TestAPI102C_Shapes(t *testing.T) {
 				key := strings.Split(f.Tag.Get("json"), ",")[0]
 				assert.NotContains(t, []string{"rich_message", "show_caption_above_media"}, key, "10.3 key")
 			}
-			// O-T3-08: no exported method (pattern: joinreq101b_test.go:433-434)
+			// no exported method (pattern: joinreq101b_test.go:433-434)
 			assert.Equal(t, 0, r.typ.NumMethod(), "no method on the value type")
 			assert.Equal(t, 0, reflect.PointerTo(r.typ).NumMethod(), "no method on the pointer type")
 		})
@@ -544,7 +544,7 @@ func TestAPI102C_Shapes(t *testing.T) {
 		rows[3].typ.NumField(), rows[4].typ.NumField()})
 }
 
-// T-nr-2 (O-T1-06): no method retries a network timeout; SendMessage, which does, is the control
+// T-nr-2: no method retries a network timeout; SendMessage, which does, is the control
 // (api101bFailTransport: joinreq101b_test.go).
 func TestAPI102C_NoRetryNetworkError(t *testing.T) {
 	rt := &api101bFailTransport{}
@@ -576,7 +576,7 @@ func api102cBreakerClient(t *testing.T, server *testutil.MockTelegramServer) *se
 		sender.WithGroupRateLimit(1000, 100), sender.WithPerChatRateLimit(1000, 100))
 }
 
-// T-cb-1 (O-T1-05): every method goes through the client's circuit breaker, and shares it with the other methods.
+// T-cb-1: every method goes through the client's circuit breaker, and shares it with the other methods.
 func TestAPI102C_Breaker(t *testing.T) {
 	fail := func(server *testutil.MockTelegramServer) {
 		for _, p := range []string{"deleteMessage", "editEphemeralMessageText", "editEphemeralMessageMedia",
@@ -621,7 +621,7 @@ func TestAPI102C_Breaker(t *testing.T) {
 	})
 }
 
-// T-sig (O-T1-07): the five methods have exactly the planned signatures (an extra variadic parameter would still
+// T-sig: the five methods have exactly the planned signatures (an extra variadic parameter would still
 // compile at every call site).
 func TestAPI102C_Signatures(t *testing.T) {
 	rows := []struct{ got, want reflect.Type }{

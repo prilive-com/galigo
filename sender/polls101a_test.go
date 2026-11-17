@@ -31,7 +31,7 @@ func TestAPI101A_Shapes(t *testing.T) {
 func TestPolls101A_Constructor(t *testing.T) {
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/l"}, sender.NewInputMediaLink("https://e.x/l"))
 	assert.Equal(t, sender.InputMedia{Type: "link"}, sender.NewInputMediaLink(""))
-	// T2-14, C1-04, C2-04, C3-03 openai: no client normalisation (plan §4): query (its order and escapes too),
+	// no client normalisation (plan §4): query (its order and escapes too),
 	// fragment, letter case, percent escapes, '+' and a missing scheme stay as given.
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://e.x/a?b=1#c"}, sender.NewInputMediaLink("https://e.x/a?b=1#c"))
 	assert.Equal(t, sender.InputMedia{Type: "link", URL: "https://E.x/Path?Key=Value#Frag"},
@@ -52,8 +52,8 @@ func TestPolls101A_LinkOptions(t *testing.T) {
 	full.Caption, full.ParseMode, full.Emoji = "c", "HTML", "👍"
 	full.Latitude, full.Longitude, full.HorizontalAccuracy = 1, 2, 3
 	full.Title, full.Address, full.FoursquareID, full.GooglePlaceID = "T", "A", "f", "g"
-	full.FoursquareType, full.GooglePlaceType = "ft", "gt" // T1-02 openai
-	// T2-06 openai: the nested file metadata that sets no file (FileName, MediaType, Caption, ParseMode) is ignored too.
+	full.FoursquareType, full.GooglePlaceType = "ft", "gt"
+	// the nested file metadata that sets no file (FileName, MediaType, Caption, ParseMode) is ignored too.
 	full.Media.FileName, full.Media.MediaType, full.Media.Caption, full.Media.ParseMode = "n.bin", "photo", "mc", "MarkdownV2"
 	rows := []struct {
 		name    string
@@ -81,7 +81,7 @@ func TestPolls101A_LinkOptions(t *testing.T) {
 				"file1": {FileName: "2.jpg", Data: []byte("d101-2")}}},
 		{"empty_url", []sender.InputPollOption{{Text: "l", Media: link("")}, {Text: "b"}},
 			`[{"text":"l","media":{"type":"link","url":""}},{"text":"b"}]`, map[string]wireFile{}},
-		// T2-14, C1-04, C2-04, C3-03 openai: the URL is sent byte for byte (no fragment or query cut, no scheme added, no
+		// the URL is sent byte for byte (no fragment or query cut, no scheme added, no
 		// case change, no percent or '+' decoding, no query re-encoding; plan §4).
 		{"url_as_given", []sender.InputPollOption{{Text: "f", Media: link("https://e.x/a?b=1#c")},
 			{Text: "s", Media: link("example.com/x")}, {Text: "m", Media: link("https://E.x/Path?Key=Value#Frag")},
@@ -176,7 +176,7 @@ func TestPolls101A_LinkInOtherPlaces(t *testing.T) {
 	})
 }
 
-// T-s-6 (T1-01, T1-03 openai): every non-link type with every field it ignores set, URL included, gives exactly the
+// T-s-6: every non-link type with every field it ignores set, URL included, gives exactly the
 // item it gives without them (the 10.0d items): nothing leaks across the restructured no-file branch.
 func TestPolls101A_IgnoredFields(t *testing.T) {
 	file := func(m sender.InputMedia) *sender.InputMedia { // a file item ignores coordinates, venue fields and URL
@@ -184,7 +184,7 @@ func TestPolls101A_IgnoredFields(t *testing.T) {
 		m.Title, m.Address = "T", "A"
 		m.FoursquareID, m.FoursquareType, m.GooglePlaceID, m.GooglePlaceType = "f", "ft", "g", "gt"
 		m.URL = "https://e.x/x"
-		// T3-06 openai: the nested file metadata is ignored too (the file name only where nothing is uploaded).
+		// the nested file metadata is ignored too (the file name only where nothing is uploaded).
 		for _, f := range []*sender.InputFile{&m.Media, m.Media.Photo} {
 			if f == nil {
 				continue
@@ -198,7 +198,7 @@ func TestPolls101A_IgnoredFields(t *testing.T) {
 	}
 	noFile := func(m sender.InputMedia, venue bool) *sender.InputMedia { // location/venue ignore caption, emoji, URL
 		m.Caption, m.ParseMode, m.Emoji, m.URL = "c", "HTML", "👍", "https://e.x/x"
-		// T3-06 openai: and the nested file metadata (no file is set, so the no-file guard does not fire).
+		// and the nested file metadata (no file is set, so the no-file guard does not fire).
 		m.Media.FileName, m.Media.MediaType, m.Media.Caption, m.Media.ParseMode = "n.bin", "photo", "mc", "MarkdownV2"
 		if !venue {
 			m.Title, m.Address = "T", "A"
@@ -213,7 +213,7 @@ func TestPolls101A_IgnoredFields(t *testing.T) {
 		files map[string]wireFile
 	}{
 		{"photo_id", file(sender.NewInputMediaPhoto(sender.FromFileID("P"))), `{"type":"photo","media":"P"}`, map[string]wireFile{}},
-		// T2-05 openai: a file by URL with InputMedia.URL also set: the file URL is the media, the link URL is ignored.
+		// a file by URL with InputMedia.URL also set: the file URL is the media, the link URL is ignored.
 		{"photo_url", file(sender.NewInputMediaPhoto(sender.FromURL("https://e.x/photo.jpg"))),
 			`{"type":"photo","media":"https://e.x/photo.jpg"}`, map[string]wireFile{}},
 		{"photo_upload", file(sender.NewInputMediaPhoto(upload("d101-p", "p.jpg"))),

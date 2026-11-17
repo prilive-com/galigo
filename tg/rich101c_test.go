@@ -323,7 +323,7 @@ func TestAPI101C_RichTextForms(t *testing.T) {
 		{`{"type":"italic","text":["p",{"type":"code","text":"q"}]}`, tg.RichText{Node: tg.RichTextItalic{Type: "italic",
 			Text: tg.RichText{Parts: []tg.RichText{{Plain: "p"}, {Node: tg.RichTextCode{Type: "code", Text: tg.RichText{Plain: "q"}}}}}}}, ""},
 		{`null`, tg.RichText{}, `""`},
-		{`["a",null,"b"]`, tg.RichText{Parts: []tg.RichText{{Plain: "a"}, {}, {Plain: "b"}}}, `["a","","b"]`}, // C1-01
+		{`["a",null,"b"]`, tg.RichText{Parts: []tg.RichText{{Plain: "a"}, {}, {Plain: "b"}}}, `["a","","b"]`},
 		{`123`, tg.RichText{Node: tg.RichTextUnknown{Raw: json.RawMessage(`123`)}}, ""},
 		{`true`, tg.RichText{Node: tg.RichTextUnknown{Raw: json.RawMessage(`true`)}}, ""},
 		{`"%2f +x "`, tg.RichText{Plain: "%2f +x "}, ""},
@@ -360,7 +360,7 @@ func TestAPI101C_RichTextDirect(t *testing.T) {
 			tg.RichText{Node: tg.RichTextBold{Type: "bold", Text: tg.RichText{Plain: "x"}}}},
 		{"stale node", tg.RichText{Node: tg.RichTextBold{Type: "bold"}}, `"s"`, tg.RichText{Plain: "s"}},
 		{"stale parts", tg.RichText{Parts: []tg.RichText{{Plain: "p"}}}, `null`, tg.RichText{}},
-		{"stale plain to parts", tg.RichText{Plain: "stale"}, `["x"]`, tg.RichText{Parts: []tg.RichText{{Plain: "x"}}}}, // C3-01
+		{"stale plain to parts", tg.RichText{Plain: "stale"}, `["x"]`, tg.RichText{Parts: []tg.RichText{{Plain: "x"}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -641,7 +641,7 @@ func TestAPI101C_RichBlocksForms(t *testing.T) {
 			tg.RichBlockUnknown{Type: "DIVIDER", Raw: json.RawMessage(`{"type":"DIVIDER"}`)},
 		}, decode(t, `[{"type":" paragraph","text":"a"},{"type":"DIVIDER"}]`))
 	})
-	t.Run("null element", func(t *testing.T) { // C2-01: a null element keeps its position
+	t.Run("null element", func(t *testing.T) { // a null element keeps its position
 		b := decode(t, `[{"type":"divider"},null]`)
 		assert.Equal(t, tg.RichBlocks{tg.RichBlockDivider{Type: "divider"}, tg.RichBlockUnknown{Raw: json.RawMessage(`null`)}}, b)
 		out, err := json.Marshal(rich101cBlocksHolder{B: b})

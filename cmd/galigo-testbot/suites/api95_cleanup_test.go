@@ -115,7 +115,7 @@ func TestB30_T4_ClearFails(t *testing.T) {
 	assert.Contains(t, res.Error, fmt.Sprintf("member tag %d/%d: clear-x", testutil.TestChatID, admin95))
 }
 
-// [t3] A-T2-01: S45 stops at step 3 (its own clear fails once): the runner clears the tag.
+// S45 stops at step 3 (its own clear fails once): the runner clears the tag.
 func TestB30_T9_OwnClearFails(t *testing.T) {
 	f := &fake95{members: []tg.ChatMember{tg.ChatMemberMember{Tag: "galigo-test"}}, tagErrs: map[int]error{1: errors.New("clear-net")}}
 	res, _ := run45(t, f, 0)

@@ -161,7 +161,7 @@ func TestAPI101D_EditMessageRichStep(t *testing.T) {
 		})
 	}
 
-	// C1-05: the adapter error, a last message with no chat, and a nil reply.
+	// the adapter error, a last message with no chat, and a nil reply.
 	t.Run("adapter error", func(t *testing.T) {
 		boom := errors.New("boom")
 		f := &fake101d{err: boom}

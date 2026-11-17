@@ -14,8 +14,8 @@ import (
 
 // Bot API 10.1 part a: links in poll options on the read side (B-25 10.1a, TEST-PLAN §2, rows T-g-1, T-g-2).
 //
-// Live fixtures: the "options" arrays of the sendPoll replies of 2026-11-06 (E10/lookups/probe101a/01, 02, 09 and
-// probe101a-form/01). The only edit: every file_id / file_unique_id -> a label (PH90, PH100). Everything else
+// Live fixtures: the "options" arrays of the sendPoll replies of 2026-11-06.
+// The only edit: every file_id / file_unique_id -> a label (PH90, PH100). Everything else
 // (texts, URLs, sizes, key order) is byte-exact. The server adds a trailing "/" to a bare host and drops a fragment
 // (probe 01 sent "https://example.com", probe 02 "https://example.com/a?b=1#c").
 const (
@@ -81,7 +81,7 @@ func TestAPI101A_EncodeKeys(t *testing.T) {
 	}
 }
 
-// T-g-3 (T1-09, T2-10 openai): tg.Link has exactly the spec's one field and no method (apidiff reports a new type as a whole, so an extra
+// T-g-3: tg.Link has exactly the spec's one field and no method (apidiff reports a new type as a whole, so an extra
 // exported field would not show there).
 func TestAPI101A_LinkShape(t *testing.T) {
 	rt := reflect.TypeOf(tg.Link{})
@@ -90,7 +90,7 @@ func TestAPI101A_LinkShape(t *testing.T) {
 	assert.Equal(t, "URL", f.Name)
 	assert.Equal(t, reflect.TypeOf(""), f.Type)
 	assert.Equal(t, reflect.StructTag(`json:"url"`), f.Tag)
-	// T2-10 openai: and no method, on the value or the pointer (apidiff does not list a new type's methods either).
+	// and no method, on the value or the pointer (apidiff does not list a new type's methods either).
 	assert.Equal(t, 0, rt.NumMethod())
 	assert.Equal(t, 0, reflect.PointerTo(rt).NumMethod())
 }

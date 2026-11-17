@@ -23,13 +23,13 @@ import (
 // Bot API 10.1 rich messages, send side (B-25 10.1d, TEST-PLAN §3, rows T-srm-1 … T-nr-2).
 
 const (
-	// api101dAsGiven is a value each standard normaliser would change (E-0117).
+	// api101dAsGiven is a value each standard normaliser would change.
 	api101dAsGiven = " **B** \t\n<b>&amp;</b> HTTPS://E.x/A%2fb?a=+ ü "
 	// api101dID is an identifier-like as-given value.
 	api101dID   = " bC-Ab+%2fx/Y== "
 	api101dChat = int64(123456789)
 
-	// api101dReply is the result of the live probe 02 (E11/lookups/probe101d/02-sendRichMessage-skip-absent.json),
+	// api101dReply is the result of the live probe 02,
 	// with the ids, names and date replaced by fake values.
 	api101dReply = `{"message_id":4242,"from":{"id":7001,"is_bot":true,"first_name":"galigo test bot","username":"galigo_test_bot"},` +
 		`"chat":{"id":123456789,"title":"galigo test","is_forum":true,"type":"supergroup"},"date":1700000000,` +
@@ -41,7 +41,7 @@ const (
 	api101dTextEmpty    = "galigo: chat_id cannot be empty string"
 	api101dDraftInteger = "must be integer for sendRichMessageDraft (private chats only)"
 	// api101dHTMLMixed is valid HTML with mixed case, an entity, quotes and non-ASCII text: a sender that changes the
-	// HTML after validation changes it (C1-07).
+	// HTML after validation changes it.
 	api101dHTMLMixed = `<p>Hello <B>World</B> &amp; "Ünï" ✓</p>`
 )
 
@@ -258,7 +258,7 @@ func TestAPI101D_SendRichMessageDraftChatID(t *testing.T) {
 		{"nil", nil, "chat_id", "required", ""},
 		{"string", "@x", "chat_id", api101dDraftInteger, ""},
 		{"int32", int32(5), "chat_id", api101dDraftInteger, ""},
-		{"uint", uint(5), "chat_id", api101dDraftInteger, ""}, // C1-04
+		{"uint", uint(5), "chat_id", api101dDraftInteger, ""},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
@@ -301,7 +301,7 @@ func TestAPI101D_SendRichMessageDraftRich(t *testing.T) {
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) { api101dDraftRow(t, r.req, r.field, r.msg, "") })
 	}
-	t.Run("whitespace html kept", func(t *testing.T) { // T1-01
+	t.Run("whitespace html kept", func(t *testing.T) {
 		api101dDraftRow(t, sender.SendRichMessageDraftRequest{ChatID: api101dChat, DraftID: 1,
 			RichMessage: tg.InputRichMessage{HTML: " \t "}}, "", "",
 			`{"chat_id":123456789,"draft_id":1,"rich_message":{"html":" \t "}}`)
@@ -332,7 +332,7 @@ func TestAPI101D_EditMessageTextRich(t *testing.T) {
 	require.NotNil(t, msg)
 	assert.NotNil(t, msg.RichMessage)
 
-	// C1-07: HTML is sent as given.
+	// HTML is sent as given.
 	server, _, err = api101dEdit(t, sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9,
 		RichMessage: &tg.InputRichMessage{HTML: api101dHTMLMixed}}, api101dReplyRich)
 	require.NoError(t, err)
@@ -412,7 +412,7 @@ func TestAPI101D_EditMessageTextRichInvalid(t *testing.T) {
 			api101dRefused(t, server, err, r.field, r.msg)
 		})
 	}
-	t.Run("whitespace html kept", func(t *testing.T) { // T1-01
+	t.Run("whitespace html kept", func(t *testing.T) {
 		server, _, err := api101dEdit(t, sender.EditMessageTextRequest{ChatID: api101dChat, MessageID: 9,
 			RichMessage: &tg.InputRichMessage{HTML: " \t "}}, api101dReplyRich)
 		require.NoError(t, err)
@@ -609,7 +609,7 @@ func TestAPI101D_NoRetryNetworkError(t *testing.T) {
 	assert.GreaterOrEqual(t, rt.n.Load(), int32(2), "the control call is retried")
 }
 
-// T-rl-1 (T1-02, T2-01): each new call uses the per-chat rate limiter of the request's chat (sender/client.go:600-603):
+// T-rl-1: each new call uses the per-chat rate limiter of the request's chat (sender/client.go:600-603):
 // one limiter after a call, the same one for a second call on that chat, a second limiter for another chat. A refused
 // call adds none.
 func TestAPI101D_PerChatLimiter(t *testing.T) {
@@ -653,10 +653,10 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 			assert.Equal(t, 3, server.CaptureCount())
 		})
 	}
-	// Each method WAITS on the chat's limiter (C2-01): with 1 call per 100 s and burst 1, a second call on the same
+	// Each method WAITS on the chat's limiter: with 1 call per 100 s and burst 1, a second call on the same
 	// chat with a 5 s deadline fails in the limiter at once and sends no request. The deadline is far below the 100 s
 	// refill, so the limiter refuses the reservation; a short deadline could expire first on a slow runner and give
-	// ctx.Err() instead (C3-03).
+	// ctx.Err() instead.
 	waits := []struct {
 		method, result string
 		call           func(ctx context.Context, c *sender.Client) error
@@ -691,7 +691,7 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 			assert.Equal(t, 1, server.CaptureCount())
 		})
 	}
-	// Each method uses the SAME chat limiter as the other methods (C3-01): after a SendMessage to the chat, a call of
+	// Each method uses the SAME chat limiter as the other methods: after a SendMessage to the chat, a call of
 	// the method on that chat fails in the limiter and sends no request. A method keyed on another string for the
 	// same chat would get its own limiter and pass the rows above.
 	for _, r := range waits {
@@ -715,7 +715,7 @@ func TestAPI101D_PerChatLimiter(t *testing.T) {
 		})
 	}
 
-	// A refused call (bad rich message) of each method, on a fresh client: no limiter, no request (C1-06).
+	// A refused call (bad rich message) of each method, on a fresh client: no limiter, no request.
 	refused := []struct {
 		method, result string
 		call           func(c *sender.Client) error

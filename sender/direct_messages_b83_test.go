@@ -14,10 +14,10 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// B-83 (E-0149, the client layer): GetChat (decoded by callJSON) and SendMessage (decoded by parseMessage inside
+// B-83 (the client layer): GetChat (decoded by callJSON) and SendMessage (decoded by parseMessage inside
 // withRetry) return the Bot API 9.2 direct-messages fields when Telegram sends them, and zero values when it does
-// not. Each row also compares the whole returned value with its reply fixture (O-T2-01), so a value the client loses
-// or changes after decode fails. The rows serve each holder and state the type rows prove (O-T3-01), with different
+// not. Each row also compares the whole returned value with its reply fixture, so a value the client loses
+// or changes after decode fails. The rows serve each holder and state the type rows prove, with different
 // values in different holders. Ids are fake.
 const (
 	b83SenderDMChat  = `{"id":-1009876543210,"type":"supergroup","title":"Test DM","is_direct_messages":true}`
@@ -44,7 +44,7 @@ func TestB83_Client_GetChat(t *testing.T) {
 				assert.Equal(t, "testchannel", chat.ParentChat.Username)
 				assert.Equal(t, false, chat.ParentChat.IsDirectMessages)
 			}},
-		// the parent holds the flag, the outer chat does not (T3 parent_is_dm_flag at the client layer; O-T3-01)
+		// the parent holds the flag, the outer chat does not (T3 parent_is_dm_flag at the client layer)
 		{"parent_is_dm", `{"id":-1009876543211,"type":"supergroup","accent_color_id":1,"max_reaction_count":11,` +
 			`"parent_chat":` + b83SenderDMChat + `}`,
 			func(t *testing.T, chat *tg.ChatFullInfo) {
@@ -92,14 +92,14 @@ func TestB83_Client_SendMessage(t *testing.T) {
 			assert.Equal(t, "supergroup", m.Chat.Type)
 			assert.Equal(t, "Test DM", m.Chat.Title)
 		}},
-		// the optional user is absent and must stay nil (O-T3-01)
+		// the optional user is absent and must stay nil
 		{"no_user", `{"message_id":44,"direct_messages_topic":{"topic_id":5},"date":1700000000,"chat":` +
 			b83SenderDMChat + `,"text":"hi"}`, func(t *testing.T, m *tg.Message) {
 			require.NotNil(t, m.DirectMessagesTopic)
 			assert.Equal(t, int64(5), m.DirectMessagesTopic.TopicID)
 			assert.Nil(t, m.DirectMessagesTopic.User)
 		}},
-		// the topic is only in the replied message (O-T3-01)
+		// the topic is only in the replied message
 		{"nested_reply", `{"message_id":45,"date":1700000000,"chat":` + b83SenderDMChat +
 			`,"reply_to_message":` + b83SenderMsg + `,"text":"re"}`, func(t *testing.T, m *tg.Message) {
 			assert.Nil(t, m.DirectMessagesTopic)
@@ -107,7 +107,7 @@ func TestB83_Client_SendMessage(t *testing.T) {
 			require.NotNil(t, m.ReplyToMessage.DirectMessagesTopic)
 			assert.Equal(t, int64(4503599627370495), m.ReplyToMessage.DirectMessagesTopic.TopicID)
 		}},
-		// the flag is only on the sender chat, not on the outer chat (O-T3-01)
+		// the flag is only on the sender chat, not on the outer chat
 		{"sender_chat", `{"message_id":43,"sender_chat":` + b83SenderDMChat + `,"date":1700000000,"chat":` +
 			b83SenderChannel + `,"text":"hi"}`, func(t *testing.T, m *tg.Message) {
 			require.NotNil(t, m.SenderChat)

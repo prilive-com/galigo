@@ -205,7 +205,7 @@ func TestAPI102D_SendDepth(t *testing.T) {
 	}
 }
 
-// T-sb-5 (T1-05, T2-01, T2-02, T3-02 of Codex): a blocks message takes the same send path as html and markdown, for
+// T-sb-5: a blocks message takes the same send path as html and markdown, for
 // each caller: the per-chat limiter of the request's chat is used and waited on, it is the SAME limiter a SendMessage
 // to that chat uses, the client's circuit breaker is used (an open breaker refuses the call, and failed blocks calls
 // open it), and a retryable reply (502) is not retried.
@@ -320,7 +320,7 @@ func TestAPI102D_PathBlocks(t *testing.T) {
 	}
 }
 
-// T-sb-6 (T2-03 of Codex): the sender checks only the form count (D3), not the blocks' content: an empty paragraph, a
+// T-sb-6: the sender checks only the form count (D3), not the blocks' content: an empty paragraph, a
 // heading of size 0 and a thinking block outside a draft are sent as given, by each caller.
 func TestAPI102D_BlocksUnchecked(t *testing.T) {
 	rm := tg.InputRichMessage{Blocks: []tg.InputRichBlock{
@@ -340,7 +340,7 @@ func TestAPI102D_BlocksUnchecked(t *testing.T) {
 	}
 }
 
-// T-sb-7 (T3-01 of Codex): blocks go with every other field of the request, for each caller: the whole body is
+// T-sb-7: blocks go with every other field of the request, for each caller: the whole body is
 // sent, as for html and markdown (the T-srm-1, T-srd-1 values).
 func TestAPI102D_BlocksOptions(t *testing.T) {
 	rm := tg.InputRichMessage{Blocks: api102dBlocks, IsRTL: true}

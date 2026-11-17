@@ -158,7 +158,7 @@ func TestB48B2_Wire(t *testing.T) {
 		assertFiles(t, map[string]wireFile{}, files)
 	})
 	t.Run("mixed_uploads", func(t *testing.T) {
-		// Item 1 uploads all four files, so the attach order media, photo, thumbnail, cover is pinned (U-T1-00).
+		// Item 1 uploads all four files, so the attach order media, photo, thumbnail, cover is pinned.
 		coverURL := sender.FromURL("https://x/c.jpg")
 		thumb := sender.FromBytes(b48b2ThumbBytes, "t.jpg")
 		cover := sender.FromBytes(b48b2CoverBytes, "c.jpg")
@@ -210,7 +210,7 @@ func TestB48B2_Wire(t *testing.T) {
 			{"all", func(m *sender.InputPaidMedia) {
 				m.Thumbnail, m.Cover, m.StartTimestamp, m.Width, m.Height, m.Duration, m.SupportsStreaming = &th, &cv, 7, 320, 240, 5, true
 			}, `{"type":"video","media":"V","thumbnail":"TH","cover":"CV","start_timestamp":7,"width":320,"height":240,"duration":5,"supports_streaming":true}`},
-			// a set value is sent as it is, also a negative one (the server checks it; O-T1-03)
+			// a set value is sent as it is, also a negative one (the server checks it)
 			{"negative", func(m *sender.InputPaidMedia) {
 				m.StartTimestamp, m.Width, m.Height, m.Duration = -1, -2, -3, -4
 			}, `{"type":"video","media":"V","start_timestamp":-1,"width":-2,"height":-3,"duration":-4}`},
@@ -226,7 +226,7 @@ func TestB48B2_Wire(t *testing.T) {
 		}
 	})
 	t.Run("options_on_other_kinds", func(t *testing.T) {
-		// the video fields are sent for any kind; the client does not check the kind (O-T1-03)
+		// the video fields are sent for any kind; the client does not check the kind
 		th, cv := sender.FromFileID("TH"), sender.FromFileID("CV")
 		set := func(m sender.InputPaidMedia) sender.InputPaidMedia {
 			m.Thumbnail, m.Cover, m.StartTimestamp, m.Width, m.Height, m.Duration, m.SupportsStreaming = &th, &cv, 7, 320, 240, 5, true
@@ -280,7 +280,7 @@ func TestB48B2_Wire(t *testing.T) {
 
 // b48b2BadItems are the item errors (AC3), each with its message: every file
 // check on every Type (photo, video, live_photo), since the checks apply
-// whatever the Type (A-T3-01, O-C1-01), and the live photo without its photo.
+// whatever the Type, and the live photo without its photo.
 func b48b2BadItems() []struct {
 	name string
 	item sender.InputPaidMedia
@@ -332,12 +332,12 @@ func TestB48B2_Validation(t *testing.T) {
 		{"order: star_count before media", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID}, "star_count", "galigo: validation: star_count - must be positive"},
 		{"order: star_count before items", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID, Media: []sender.InputPaidMedia{{Type: "photo"}}}, "star_count", "galigo: validation: star_count - must be positive"},
 		{"first check wins", paidReq(sender.InputPaidMedia{Type: "live_photo"}), "media", "galigo: validation: media - item 0: media is required"},
-		// check order inside one item (PLAN D4): two errors, the earlier check wins (A-T1-03)
+		// check order inside one item (PLAN D4): two errors, the earlier check wins
 		{"order: media before photo", paidReq(sender.InputPaidMedia{Type: "photo", Media: sender.InputFile{}.WithPhoto(sender.InputFile{})}),
 			"media", "galigo: validation: media - item 0: media is required"},
 		{"order: photo before thumbnail", paidReq(sender.InputPaidMedia{Type: "video", Media: sender.FromFileID("V").WithPhoto(sender.InputFile{}), Thumbnail: &sender.InputFile{}}),
 			"media", "galigo: validation: media - item 0: photo is empty"},
-		// live_photo is checked before thumbnail and cover (O-T2-03/A-T2-02)
+		// live_photo is checked before thumbnail and cover
 		{"order: live before thumbnail", paidReq(sender.InputPaidMedia{Type: "live_photo", Media: sender.FromFileID("V"), Thumbnail: &sender.InputFile{}}),
 			"media", "galigo: validation: media - item 0: live_photo requires Media.Photo"},
 		{"order: live before cover", paidReq(sender.InputPaidMedia{Type: "live_photo", Media: sender.FromFileID("V"), Cover: &sender.InputFile{}}),
@@ -349,7 +349,7 @@ func TestB48B2_Validation(t *testing.T) {
 		rows = append(rows,
 			row{"item 0: " + b.name, paidReq(b.item), "media", "galigo: validation: media - item 0: " + b.text},
 			row{"item 1: " + b.name, paidReq(good, b.item), "media", "galigo: validation: media - item 1: " + b.text},
-			// a bad item before a good one: every item is checked, not only the last (A1-T1-04)
+			// a bad item before a good one: every item is checked, not only the last
 			row{"item 0 of 2: " + b.name, paidReq(b.item, good), "media", "galigo: validation: media - item 0: " + b.text})
 	}
 	for _, r := range rows {
@@ -585,7 +585,7 @@ func TestB48B2_LimiterKey(t *testing.T) {
 	t.Run("int", func(t *testing.T) {
 		api100LimiterRow(t, "sendPaidMedia", `{"message_id":1,"date":1,"chat":{"id":-1001234567890,"type":"supergroup"}}`, call)
 	})
-	// block: the call waits on its chat's limiter, which SendMessage to the same chat shares (O-T1-01, E-0121)
+	// block: the call waits on its chat's limiter, which SendMessage to the same chat shares
 	for _, c := range []struct {
 		name        string
 		chat, other tg.ChatID
@@ -611,7 +611,7 @@ func TestB48B2_LimiterKey(t *testing.T) {
 		})
 	}
 	t.Run("global", func(t *testing.T) {
-		// the call also waits on the global limiter (O-T1-01)
+		// the call also waits on the global limiter
 		server := testutil.NewMockServer(t)
 		server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyMessage(w, 2) })
 		client := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(0.001, 1),
@@ -641,7 +641,7 @@ func TestB48B2_LimiterKey(t *testing.T) {
 	})
 }
 
-// b48b2Reply is the measured reply (E26/lookups/probe-b48b2-raw/03-sendPaidMedia.json) with testutil's bot and chat
+// b48b2Reply is the measured reply with testutil's bot and chat
 // and synthetic file ids; the video's undocumented "thumb" key is kept (a lenient decode ignores it).
 const b48b2Reply = `{"message_id":1574,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},` +
 	`"chat":{"id":-1001234567890,"title":"Test Chat","type":"supergroup"},"date":1794440965,` +

@@ -13,7 +13,7 @@ import (
 
 // Bot API 10.1 rich messages, send side (B-25 10.1d, TEST-PLAN §2, rows T-irm-1 … T-irc-2).
 
-// rich101dAsGiven is a value each standard normaliser would change (E-0117): spaces and a tab at both ends, a
+// rich101dAsGiven is a value each standard normaliser would change: spaces and a tab at both ends, a
 // newline, markup characters that encoding/json escapes, mixed case, "%2f", "+" and a non-ASCII rune.
 const rich101dAsGiven = " **B** \t\n<b>&amp;</b> HTTPS://E.x/A%2fb?a=+ ü "
 

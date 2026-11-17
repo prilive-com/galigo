@@ -240,7 +240,7 @@ func TestSenderAdapter101D(t *testing.T) {
 		server.On("/bot"+testutil.TestToken+"/"+path, reply)
 		return NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), server
 	}
-	rm := tg.InputRichMessage{Markdown: "**m**", IsRTL: true, SkipEntityDetection: true} // both flags reach the body (C3-02)
+	rm := tg.InputRichMessage{Markdown: "**m**", IsRTL: true, SkipEntityDetection: true} // both flags reach the body
 	rows := []struct {
 		path string
 		call func(a *SenderAdapter) error

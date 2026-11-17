@@ -201,7 +201,7 @@ func TestB83_Absent(t *testing.T) {
 	})
 }
 
-// T5: shapes by reflection (E-0132, E-0126): name, Go type, tag, place, not embedded.
+// T5: shapes by reflection: name, Go type, tag, place, not embedded.
 func TestB83_Shapes(t *testing.T) {
 	type field struct{ name, typ, tag string }
 	t.Run("DirectMessagesTopic", func(t *testing.T) {

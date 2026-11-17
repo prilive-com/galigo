@@ -12,7 +12,7 @@ import (
 
 // B-48b2 TEST-PLAN §2.2, T-sc, T-sc-stars.
 func TestB48B2_Scenario(t *testing.T) {
-	// first, so it runs even when a check below stops the parent (O-T2-04)
+	// first, so it runs even when a check below stops the parent
 	t.Run("stars", func(t *testing.T) {
 		var names []string
 		for _, sc := range AllStarsScenarios() {

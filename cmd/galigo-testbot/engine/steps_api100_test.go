@@ -130,11 +130,11 @@ func (f *fake100) SendMessageDraft(_ context.Context, chatID int64, draftID int,
 var api100Writes = []string{"deleteMessageReaction", "deleteAllMessageReactions", "sendMessageDraft"}
 
 // api100OtherChatID is a second chat id for the fresh-runtime rows: not TestChatID, so a step that reads the
-// wrong chat (a stale LastMessage, a fixed id) fails them (X-C2-01).
+// wrong chat (a stale LastMessage, a fixed id) fails them.
 const api100OtherChatID int64 = -1001000000100
 
 // api100StaleRuntime is a runtime whose other chat sources (LastMessage, ForumChatID, ChatCtx.ChatID,
-// TestUserID) all differ from rt.ChatID, so a step that falls back to any of them fails (X-C3-01).
+// TestUserID) all differ from rt.ChatID, so a step that falls back to any of them fails.
 func api100StaleRuntime(f *fake100) *Runtime {
 	rt := api100Runtime(f)
 	rt.ChatID = api100OtherChatID
@@ -339,7 +339,7 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 			}
 			api100Fields(t, step, res, "getChatAdministrators")
 			assert.Equal(t, map[string]int{"getChatAdministratorsWithBots": 1}, f.calls)
-			// the test chat, not the admin's id (O-C1-01)
+			// the test chat, not the admin's id
 			assert.Equal(t, []int64{testutil.TestChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 		})
 	}
@@ -366,7 +366,7 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 		assert.Equal(t, []int64{testutil.TestChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 	})
 	t.Run("fresh runtime", func(t *testing.T) {
-		// API100 T-tb-4 (d): rt.ChatID only; no LastMessage (X-C2-01)
+		// API100 T-tb-4 (d): rt.ChatID only; no LastMessage
 		f := newFake100().script("getChatAdministratorsWithBots", fake100Reply{members: []tg.ChatMember{api100Admin(api100BotID, true, false)}})
 		rt := NewRuntime(f, api100OtherChatID, testutil.TestUserID)
 		rt.ChatCtx = &ChatContext{BotIsAdmin: true}
@@ -381,7 +381,7 @@ func TestAPI100Steps_AdminsWithBots(t *testing.T) {
 		assert.Equal(t, []int64{api100OtherChatID}, f.chatIDs["getChatAdministratorsWithBots"])
 	})
 	t.Run("stale runtime", func(t *testing.T) {
-		// API100 T-tb-4 (d): rt.ChatID, not another chat the runtime holds (X-C3-01)
+		// API100 T-tb-4 (d): rt.ChatID, not another chat the runtime holds
 		f := newFake100().script("getChatAdministratorsWithBots", fake100Reply{members: []tg.ChatMember{api100Admin(api100BotID, true, false)}})
 		res, err := step.Execute(context.Background(), api100StaleRuntime(f))
 		require.NoError(t, err)
@@ -421,12 +421,12 @@ func TestAPI100Steps_ChatPermissionsReact(t *testing.T) {
 			}
 			api100Fields(t, step, res, "getChat")
 			assert.Equal(t, map[string]int{"getChat": 1}, fk.calls)
-			// the test chat, not the admin's id (O-C1-01)
+			// the test chat, not the admin's id
 			assert.Equal(t, []int64{testutil.TestChatID}, fk.chatIDs["getChat"])
 		})
 	}
 	t.Run("fresh runtime", func(t *testing.T) {
-		// API100 T-tb-4 (e): rt.ChatID only; no LastMessage (X-C2-01)
+		// API100 T-tb-4 (e): rt.ChatID only; no LastMessage
 		fk := newFake100().script("getChat", fake100Reply{chat: &tg.ChatFullInfo{ID: api100OtherChatID, Type: "supergroup", Permissions: &tg.ChatPermissions{CanReactToMessages: &tr}}})
 		rt := NewRuntime(fk, api100OtherChatID, testutil.TestUserID)
 		var (
@@ -440,7 +440,7 @@ func TestAPI100Steps_ChatPermissionsReact(t *testing.T) {
 		assert.Equal(t, []int64{api100OtherChatID}, fk.chatIDs["getChat"])
 	})
 	t.Run("stale runtime", func(t *testing.T) {
-		// API100 T-tb-4 (e): rt.ChatID, not another chat the runtime holds (X-C3-01)
+		// API100 T-tb-4 (e): rt.ChatID, not another chat the runtime holds
 		fk := newFake100().script("getChat", fake100Reply{chat: &tg.ChatFullInfo{ID: api100OtherChatID, Type: "supergroup", Permissions: &tg.ChatPermissions{CanReactToMessages: &tr}}})
 		res, err := step.Execute(context.Background(), api100StaleRuntime(fk))
 		require.NoError(t, err)
@@ -607,7 +607,7 @@ type fakeLive struct {
 
 	sends      []liveSend
 	groups     [][]MediaInput
-	groupChats []int64 // the chat id of each SendMediaGroup call (C1-06)
+	groupChats []int64 // the chat id of each SendMediaGroup call
 	edits      []liveEdit
 
 	sendReply  *tg.Message
@@ -763,7 +763,7 @@ func TestAPI100B_SendLivePhotoByID(t *testing.T) { // API100B T-tb-3
 			assert.Equal(t, 0, f.total())
 		})
 	}
-	// T3-04: the reply checks run on the by-id branch too, and a failed check keeps the result.
+	// the reply checks run on the by-id branch too, and a failed check keeps the result.
 	for name, reply := range liveBad(8, "lp") {
 		t.Run("bad reply by id: "+name, func(t *testing.T) {
 			f := &fakeLive{sendReply: reply}
@@ -833,7 +833,7 @@ func TestAPI100B_LivePhotoAlbum(t *testing.T) { // API100B T-tb-4
 		{"2nd invalid", []*tg.Message{liveMsg(41, "v", "s", ""), bad2}, []int{41, 32}},
 	}
 	for _, r := range failures {
-		for _, byID := range []bool{false, true} { // C1-01: the checks hold in both modes
+		for _, byID := range []bool{false, true} { // the checks hold in both modes
 			name := "bad reply: " + r.name
 			if byID {
 				name = "bad reply by id: " + r.name
@@ -865,7 +865,7 @@ func TestAPI100B_LivePhotoAlbum(t *testing.T) { // API100B T-tb-4
 		}
 		assert.Empty(t, rt.CreatedMessages)
 	})
-	// T3-05: by id, each captured key absent or empty -> an error naming it, no call, no panic.
+	// by id, each captured key absent or empty -> an error naming it, no call, no panic.
 	for _, key := range []string{"live_video", "live_still"} {
 		for _, empty := range []bool{false, true} {
 			name := "absent " + key
@@ -1028,7 +1028,7 @@ func poll100Channel() *tg.APIError {
 	return &tg.APIError{Code: 400, Description: "Bad Request: poll voters can be restricted only in channel chats"}
 }
 
-// T-tb-1: a success with each restriction echoed (T1-05, T1-10).
+// T-tb-1: a success with each restriction echoed.
 func TestSendPoll100Step_Echo(t *testing.T) {
 	rows := []struct {
 		name    string
@@ -1056,8 +1056,7 @@ func TestSendPoll100Step_Echo(t *testing.T) {
 	}
 }
 
-// T-tb-2: a reply that does not echo the request fails, keeps the message tracked and the id in the result
-// (T1-05, T2-02).
+// T-tb-2: a reply that does not echo the request fails, keeps the message tracked and the id in the result.
 func TestSendPoll100Step_BadEcho(t *testing.T) {
 	rows := []struct {
 		name  string
@@ -1086,7 +1085,7 @@ func TestSendPoll100Step_BadEcho(t *testing.T) {
 }
 
 // T-tb-3: nil and empty country lists are equal, and the order of the codes does not matter: the API does not
-// promise to return them in request order (c1 C1-02).
+// promise to return them in request order.
 func TestSendPoll100Step_NilEmpty(t *testing.T) {
 	for name, c := range map[string][2][]string{"nil wanted": {nil, {}}, "empty wanted": {{}, nil},
 		"reordered": {{"DE", "FT"}, {"FT", "DE"}}} {
@@ -1098,7 +1097,7 @@ func TestSendPoll100Step_NilEmpty(t *testing.T) {
 	}
 }
 
-// T-tb-4: the channel-only refusal passes when a restriction was asked for (T1-04).
+// T-tb-4: the channel-only refusal passes when a restriction was asked for.
 func TestSendPoll100Step_Refused(t *testing.T) {
 	suffix := poll100Channel()
 	suffix.Description += ", x"
@@ -1125,7 +1124,7 @@ func TestSendPoll100Step_Refused(t *testing.T) {
 	}
 }
 
-// T-tb-5: the same refusal fails when no restriction was asked for (T1-04).
+// T-tb-5: the same refusal fails when no restriction was asked for.
 func TestSendPoll100Step_RefusedUnset(t *testing.T) {
 	for name, req := range map[string]sender.SendPollRequest{
 		"neither": poll100Req(false, nil), "empty countries": poll100Req(false, []string{}),
@@ -1138,7 +1137,7 @@ func TestSendPoll100Step_RefusedUnset(t *testing.T) {
 	}
 }
 
-// T-tb-6: any other error fails (T1-04).
+// T-tb-6: any other error fails.
 func TestSendPoll100Step_OtherErrors(t *testing.T) {
 	rows := map[string]error{
 		"other 400":        &tg.APIError{Code: 400, Description: "Bad Request: chat not found"},
@@ -1165,7 +1164,7 @@ func simple100Run(t *testing.T, options []string, msg *tg.Message) (*fakePoll100
 	return f, rt, res, err
 }
 
-// T-tb-7: SendPollSimpleStep checks the reply's option count and records both counts (T1-10, T2-03).
+// T-tb-7: SendPollSimpleStep checks the reply's option count and records both counts.
 func TestSendPollSimpleStep_Check(t *testing.T) {
 	twelve := []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"}
 	for _, r := range []struct {
@@ -1323,7 +1322,7 @@ func TestPollMediaKind(t *testing.T) {
 			assert.Equal(t, kind, k)
 		}
 	})
-	t.Run("empty", func(t *testing.T) { // C1-02 openai, round c1: a non-nil media with no kind set
+	t.Run("empty", func(t *testing.T) { // a non-nil media with no kind set
 		for name, m := range map[string]*tg.PollMedia{"zero": {}, "empty_photo_slice": {Photo: []tg.PhotoSize{}}} {
 			k, err := pollMediaKind(m)
 			require.NoError(t, err, name)
@@ -1341,7 +1340,7 @@ func TestPollMediaKind(t *testing.T) {
 }
 
 // T-tb-2: every field of tg.PollMedia, set alone, gives its JSON tag name (a new field fails until the helper knows
-// it) (T1-08, T2-02 openai).
+// it).
 func TestPollMediaKind_AllFields(t *testing.T) {
 	rt := reflect.TypeOf(tg.PollMedia{})
 	assert.Equal(t, 10, rt.NumField(), "the T-tb-1 rows cover 10 fields") // API101A T-tb-2: link (10.1)
@@ -1413,7 +1412,7 @@ func pollMediaRun(t *testing.T, step *SendPollMediaStep, msg *tg.Message, err er
 	return f, rt, res, stepErr
 }
 
-// T-tb-3: each S63-S65 step passes on a reply with the wanted kinds (T1-01 google, T1-06 openai).
+// T-tb-3: each S63-S65 step passes on a reply with the wanted kinds.
 func TestSendPollMediaStep_Pass(t *testing.T) {
 	steps := pollMediaSteps()
 	for _, name := range []string{"desc_photo", "desc_location", "options", "quiz", "link_no_file", "link_upload"} {
@@ -1476,8 +1475,8 @@ func TestSendPollMediaStep_Links(t *testing.T) {
 		{"empty_url_in_reply", step1, []string{"", "https://example.com/2", ""}, `sendPoll: option 0 link "" in the reply, want "https://example.com/1"`},
 		{"short_want", with("https://example.com/1", "https://example.com/2"), ok3, `sendPoll: 3 options in the reply, want 2 links`},
 		{"long_want", with("https://example.com/1", "https://example.com/2", "", ""), ok3, `sendPoll: 3 options in the reply, want 4 links`},
-		{"empty_want", with([]string{}...), ok3, `sendPoll: 3 options in the reply, want 0 links`},                                                                     // T1-04 openai: only nil checks nothing
-		{"plain_slot_wanted", with("https://example.com/1", "https://example.com/2", "unexpected"), ok3, `sendPoll: option 2 link "" in the reply, want "unexpected"`}, // T1-05 openai
+		{"empty_want", with([]string{}...), ok3, `sendPoll: 3 options in the reply, want 0 links`}, // only nil checks nothing
+		{"plain_slot_wanted", with("https://example.com/1", "https://example.com/2", "unexpected"), ok3, `sendPoll: option 2 link "" in the reply, want "unexpected"`},
 	}
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
@@ -1487,12 +1486,12 @@ func TestSendPollMediaStep_Links(t *testing.T) {
 			assert.Equal(t, []int{pollMediaMsgID}, liveTracked(rt))
 			require.NotNil(t, res)
 			assert.Equal(t, []int{pollMediaMsgID}, res.MessageIDs)
-			// T1-06 openai: the whole evidence, with the reply's URLs (not the wanted ones).
+			// the whole evidence, with the reply's URLs (not the wanted ones).
 			assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": "", "explanation_media": "",
 				"option_media": step1.WantOptions, "option_links": r.urls}, res.Evidence)
 		})
 	}
-	// T2-07 openai: a link after a non-link media option is still compared (a loop that stops at the first
+	// a link after a non-link media option is still compared (a loop that stops at the first
 	// non-link media option passes the rows above).
 	t.Run("photo_then_link_wrong", func(t *testing.T) {
 		c := *s["link_upload"]
@@ -1511,7 +1510,7 @@ func TestSendPollMediaStep_Links(t *testing.T) {
 		assert.Equal(t, map[string]any{"message_id": pollMediaMsgID, "media": "", "explanation_media": "",
 			"option_media": []string{"photo", "link"}, "option_links": []string{"", "https://example.com/9"}}, res.Evidence)
 	})
-	// T3-07 openai: a link after a plain option whose (empty) URL matches is still compared (a loop that stops at
+	// a link after a plain option whose (empty) URL matches is still compared (a loop that stops at
 	// a matching plain option passes the rows above).
 	t.Run("plain_then_link_wrong", func(t *testing.T) {
 		c := *step1
@@ -1539,8 +1538,7 @@ func TestSendPollMediaStep_Links(t *testing.T) {
 	})
 }
 
-// T-tb-4: a reply with a different kind or count fails, and keeps the message tracked and the id in the result
-// (T1-06, T2-05 openai).
+// T-tb-4: a reply with a different kind or count fails, and keeps the message tracked and the id in the result.
 func TestSendPollMediaStep_Fail(t *testing.T) {
 	s := pollMediaSteps()
 	twoKinds := pollMediaReply("", "", s["options"].WantOptions)
@@ -1548,7 +1546,7 @@ func TestSendPollMediaStep_Fail(t *testing.T) {
 	noPoll := pollMediaReply("", "", nil)
 	noPoll.Poll = nil
 	quizPlain := &SendPollMediaStep{Req: s["quiz"].Req, WantOptions: []string{"photo", ""}}
-	// T3-04 openai: a two-kind description or explanation while nothing is wanted there.
+	// a two-kind description or explanation while nothing is wanted there.
 	ambDesc := pollMediaReply("", "", s["options"].WantOptions)
 	ambDesc.Poll.Media = &tg.PollMedia{Photo: []tg.PhotoSize{{FileID: "ph"}}, Location: &tg.Location{}}
 	ambExpl := pollMediaReply("", "", []string{"photo", ""})

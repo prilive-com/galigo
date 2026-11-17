@@ -265,7 +265,7 @@ func TestAPI100_GetChatAdministratorsWithBots(t *testing.T) {
 		})
 	}
 
-	// the public signature of GetChatAdministrators stays as base (t2 O-T1-10)
+	// the public signature of GetChatAdministrators stays as base
 	assert.Equal(t, reflect.TypeOf((func(*sender.Client, context.Context, tg.ChatID) ([]tg.ChatMember, error))(nil)),
 		reflect.TypeOf((*sender.Client).GetChatAdministrators))
 }

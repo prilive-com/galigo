@@ -12,7 +12,7 @@ import (
 
 // Bot API 10.1 part b: join request queries on the read side (B-25 10.1b, TEST-PLAN §2, rows T-tg-1..T-tg-5).
 //
-// api101bGetMe is the getMe reply of 2026-11-07 (E10/lookups/probe101b/01-getMe.json), key order and values
+// api101bGetMe is the getMe reply of 2026-11-07, key order and values
 // byte-exact except the bot's own id, first_name and username, which are fakes (the repo is public).
 const api101bGetMe = `{"id":1000000101,"is_bot":true,"first_name":"Test Bot","username":"test_101b_bot",` +
 	`"can_join_groups":true,"can_read_all_group_messages":false,"supports_inline_queries":false,` +

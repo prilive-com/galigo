@@ -10,8 +10,7 @@ import (
 	"github.com/prilive-com/galigo/sender"
 )
 
-// T-s-1: every new name has its planned type. A wrong field type or constructor signature does not compile
-// (P1-01 openai).
+// T-s-1: every new name has its planned type. A wrong field type or constructor signature does not compile.
 func TestInputMedia100D_APIShapes(t *testing.T) {
 	hasType[func(sender.InputFile) sender.InputMedia](sender.NewInputMediaSticker)
 	hasType[func(float64, float64) sender.InputMedia](sender.NewInputMediaLocation)

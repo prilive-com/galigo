@@ -12,7 +12,7 @@ import (
 // The selector-table cells of PLAN §9 that compile and change or keep the output, for *sender.Config (the same method
 // set rules apply to the receiver and tg configs). Cell 0 and the embedded value are in TestB101_SenderNested and
 // TestB101_SenderEmbeddedValue. The calls and assignments that stop compiling (cells 3, 3b, 4, 6, 7, and by value 3, 3b,
-// 4, 5, 6, 7) are probes: E36/lookups/selector-table.txt, selector-byvalue.txt and selector-byvalue2.txt.
+// 4, 5, 6, 7) were checked once with compile probes outside the repository.
 
 type b101Custom struct{}
 
@@ -82,7 +82,7 @@ type b101DeeperTime struct {
 	b101TimeMid
 }
 
-// The same cells with the config embedded BY VALUE (PLAN §9 by-value list, round p2 C-P2-02).
+// The same cells with the config embedded BY VALUE (PLAN §9 by-value list).
 type b101OwnStringV struct{ Config }
 
 func (b101OwnStringV) String() string { return "OWN-STRING" }

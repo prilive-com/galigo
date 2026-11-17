@@ -36,7 +36,7 @@ const (
 		`"can_change_info":true,"can_invite_users":true,"can_pin_messages":true,"can_manage_topics":false}`
 
 	// synthetic: user A (the guest caller), chat B (the caller's chat), and the guest message's own chat C; three
-	// distinct ids (E-0013).
+	// distinct ids.
 	api100UserA = `{"id":987654321,"is_bot":false,"first_name":"Test","username":"testuser"}`
 	api100ChatB = `{"id":123456789,"type":"supergroup","title":"Test Chat"}`
 	api100ChatC = `{"id":555000222,"type":"private","first_name":"Guest"}`

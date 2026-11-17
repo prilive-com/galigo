@@ -160,7 +160,7 @@ func (s *EmptyDraft100Step) Execute(ctx context.Context, rt *Runtime) (*StepResu
 //
 // Each live photo step makes one Telegram call. A send step tracks every returned message and fills MessageIDs
 // before any check of the reply, and on a failed check returns that result with the error, so a failed run still
-// lists every sent id for cleanup (PLAN §8 P3-01). File ids are captured under these keys.
+// lists every sent id for cleanup (PLAN §8). File ids are captured under these keys.
 const (
 	liveVideoKey = "live_video" // LivePhoto.FileID of the last upload
 	liveStillKey = "live_still" // the last LivePhoto.Photo size's FileID of the last upload
@@ -351,7 +351,7 @@ func (s *EditToLivePhoto100Step) Execute(ctx context.Context, rt *Runtime) (*Ste
 }
 
 // pollRefusal100 is the error text of a voter restriction (members_only or country_codes) outside a channel, as
-// the server sent it on 2026-11-06 (E10/lookups/probe100c/10, 11).
+// the server sent it on 2026-11-06.
 const pollRefusal100 = "poll voters can be restricted only in channel chats"
 
 // SendPoll100Step sends Req to rt.ChatID with sendPoll and checks that the reply echoes the option count,

@@ -2,7 +2,7 @@ package registry
 
 import "testing"
 
-// B-48b2 T-reg (O-T1-05): sendPaidMedia is in AllMethods exactly once, as a messaging method. --status cannot show
+// B-48b2 T-reg: sendPaidMedia is in AllMethods exactly once, as a messaging method. --status cannot show
 // this: it also counts methods that only a scenario names, and its map hides a duplicate.
 func TestB48B2_Registry(t *testing.T) {
 	var got []Method

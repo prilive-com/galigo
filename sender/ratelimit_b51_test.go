@@ -20,7 +20,7 @@ import (
 
 // B-51: every request of a sender.Client waits on the client's global limiter; a request with a chat id also waits on
 // that chat's limiter first. Rows R1-R14 of the B-51 test plan (R10 is TestAPI101B_GlobalRateLimit). A refusal is
-// compared as the whole error: the limiter's or the context's error reaches the caller unchanged (T3-01).
+// compared as the whole error: the limiter's or the context's error reaches the caller unchanged.
 
 const (
 	b51Watchdog = 10 * time.Second // a call that blocks longer fails the row, not the whole binary
@@ -100,7 +100,7 @@ func b51Ctx(t *testing.T) context.Context {
 	return ctx
 }
 
-// R1: a zero limiter refuses every class before any request, with a long and with a short deadline (C2-04: the
+// R1: a zero limiter refuses every class before any request, with a long and with a short deadline (the
 // deadline is an input class too, so a fast lane for short deadlines fails here).
 func TestB51_ZeroLimiterRefusesEveryClass(t *testing.T) {
 	deadlines := []time.Duration{b51Deadline, 100 * time.Millisecond}
@@ -288,7 +288,7 @@ func TestB51_BreakerOpenTakesToken(t *testing.T) {
 	assert.Equal(t, 2, s.CaptureCount())
 }
 
-// R13 (T1-01): a call blocked in the global wait does not block other callers: each class, with a 5 s deadline, is
+// R13: a call blocked in the global wait does not block other callers: each class, with a 5 s deadline, is
 // refused at once while another chat-less call waits for the next token.
 func TestB51_BlockedWaitDoesNotBlockOthers(t *testing.T) {
 	for _, other := range b51Classes {
@@ -318,8 +318,8 @@ func TestB51_BlockedWaitDoesNotBlockOthers(t *testing.T) {
 	}
 }
 
-// R14 (T2-01, E-0143): a census of the chat-less methods named in PLAN §2 and §8, plus every Answer* method of
-// sender.Client (C1-02, C2-03: the time-critical answers a fast lane would touch, backlog B-79): with a zero limiter
+// R14: a census of the chat-less methods named in PLAN §2 and §8, plus every Answer* method of
+// sender.Client (the time-critical answers a fast lane would touch, backlog B-79): with a zero limiter
 // each one is refused before any request, so none of these methods is exempt from the global wait. A new Answer*
 // method that is not listed here fails the guard at the end.
 func TestB51_ChatLessMethodsCensus(t *testing.T) {

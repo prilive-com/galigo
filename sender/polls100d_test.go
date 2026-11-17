@@ -26,7 +26,7 @@ var pollJSONKeys = []string{"options", "media", "explanation_media"}
 
 // pollJSON decodes one JSON value strictly: numbers keep their text (json.Number, so 1 and 1.0 differ), a
 // duplicate key in any object at any depth is an error (the Bot API reads the first of two equal keys; a Go map
-// keeps the last), and trailing data is an error (T1-05, T2-01 openai).
+// keeps the last), and trailing data is an error.
 func pollJSON(raw string) (any, error) {
 	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.UseNumber()
@@ -210,7 +210,7 @@ func TestPolls100D_Location(t *testing.T) {
 		{"accuracy", withAccuracy(sender.NewInputMediaLocation(52.52, 13.405), 50.5),
 			`{"type":"location","latitude":52.52,"longitude":13.405,"horizontal_accuracy":50.5}`},
 		{"zero", sender.NewInputMediaLocation(0, 0), `{"type":"location","latitude":0,"longitude":0}`},
-		// T3-02 openai: one zero coordinate is sent as well.
+		// one zero coordinate is sent as well.
 		{"zero_latitude", sender.NewInputMediaLocation(0, 13.405), `{"type":"location","latitude":0,"longitude":13.405}`},
 		{"zero_longitude", sender.NewInputMediaLocation(52.52, 0), `{"type":"location","latitude":52.52,"longitude":0}`},
 	})
@@ -239,7 +239,7 @@ func TestPolls100D_Venue(t *testing.T) {
 		{"only_foursquare_type", only(func(v *sender.InputMedia) { v.FoursquareType = "ft" }), `{` + base + `,"foursquare_type":"ft"}`},
 		{"only_google_place_id", only(func(v *sender.InputMedia) { v.GooglePlaceID = "gid" }), `{` + base + `,"google_place_id":"gid"}`},
 		{"only_google_place_type", only(func(v *sender.InputMedia) { v.GooglePlaceType = "gt" }), `{` + base + `,"google_place_type":"gt"}`},
-		// T3-02, T3-03 openai: one zero coordinate; accuracy without any venue ID or type.
+		// one zero coordinate; accuracy without any venue ID or type.
 		{"zero_latitude", sender.NewInputMediaVenue(0, 2.2945, "T", "A"),
 			`{"type":"venue","latitude":0,"longitude":2.2945,"title":"T","address":"A"}`},
 		{"zero_longitude", sender.NewInputMediaVenue(48.8584, 0, "T", "A"),
@@ -273,7 +273,7 @@ func TestPolls100D_NumberText(t *testing.T) {
 	}
 }
 
-// T-s-8: a location or venue with a file is refused before anything is sent (P1-03 openai, P1-01 google).
+// T-s-8: a location or venue with a file is refused before anything is sent.
 func TestPolls100D_NoFileOnPlace(t *testing.T) {
 	photo := sender.FromFileID("Y")
 	files := []struct {
@@ -335,7 +335,7 @@ var (
 )
 
 // T-s-9: option media by reference, every option field kept, plain options before media options, entities
-// without a parse mode (T1-01, T1-02, T2-03 openai).
+// without a parse mode.
 func TestPolls100D_OptionMedia(t *testing.T) {
 	rows := []struct {
 		name    string
@@ -375,7 +375,7 @@ func TestPolls100D_OptionMedia(t *testing.T) {
 		}, `[{"text":"e","text_entities":[{"type":"custom_emoji","offset":0,"length":1,"custom_emoji_id":"5368324170671202286"}]},` +
 			`{"text":"m","text_entities":[{"type":"custom_emoji","offset":0,"length":1,"custom_emoji_id":"5368324170671202286"}],` +
 			`"media":{"type":"photo","media":"P"}}]`, map[string]wireFile{}},
-		// T3-01 openai: a parse mode without entities, on a plain option and on a media option.
+		// a parse mode without entities, on a plain option and on a media option.
 		{"parse_mode_only", []sender.InputPollOption{
 			{Text: "h", TextParseMode: tg.ParseModeHTML},
 			{Text: "m", TextParseMode: tg.ParseModeHTML, Media: mp(sender.NewInputMediaPhoto(sender.FromFileID("P")))},
@@ -461,7 +461,7 @@ func polls100dPartOrder(t *testing.T, call func(ctx context.Context, c *sender.C
 	return names
 }
 
-// T-s-11: explanation media by reference and by upload alone (T1-04 google).
+// T-s-11: explanation media by reference and by upload alone.
 func TestPolls100D_Explanation(t *testing.T) {
 	rows := []struct {
 		name  string
@@ -486,8 +486,8 @@ func TestPolls100D_Explanation(t *testing.T) {
 	}
 }
 
-// T-s-12: a poll without media is sent byte for byte as at the baseline (literals copied from the baseline record
-// E10/red/baseline-bytes.txt, recorded at ab5a1b8 before the change).
+// T-s-12: a poll without media is sent byte for byte as at the baseline (literals copied from a baseline record
+// made at ab5a1b8 before the change).
 func TestPolls100D_NoMediaBytes(t *testing.T) {
 	anon, f, zero := false, false, 0
 	rows := []struct {
@@ -538,7 +538,7 @@ func TestPolls100D_NoMediaBytes(t *testing.T) {
 }
 
 // T-s-13: editMessageMedia items of the baseline constructors keep their keys, values and file parts (AC4;
-// literals copied from the baseline record E10/red/baseline-bytes.txt). It pins the decoded item and the file
+// literals copied from the same baseline record). It pins the decoded item and the file
 // bytes, not the raw item text or the multipart body bytes.
 func TestPolls100D_EditItemsUnchanged(t *testing.T) {
 	kinds := []struct {
@@ -591,7 +591,7 @@ func TestPolls100D_EditItemsUnchanged(t *testing.T) {
 	}
 }
 
-// T-s-15: the pollJSON helper itself (T1-05, T2-01 openai).
+// T-s-15: the pollJSON helper itself.
 func TestPolls100D_PollArgsHelper(t *testing.T) {
 	t.Run("duplicate option media", func(t *testing.T) {
 		_, err := pollJSON(`[{"text":"p","media":null,"media":{"type":"photo","media":"P"}}]`)
@@ -618,7 +618,7 @@ func TestPolls100D_PollArgsHelper(t *testing.T) {
 }
 
 // T-s-16: ids, places and URLs before uploads in the options, then explanation and description uploads; a sticker
-// upload keeps its emoji (T1-03, T1-04 openai).
+// upload keeps its emoji.
 func TestPolls100D_AttachOrderMixed(t *testing.T) {
 	mediaType, args, files, err := polls100dSend(t, sender.SendPollRequest{
 		Options: []sender.InputPollOption{
@@ -649,7 +649,7 @@ func TestPolls100D_AttachOrderMixed(t *testing.T) {
 	}, files)
 }
 
-// T-s-17 (C1-01 openai, round c1): a nil *InputMedia held in an `any` field is not removed by the zero-value skip
+// T-s-17: a nil *InputMedia held in an `any` field is not removed by the zero-value skip
 // (the interface is not nil). It is written like a nil *InputFile: no argument, no file, no multipart, no panic.
 func TestPolls100D_TypedNilInAny(t *testing.T) {
 	var nilMedia *sender.InputMedia
@@ -669,7 +669,7 @@ func TestPolls100D_TypedNilInAny(t *testing.T) {
 		assert.NotContains(t, args, "media")
 		assert.NotContains(t, args, "explanation_media")
 	})
-	// C2-01 openai, round c2: the nil value's "no multipart" answer comes after an option with media; the earlier
+	// the nil value's "no multipart" answer comes after an option with media; the earlier
 	// answer must stay (formOnly = formOnly || needsForm). No upload, so only that answer makes the request multipart.
 	t.Run("option_media_then_nil", func(t *testing.T) {
 		photo := sender.NewInputMediaPhoto(sender.FromFileID("P"))
@@ -688,7 +688,7 @@ func TestPolls100D_TypedNilInAny(t *testing.T) {
 	})
 }
 
-// T-s-18 (C3-01 openai, round c3): a value json.Marshal cannot encode (a NaN coordinate) is a build error with its
+// T-s-18: a value json.Marshal cannot encode (a NaN coordinate) is a build error with its
 // field and step named, before any request; in an option and in the description media.
 func TestPolls100D_UnencodableNumber(t *testing.T) {
 	nan := sender.NewInputMediaLocation(math.NaN(), 2)

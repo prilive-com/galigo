@@ -39,8 +39,8 @@ func TestB98_WebhookHandler(t *testing.T) {
 	const text = "receiver.WebhookHandler{[REDACTED]}"
 	h := receiver.NewWebhookHandler(nil, make(chan tg.Update, 1), b98Config())
 	b98HolderRows(t, h, &receiver.WebhookHandler{}, (*receiver.WebhookHandler)(nil), text, b98Secret)
-	// A handler that has served a request has used its buffer pool, which the GC empties during the matrix (c1
-	// A-C1-02): a correct Format must still pass the state check.
+	// A handler that has served a request has used its buffer pool, which the GC empties during the matrix:
+	// a correct Format must still pass the state check.
 	t.Run("matrix_after_request", func(t *testing.T) {
 		hs := receiver.NewWebhookHandler(nil, make(chan tg.Update, 1), b98Config())
 		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"update_id":1}`))
@@ -51,7 +51,7 @@ func TestB98_WebhookHandler(t *testing.T) {
 		testutil.AssertFormatsAs(t, hs, text, b98Secret)
 	})
 	// The state check records a func by its code address, so it does not see a Format that replaces the buffer
-	// pool's New with a closure of the same literal and another size (c3 C3-01): the next request does.
+	// pool's New with a closure of the same literal and another size: the next request does.
 	t.Run("request_after_matrix", func(t *testing.T) {
 		updates := make(chan tg.Update, 1)
 		hf := receiver.NewWebhookHandler(nil, updates, b98Config())

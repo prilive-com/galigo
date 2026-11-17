@@ -21,7 +21,7 @@ import (
 
 // Bot API 10.1 part b: join request queries (B-25 10.1b, TEST-PLAN §3, rows T-s-1 … T-s-13).
 //
-// The inputs are values a normaliser would change (E-0117): spaces at both ends, mixed case, "+", a lower-case
+// The inputs are values a normaliser would change: spaces at both ends, mixed case, "+", a lower-case
 // "%2f", "%20", an unsorted query and a fragment. The request body is compared with literal JSON.
 const (
 	api101bID = " jQ-Ab+%2fx/Y== "
@@ -323,7 +323,7 @@ func (rt *api101bFailTransport) RoundTrip(*http.Request) (*http.Response, error)
 	return nil, api101bTimeout{}
 }
 
-// T-s-8 (C2-01 openai): neither method retries a network error, not even a timeout; SendMessage, which retries a
+// T-s-8: neither method retries a network error, not even a timeout; SendMessage, which retries a
 // timeout, is the control.
 func TestAPI101B_NoRetryNetworkError(t *testing.T) {
 	rt := &api101bFailTransport{}
@@ -445,7 +445,7 @@ func TestAPI101B_RequestShapes(t *testing.T) {
 		})
 	}
 
-	// C1-01 openai: the two methods have exactly the planned signatures (an extra variadic parameter would still
+	// the two methods have exactly the planned signatures (an extra variadic parameter would still
 	// compile at every call site)
 	assert.Equal(t,
 		reflect.TypeFor[func(*sender.Client, context.Context, sender.AnswerChatJoinRequestQueryRequest) error]().String(),

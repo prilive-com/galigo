@@ -132,7 +132,7 @@ func TestB48B2_Step(t *testing.T) {
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), b.text)
 			assert.Equal(t, tracked, rt.CreatedMessages, "tracked, so the cleanup deletes it")
-			// the evidence records what the reply carried, so a failed run shows it (A-T1-07)
+			// the evidence records what the reply carried, so a failed run shows it
 			if b.ev == nil {
 				assert.Nil(t, res.Evidence)
 			} else {
@@ -142,9 +142,9 @@ func TestB48B2_Step(t *testing.T) {
 	}
 }
 
-// T-ad (E-0123): the adapter is a pass-through: for a request that sets every field (16 form keys) and a video
+// T-ad: the adapter is a pass-through: for a request that sets every field (16 form keys) and a video
 // item with every option, the form it sends equals the one sender.Client sends, it returns the same message, and it
-// returns the client's error (O-T1-04).
+// returns the client's error.
 func TestSenderAdapterB48B2(t *testing.T) {
 	still := sender.FromBytes([]byte("still"), "s.jpg")
 	thumb := sender.FromBytes([]byte("thumb"), "t.jpg")
@@ -172,7 +172,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		args  map[string]string
 		files map[string][2]string
 	}
-	// paidReply is a sendPaidMedia reply with a caption and paid media (fake ids), so a dropped field shows (O-T2-01).
+	// paidReply is a sendPaidMedia reply with a caption and paid media (fake ids), so a dropped field shows.
 	paidReply := func(w http.ResponseWriter) {
 		testutil.ReplyOK(w, map[string]any{
 			"message_id": 5, "date": 1234567890, "chat": map[string]any{"id": -1001234567890, "type": "supergroup"},
@@ -223,7 +223,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 			"file2": {"v.mp4", "video"}, "file3": {"t.jpg", "thumb"}}, got.files)
 	})
 	t.Run("rate_limited", func(t *testing.T) {
-		// the client's *tg.APIError reaches the caller as it is: RetryAfter and the sentinel kept (O-T2-01)
+		// the client's *tg.APIError reaches the caller as it is: RetryAfter and the sentinel kept
 		limited := func(w http.ResponseWriter) { testutil.ReplyRateLimit(w, 7) }
 		want, got := send(t, bg, limited, viaClient), send(t, bg, limited, viaAdapter)
 		require.Error(t, want.err)
@@ -239,7 +239,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		assert.ErrorIs(t, got.err, tg.ErrTooManyRequests)
 	})
 	t.Run("cancelled", func(t *testing.T) {
-		// the adapter passes the caller's context on (O-T2-02)
+		// the adapter passes the caller's context on
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		got := send(t, ctx, paidReply, viaAdapter)
@@ -249,7 +249,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		assert.Equal(t, 0, got.n, "no request after the cancel")
 	})
 	t.Run("cancelled_in_flight", func(t *testing.T) {
-		// a cancel after the request has started still reaches the client (A-T3-02/O-T3-02)
+		// a cancel after the request has started still reaches the client
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		server := testutil.NewMockServer(t)
@@ -257,7 +257,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 			branch string
 			wait   time.Duration // from the caller's cancel to the end of the request context
 		}
-		branch := make(chan ending, 1) // which way the handler ended (O-C1-02), and when (A-C2-01)
+		branch := make(chan ending, 1) // which way the handler ended, and when
 		server.On("/bot"+testutil.TestToken+"/sendPaidMedia", func(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			start := time.Now()
@@ -278,7 +278,7 @@ func TestSenderAdapterB48B2(t *testing.T) {
 		case b := <-branch:
 			assert.Equal(t, "cancelled", b.branch, "the HTTP request itself must see the cancel; a returned context.Canceled alone is not proof")
 			// The caller's cancel, not some later timeout of the adapter's own, must end the request:
-			// measured 2.6 ms max under -race (200 runs), so 250 ms leaves a wide margin (A-C2-01).
+			// measured 2.6 ms max under -race (200 runs), so 250 ms leaves a wide margin.
 			assert.Less(t, b.wait, 250*time.Millisecond, "the request ended long after the caller's cancel")
 		case <-time.After(5 * time.Second):
 			t.Fatal("the handler did not end")

@@ -15,8 +15,7 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// s68Kinds are the block kinds S68 sends and wants back, in order: the kinds the server returned in the live trial
-// (E16/live/trial-api102.txt).
+// s68Kinds are the block kinds S68 sends and wants back, in order: the kinds the server returned in the live trial.
 var s68Kinds = []string{"heading", "paragraph", "pre", "divider", "mathematical_expression", "anchor", "list",
 	"blockquote", "pullquote", "table", "details", "map", "footer"}
 

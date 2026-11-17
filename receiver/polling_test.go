@@ -1083,8 +1083,7 @@ type deleteWebhookRecorder struct {
 	onDelete        func(r *http.Request) // optional; runs before the deleteWebhook answer
 	mu              sync.Mutex
 	reqs            []recordedRequest
-	deadlines       []time.Time // per request; zero when it had none
-	values          []any       // per request: the request context's b112CtxKey value
+	ctxs            []reqCtx // per request, in the order of reqs
 	firstGetUpdates chan struct{}
 	once            sync.Once
 }
@@ -1108,8 +1107,7 @@ func (rec *deleteWebhookRecorder) serve(sent *http.Request, w http.ResponseWrite
 		Tag:      r.Header.Get("X-Galigo-Test"),
 	})
 	d, _ := r.Context().Deadline()
-	rec.deadlines = append(rec.deadlines, d)
-	rec.values = append(rec.values, r.Context().Value(b112CtxKey{}))
+	rec.ctxs = append(rec.ctxs, reqCtx{deadline: d, value: r.Context().Value(b112CtxKey{})})
 	rec.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	switch {
@@ -1139,16 +1137,16 @@ func (rec *deleteWebhookRecorder) requests() []recordedRequest {
 	return append([]recordedRequest(nil), rec.reqs...)
 }
 
-func (rec *deleteWebhookRecorder) deadline(i int) time.Time {
-	rec.mu.Lock()
-	defer rec.mu.Unlock()
-	return rec.deadlines[i]
+// reqCtx is what the context of one recorded request carried.
+type reqCtx struct {
+	deadline time.Time // zero when it had none
+	value    any       // its b112CtxKey value
 }
 
-func (rec *deleteWebhookRecorder) value(i int) any {
+func (rec *deleteWebhookRecorder) reqContext(i int) reqCtx {
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
-	return rec.values[i]
+	return rec.ctxs[i]
 }
 
 // b112CtxKey is the key of a value that the caller's context must bring to
@@ -1169,8 +1167,9 @@ func callerContext() (context.Context, time.Time, context.CancelFunc) {
 func assertCallerContext(t *testing.T, rec *deleteWebhookRecorder, deadline time.Time) {
 	t.Helper()
 	for i := range rec.requests() {
-		assert.Equal(t, "b112-value", rec.value(i), "request %d lost the caller's context value", i)
-		assert.True(t, rec.deadline(i).Equal(deadline), "request %d deadline %v, want the caller's %v", i, rec.deadline(i), deadline)
+		rc := rec.reqContext(i)
+		assert.Equal(t, "b112-value", rc.value, "request %d lost the caller's context value", i)
+		assert.True(t, rc.deadline.Equal(deadline), "request %d deadline %v, want the caller's %v", i, rc.deadline, deadline)
 	}
 }
 
@@ -1242,10 +1241,11 @@ const (
 	b112Delete401 = `{"ok":false,"error_code":401,"description":"Unauthorized"}`
 
 	// b112BaseURL is the main Config.BaseURL. Its path is not "/bot", so a
-	// fix that swaps only the host of the default URL is visible.
-	b112BaseURL    = "http://" + b112Host + "/custom/bot"
-	b112DeletePath = "/custom/bot" + b112Token + "/deleteWebhook"
-	b112UpdatePath = "/custom/bot" + b112Token + "/getUpdates"
+	// fix that swaps only the host of the default URL is visible, and it ends
+	// in "/", so a fix that trims the base is visible too.
+	b112BaseURL    = "http://" + b112Host + "/custom/bot/"
+	b112DeletePath = "/custom/bot/" + b112Token + "/deleteWebhook"
+	b112UpdatePath = "/custom/bot/" + b112Token + "/getUpdates"
 
 	// b112TLSBaseURL is a second Config.BaseURL: another scheme, a port and
 	// an escaped slash, which only the URL's raw path keeps.
@@ -1498,7 +1498,7 @@ func TestPolling_Start_DeleteWebhookTarget(t *testing.T) {
 				// redirects it to /redirected.
 				assert.Equal(t, 1, countPathSuffix(reqs, "/deleteWebhook"))
 				// The polling client's own Timeout bounds the request.
-				d := rec.deadline(0)
+				d := rec.reqContext(0).deadline
 				require.False(t, d.IsZero(), "deleteWebhook request has no deadline")
 				assert.False(t, d.Before(before.Add(tt.timeout)) || d.After(after.Add(tt.timeout)),
 					"deadline %v not in [%v, %v]", d, before.Add(tt.timeout), after.Add(tt.timeout))

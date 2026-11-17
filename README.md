@@ -60,10 +60,15 @@ func main() {
         log.Fatal(err)
     }
 
-    for update := range bot.Updates() {
-        if update.Message != nil {
-            bot.SendMessage(ctx, update.Message.Chat.ID,
-                "Echo: "+update.Message.Text)
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case update := <-bot.Updates():
+            if update.Message != nil {
+                bot.SendMessage(ctx, update.Message.Chat.ID,
+                    "Echo: "+update.Message.Text)
+            }
         }
     }
 }
@@ -240,7 +245,7 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 import "github.com/prilive-com/galigo/receiver"
 
 updates := make(chan tg.Update, 100)
-poller := receiver.NewPollingClient(token, updates, logger, cfg)
+poller := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, cfg)
 poller.Start(ctx)
 ```
 

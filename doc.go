@@ -14,8 +14,19 @@
 //	}
 //	defer bot.Close()
 //
-//	for update := range bot.Updates() {
-//	    bot.SendMessage(ctx, update.Message.Chat.ID, "Echo: "+update.Message.Text)
+//	if err := bot.Start(ctx); err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	for {
+//	    select {
+//	    case <-ctx.Done():
+//	        return
+//	    case update := <-bot.Updates():
+//	        if update.Message != nil {
+//	            bot.SendMessage(ctx, update.Message.Chat.ID, "Echo: "+update.Message.Text)
+//	        }
+//	    }
 //	}
 //
 // # Separate Receiver/Sender
@@ -24,7 +35,9 @@
 //
 //	// Only receive updates
 //	import "github.com/prilive-com/galigo/receiver"
-//	recv, _ := receiver.New(token)
+//	updates := make(chan tg.Update, 100)
+//	recv := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, receiver.DefaultConfig())
+//	err := recv.Start(ctx)
 //
 //	// Only send messages
 //	import "github.com/prilive-com/galigo/sender"

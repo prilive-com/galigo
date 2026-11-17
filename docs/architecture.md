@@ -9,7 +9,7 @@ galigo is not a passive library — it runs background goroutines and manages in
 │                         galigo.Bot                              │
 │                                                                 │
 │  ┌──────────────────────┐      ┌──────────────────────────┐    │
-│  │  receiver.Polling    │      │     sender.Client        │    │
+│  │receiver.PollingClient│      │     sender.Client        │    │
 │  │  ┌────────────────┐  │      │  ┌────────────────────┐  │    │
 │  │  │ Poll goroutine │──┼──────┼─►│ Circuit Breaker    │  │    │
 │  │  └───────┬────────┘  │      │  └────────────────────┘  │    │

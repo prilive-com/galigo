@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -137,9 +138,11 @@ func deleteWebhookAt(ctx context.Context, client *http.Client, baseURL string, t
 	}
 
 	if !result.OK {
+		// The server at baseURL may repeat the request path, token included,
+		// in its description.
 		return &APIError{
 			Code:        result.ErrorCode,
-			Description: result.Description,
+			Description: scrub.TokenFromError(errors.New(result.Description), token).Error(),
 		}
 	}
 

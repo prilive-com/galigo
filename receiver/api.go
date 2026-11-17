@@ -104,12 +104,18 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 
 // DeleteWebhook removes the webhook from Telegram.
 func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, dropPending bool) error {
+	return deleteWebhookAt(ctx, client, telegramAPIBaseURL, token, dropPending)
+}
+
+// deleteWebhookAt sends deleteWebhook to baseURL, which ends where the token
+// begins (for example "https://api.telegram.org/bot").
+func deleteWebhookAt(ctx context.Context, client *http.Client, baseURL string, token tg.SecretToken, dropPending bool) error {
 	if client == nil {
 		client = defaultAPIClient
 	}
 
 	apiURL := fmt.Sprintf("%s%s/deleteWebhook?drop_pending_updates=%t",
-		telegramAPIBaseURL, token.Value(), dropPending)
+		baseURL, token.Value(), dropPending)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {

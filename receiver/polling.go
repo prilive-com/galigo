@@ -267,7 +267,7 @@ func (c *PollingClient) Start(ctx context.Context) error {
 
 	if c.deleteWebhookOnStart {
 		c.logger.Info("deleting existing webhook")
-		if err := DeleteWebhook(ctx, c.client, c.token, false); err != nil {
+		if err := deleteWebhookAt(ctx, c.client, c.baseURL, c.token, false); err != nil {
 			c.running.Store(false)
 			return fmt.Errorf("failed to delete webhook: %w", err)
 		}

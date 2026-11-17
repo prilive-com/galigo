@@ -14,8 +14,19 @@
 //	}
 //	defer bot.Close()
 //
-//	for update := range bot.Updates() {
-//	    bot.SendMessage(ctx, update.Message.Chat.ID, "Echo: "+update.Message.Text)
+//	if err := bot.Start(ctx); err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	for {
+//	    select {
+//	    case <-ctx.Done():
+//	        return
+//	    case update := <-bot.Updates():
+//	        if update.Message != nil {
+//	            bot.SendMessage(ctx, update.Message.Chat.ID, "Echo: "+update.Message.Text)
+//	        }
+//	    }
 //	}
 //
 // # Separate Receiver/Sender

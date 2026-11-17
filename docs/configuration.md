@@ -187,8 +187,13 @@ if err := poller.Start(ctx); err != nil {
 }
 defer poller.Stop()
 
-for update := range updates {
-    process(update) // your code
+for {
+    select {
+    case <-ctx.Done():
+        return
+    case update := <-updates:
+        process(update) // your code
+    }
 }
 ```
 

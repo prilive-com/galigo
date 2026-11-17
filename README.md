@@ -60,10 +60,15 @@ func main() {
         log.Fatal(err)
     }
 
-    for update := range bot.Updates() {
-        if update.Message != nil {
-            bot.SendMessage(ctx, update.Message.Chat.ID,
-                "Echo: "+update.Message.Text)
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case update := <-bot.Updates():
+            if update.Message != nil {
+                bot.SendMessage(ctx, update.Message.Chat.ID,
+                    "Echo: "+update.Message.Text)
+            }
         }
     }
 }

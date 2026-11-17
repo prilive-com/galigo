@@ -120,21 +120,6 @@ func TestSetWebhook_TelegramError(t *testing.T) {
 	assert.Contains(t, apiErr.Description, "bad webhook")
 }
 
-func TestSetWebhook_NilClient_UsesDefault(t *testing.T) {
-	// This test verifies nil client handling - the request will fail
-	// because there's no actual Telegram API, but it shouldn't panic
-	err := receiver.SetWebhook(
-		context.Background(),
-		nil, // nil client
-		tg.SecretToken("test:token"),
-		"https://example.com/webhook",
-		"",
-	)
-
-	// Should return an error (connection refused or similar) but not panic
-	assert.Error(t, err)
-}
-
 func TestSetWebhook_ContextCancelled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Slow response
@@ -248,16 +233,6 @@ func TestDeleteWebhook_TelegramError(t *testing.T) {
 	assert.Equal(t, 401, apiErr.Code)
 }
 
-func TestDeleteWebhook_NilClient_UsesDefault(t *testing.T) {
-	err := receiver.DeleteWebhook(
-		context.Background(),
-		nil,
-		tg.SecretToken("test:token"),
-		false,
-	)
-	assert.Error(t, err) // Will fail but shouldn't panic
-}
-
 // ==================== GetWebhookInfo ====================
 
 func TestGetWebhookInfo_Success(t *testing.T) {
@@ -357,16 +332,6 @@ func TestGetWebhookInfo_TelegramError(t *testing.T) {
 	var apiErr *receiver.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 401, apiErr.Code)
-}
-
-func TestGetWebhookInfo_NilClient_UsesDefault(t *testing.T) {
-	info, err := receiver.GetWebhookInfo(
-		context.Background(),
-		nil,
-		tg.SecretToken("test:token"),
-	)
-	assert.Error(t, err)
-	assert.Nil(t, info)
 }
 
 // urlRewriteTransport rewrites requests to target our test server

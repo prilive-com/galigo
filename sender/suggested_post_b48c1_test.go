@@ -278,6 +278,9 @@ func TestB48C1_Census(t *testing.T) {
 		require.NoError(t, err)
 		files++
 		ast.Inspect(f, func(node ast.Node) bool {
+			if _, ok := node.(*ast.FuncDecl); ok { // a type declared in a method or function body is not a package type (B-100)
+				return false
+			}
 			ts, ok := node.(*ast.TypeSpec)
 			if !ok {
 				return true

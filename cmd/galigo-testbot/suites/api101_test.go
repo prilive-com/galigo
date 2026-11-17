@@ -51,7 +51,7 @@ func TestAPI101Scenarios(t *testing.T) {
 			WantBlocks: []string{"paragraph"}},
 		&engine.EditMessageRichStep{RichMessage: tg.InputRichMessage{HTML: "<p>edited <b>rich</b></p>"},
 			WantBlocks: []string{"paragraph"}},
-		&engine.CleanupStep{}, // before the draft: a Skip ends the scenario (C1-01)
+		&engine.CleanupStep{}, // before the draft: a Skip ends the scenario
 		&engine.SendRichMessageDraftStep{DraftID: 1, RichMessage: tg.InputRichMessage{Markdown: "galigo 10.1 draft"}},
 	}), viewSteps(got[1].Steps()))
 
@@ -124,7 +124,7 @@ func (f *fake101dGroup) DeleteMessage(_ context.Context, chatID int64, messageID
 	return nil
 }
 
-// B-25 10.1d T-tb-7 (C1-01): in a group the draft is skipped, and the sent message is still deleted.
+// B-25 10.1d T-tb-7: in a group the draft is skipped, and the sent message is still deleted.
 func TestAPI101D_S67GroupCleanup(t *testing.T) {
 	f := &fake101dGroup{}
 	rt := engine.NewRuntime(f, testutil.TestChatID, testutil.TestUserID)

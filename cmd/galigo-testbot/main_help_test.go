@@ -14,7 +14,7 @@ import (
 	"github.com/prilive-com/galigo/internal/testutil"
 )
 
-// T-tb-11 (B-25 slice 2c, TEST-PLAN §4, T3-03, T3-05): the help text that handleHelp really sends names the Bot
+// T-tb-11 (B-25 slice 2c, TEST-PLAN §4): the help text that handleHelp really sends names the Bot
 // API 10.0 range with the poll scenarios, the polls in the api100 line, and keeps the live-photos range.
 func TestHandleHelp_Text(t *testing.T) {
 	server := testutil.NewMockServer(t)
@@ -42,7 +42,7 @@ func TestHandleHelp_Text(t *testing.T) {
 	require.Len(t, api100, 1)
 	assert.Contains(t, api100[0], "polls")
 	assert.Contains(t, lines, "Bot API 10.1 (S66, S67):") // API101A T-tb-9, API101D T-tb-6
-	var api101 []string                                   // T1-08 openai: exactly one api101 line
+	var api101 []string                                   // exactly one api101 line
 	for _, l := range lines {
 		if strings.HasPrefix(l, "  api101 ") {
 			api101 = append(api101, l)

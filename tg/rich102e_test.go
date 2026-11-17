@@ -258,7 +258,7 @@ func TestAPI102E_InputRichMediaInterface(t *testing.T) {
 	assert.Empty(t, impl, "a tg type declares InputRichMediaType")
 }
 
-// T-walk (E-0132): the per-field rules are listed by a reflection walk over the new types, not by hand. Every string
+// T-walk: the per-field rules are listed by a reflection walk over the new types, not by hand. Every string
 // reachable through struct and pointer fields (a RichText is a leaf: its Plain is set) is set to a distinct value with
 // edge whitespace and must appear once, as given; every interface field gets a fake with such values. Every
 // "omitempty" field left at its zero value must be absent, every other field present.

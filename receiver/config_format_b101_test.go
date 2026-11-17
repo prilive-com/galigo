@@ -57,11 +57,11 @@ func b101Configs() []b101Case {
 }
 
 // b101Fill sets every exported field of *c that is a string, number or []string to a value no other field has, and
-// every bool to true, so a wrong Format that drops or swaps a field changes the output (round t1 O-T1-01); a list
-// has two items in descending order, so a lost tail or a sort shows (rounds t2, t3); every string field holds an
-// invalid UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows (round t3);
+// every bool to true, so a wrong Format that drops or swaps a field changes the output; a list
+// has two items in descending order, so a lost tail or a sort shows; every string field holds an
+// invalid UTF-8 byte and every int with an even index is negative, so a re-encoding or a sign change shows;
 // every string field has a space at each end and every float a fraction that float32 cannot hold, so a trim or a
-// narrowing shows (rounds c1, c2). The caller sets the secrets and funcs.
+// narrowing shows. The caller sets the secrets and funcs.
 // Another kind panics, so a new field type cannot go untested.
 func b101Fill(c *Config) {
 	v := reflect.ValueOf(c).Elem()
@@ -103,13 +103,13 @@ var b101Directives = []struct{ name, d string }{
 	{"arg_index_twice", "%[1]+v %[1]s"}, {"index_flag", "%[1]+"}, {"index_sharp", "%[1]#"}, {"index_space", "%[1] v"},
 	{"index_bracket", "%[1][1]v"}, {"index_close", "%[1]]"}, {"index_star", "%[1]*v"}, {"index_digit", "%5.2[1]3v"},
 	{"index_multibyte", "%[1]é"}, {"index_second", "%[1]v %[2]v"}, {"w", "%w"},
-	// round t1: a present zero precision (O-T1-02), the other integer and float verbs (C-T1-03), and a verb that is
-	// '.' or an invalid rune, also after an index (C-T1-04)
+	// a present zero precision, the other integer and float verbs, and a verb that is
+	// '.' or an invalid rune, also after an index
 	{"zero_prec_s", "%.0s"}, {"dot_prec_v", "%.v"}, {"b", "%b"}, {"c", "%c"}, {"U", "%U"}, {"O", "%O"},
 	{"g", "%g"}, {"dot_verb", "%.."}, {"invalid_rune", "%\xff"}, {"index_invalid_rune", "%[1]\xff"},
-	// round t2: the other float verbs (O-T2-03)
+	// the other float verbs
 	{"f", "%f"}, {"F", "%F"}, {"E", "%E"}, {"G", "%G"},
-	// round c1: the space flag with v, and the minus flag with verbs other than v (C-C1-01)
+	// the space flag with v, and the minus flag with verbs other than v
 	{"space_v", "% v"}, {"minus_s", "%-12s|"}, {"minus_d", "%-8d|"},
 }
 
@@ -151,8 +151,7 @@ func TestB101_ReceiverTopLevel(t *testing.T) {
 	}
 }
 
-// b101Matrix: every verb of b101Directives with each flag, a width, a zero and a non-zero precision, alone and mixed
-// (rounds c2, c3).
+// b101Matrix: every verb of b101Directives with each flag, a width, a zero and a non-zero precision, alone and mixed.
 var b101Matrix = func() (m []string) {
 	for _, verb := range "vsqxXdoObcUteEfFgG" {
 		for _, mod := range []string{"", "+", "-", " ", "#", "0", "8", "08", ".0", ".2", "#.0", "-8.2", "+#08.2"} {
@@ -162,7 +161,7 @@ var b101Matrix = func() (m []string) {
 	return m
 }()
 
-// b101AllDirectives: b101Directives and b101Matrix, for the rows that check printing changes nothing (round c3).
+// b101AllDirectives: b101Directives and b101Matrix, for the rows that check printing changes nothing.
 func b101AllDirectives() []string {
 	all := slices.Clone(b101Matrix)
 	for _, dd := range b101Directives {
@@ -172,7 +171,7 @@ func b101AllDirectives() []string {
 }
 
 // TestB101_ReceiverFlagMatrix: b101Matrix equal to the method-less copy, so a Format that drops a flag, the width or the
-// precision for one of these verbs fails (rounds c2, c3).
+// precision for one of these verbs fails.
 func TestB101_ReceiverFlagMatrix(t *testing.T) {
 	for _, cc := range b101Configs() {
 		t.Run(cc.name, func(t *testing.T) {
@@ -335,7 +334,7 @@ func TestB101_ReceiverSlog(t *testing.T) {
 	}
 }
 
-// TestB101_ReceiverLiteral: exact texts written out, so the type name does not rest on the oracle alone (round p1 C-P1-06).
+// TestB101_ReceiverLiteral: exact texts written out, so the type name does not rest on the oracle alone.
 func TestB101_ReceiverLiteral(t *testing.T) {
 	full := b101Configs()[0].c
 	var nilc *Config
@@ -350,7 +349,7 @@ func TestB101_ReceiverLiteral(t *testing.T) {
 }
 
 // TestB101_ReceiverReadOnly: printing leaves the config as it was, full and zero; an in-place redaction would pass every
-// output row (round p1 O-P1-05, E-0158; round t1 O-T1-03). The %#v snapshot cannot see the secrets (they print
+// output row. The %#v snapshot cannot see the secrets (they print
 // redacted) or a func; the token, webhook_secret and callback rows read those.
 func TestB101_ReceiverReadOnly(t *testing.T) {
 	for _, cc := range b101Configs()[:2] {
@@ -379,7 +378,7 @@ func TestB101_ReceiverReadOnly(t *testing.T) {
 		})
 	}
 	t.Run("print_change_print", func(t *testing.T) {
-		for _, d := range b101AllDirectives() { // every directive, so a memo behind one verb shows (round t2 C-T2-01)
+		for _, d := range b101AllDirectives() { // every directive, so a memo behind one verb shows
 			c := b101Configs()[0].c
 			_ = fmt.Sprintf(d, c)
 			c.BaseURL = "changed"
@@ -390,8 +389,8 @@ func TestB101_ReceiverReadOnly(t *testing.T) {
 
 // TestB101_ReceiverConcurrent: goroutines that print a shared full and zero config with every directive while others read
 // their tokens see the raw values and the same text each time. A Format that writes the config, even one that
-// restores it, behind any verb, flag or config value, is a data race the -race gate reports here (round t1 C-T1-01,
-// rounds t2, t3). %p is left out: it prints the address of the new slice. The expected %v text is checked against
+// restores it, behind any verb, flag or config value, is a data race the -race gate reports here.
+// %p is left out: it prints the address of the new slice. The expected %v text is checked against
 // the oracle first (a config in a slice prints its fields).
 func TestB101_ReceiverConcurrent(t *testing.T) {
 	c, z := b101Configs()[0].c, b101Configs()[1].c
@@ -433,7 +432,7 @@ func TestB101_ReceiverConcurrent(t *testing.T) {
 }
 
 // TestB101_ReceiverEmptyList: a non-nil empty list prints as before ([]string{}, not []string(nil)), so a Format that copies
-// the list into a nil slice fails (round t3). Only the receiver Config has a list.
+// the list into a nil slice fails. Only the receiver Config has a list.
 func TestB101_ReceiverEmptyList(t *testing.T) {
 	c := &Config{AllowedUpdates: []string{}}
 	for _, dd := range b101Directives {
@@ -459,7 +458,7 @@ func TestB101_ReceiverLimits(t *testing.T) {
 	})
 }
 
-// TestB101_ReceiverIndexException pins AC2's one named exception (PLAN AC2, round p2 P2-01): a digit or * verb after an
+// TestB101_ReceiverIndexException pins AC2's one named exception (PLAN AC2): a digit or * verb after an
 // argument index when fmt holds no width other than 0 and no precision. Format prints %!(NOVERB), after fmt's own
 // prefix, where the baseline printed bad-verb text. No secret prints either way.
 func TestB101_ReceiverIndexException(t *testing.T) {
@@ -513,5 +512,5 @@ func b101NoSecret(t *testing.T, got string) {
 	}
 }
 
-// b101DropCalls counts calls of the full fixture's OnUpdateDropped (round t1 O-T1-04).
+// b101DropCalls counts calls of the full fixture's OnUpdateDropped.
 var b101DropCalls int

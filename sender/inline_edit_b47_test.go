@@ -89,7 +89,7 @@ func b47Run(t *testing.T, method, body string, call func(ctx context.Context, c 
 
 // T-1: the inline success, also with JSON whitespace around the value. The
 // result alone decides (owner decision, PLAN D2): a chat request answered
-// with true is also (nil, nil) [T1-01].
+// with true is also (nil, nil).
 func TestB47_True(t *testing.T) {
 	bodies := map[string]string{
 		"plain":  `{"ok":true,"result":true}`,
@@ -116,9 +116,9 @@ func TestB47_True(t *testing.T) {
 
 // T-2: a Message result is returned as today, whole; text "true" is not the
 // boolean; an unknown key is ignored. An inline request answered with a Message
-// also returns it [T1-01, T1-02, T2-02].
+// also returns it.
 func TestB47_Message(t *testing.T) {
-	// future_server_field: a key tg.Message does not have is ignored, as today [T2-02].
+	// future_server_field: a key tg.Message does not have is ignored, as today.
 	body := `{"ok":true,"result":{"message_id":7,"date":1,"chat":{"id":100,"type":"private"},"text":"true","future_server_field":true}}`
 	want := &tg.Message{MessageID: 7, Date: 1, Chat: &tg.Chat{ID: 100, Type: "private"}, Text: "true"}
 	for _, m := range b47Methods() {
@@ -136,7 +136,7 @@ func TestB47_Message(t *testing.T) {
 		})
 		// Outer whitespace in Text is kept, and an unknown key with a number too
 		// large for float64 is ignored, as json.Unmarshal into tg.Message does
-		// today (round t3 T3-01, T3-02: fixed after the third review).
+		// today.
 		t.Run(m.name+"/odd-values", func(t *testing.T) {
 			_, msg, err := b47Run(t, m.method, `{"ok":true,"result":{"message_id":7,"text":"  true\n","future_server_field":1e400}}`, m.chat)
 			require.NoError(t, err)
@@ -146,9 +146,9 @@ func TestB47_Message(t *testing.T) {
 }
 
 // T-3: any other result keeps today's parse error (the exact text and the
-// wrapped encoding/json error) and a nil Message [T1-03], also for an object
-// with a wrong field type ("bad-field", T2-01). "one" and
-// "array-true" are Grok t1's extra-literal programs.
+// wrapped encoding/json error) and a nil Message, also for an object
+// with a wrong field type ("bad-field"). "one" and
+// "array-true" catch a wrong version that accepts other literals.
 func TestB47_NotTrue(t *testing.T) {
 	const pre = "failed to parse message: json: "
 	rows := []struct {
@@ -162,7 +162,7 @@ func TestB47_NotTrue(t *testing.T) {
 		{"array", `{"ok":true,"result":[]}`, pre + "cannot unmarshal array into Go value of type tg.Message", false},
 		{"array-true", `{"ok":true,"result":[true]}`, pre + "cannot unmarshal array into Go value of type tg.Message", false},
 		{"no-result", `{"ok":true}`, "failed to parse message: unexpected end of JSON input", true},
-		{"bad-field", `{"ok":true,"result":{"message_id":"bad"}}`, pre + "cannot unmarshal string into Go struct field Message.message_id of type int", false}, // [T2-01]
+		{"bad-field", `{"ok":true,"result":{"message_id":"bad"}}`, pre + "cannot unmarshal string into Go struct field Message.message_id of type int", false},
 	}
 	for _, m := range b47Methods() {
 		for _, row := range rows {
@@ -189,13 +189,13 @@ func TestB47_Null(t *testing.T) {
 			t.Run(m.name+"/"+name, func(t *testing.T) {
 				_, msg, err := b47Run(t, m.method, body, m.inline)
 				require.NoError(t, err)
-				assert.Equal(t, &tg.Message{}, msg) // [T1-02]
+				assert.Equal(t, &tg.Message{}, msg)
 			})
 		}
 	}
 }
 
-// T-5: a rich inline edit (backlog B-47, Codex C1-09 of 10.1d).
+// T-5: a rich inline edit (backlog B-47).
 func TestB47_RichInline(t *testing.T) {
 	args, msg, err := b47Run(t, "editMessageText", `{"ok":true,"result":true}`, func(ctx context.Context, c *sender.Client) (*tg.Message, error) {
 		return c.EditMessageText(ctx, sender.EditMessageTextRequest{InlineMessageID: "im-1", RichMessage: &tg.InputRichMessage{Markdown: "m"}})
@@ -206,8 +206,8 @@ func TestB47_RichInline(t *testing.T) {
 }
 
 // T-6 (sender): Client.Edit on an inline message passes (nil, nil) through,
-// and passes the parse error of any other result through (Grok t1's
-// wrapper-swallow program).
+// and passes the parse error of any other result through (a wrapper
+// that swallows the error fails here).
 func TestB47_EditWrappers(t *testing.T) {
 	edit := func(ctx context.Context, c *sender.Client) (*tg.Message, error) {
 		return c.Edit(ctx, tg.InlineMessage{InlineMessageID: "im-1"}, "x")

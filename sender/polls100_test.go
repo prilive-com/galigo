@@ -20,7 +20,7 @@ import (
 // Bot API 10.0 part c on the send side of sendPoll: members_only, country_codes and 1-12 options
 // (B-25 slice 2c, TEST-PLAN §3, rows T-s-1 … T-s-7).
 
-// polls100Probe21 is the probe 21 message, the same bytes as api100cProbe21 in tg/api100c_test.go (E10/gen100c.py).
+// polls100Probe21 is the probe 21 message, the same bytes as api100cProbe21 in tg/api100c_test.go.
 const polls100Probe21 = `{"message_id":1101,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},"chat":{"id":123456789,"title":"Test Chat","is_forum":true,"type":"supergroup"},"date":1793928592,"poll":{"id":"poll-21","question":"probe100c option media","options":[{"persistent_id":"0","text":"photo","media":{"photo":[{"file_id":"PH90-file","file_unique_id":"PH90-uniq","file_size":341,"width":90,"height":90},{"file_id":"PH100-file","file_unique_id":"PH100-uniq","file_size":361,"width":100,"height":100}]},"voter_count":0},{"persistent_id":"1","text":"loc","media":{"location":{"latitude":52.520005,"longitude":13.404999}},"voter_count":0},{"persistent_id":"2","text":"venue","media":{"venue":{"location":{"latitude":48.858396,"longitude":2.294497},"title":"probe venue","address":"probe address"}},"voter_count":0},{"persistent_id":"3","text":"sticker","media":{"sticker":{"width":512,"height":512,"is_animated":false,"is_video":false,"type":"regular","thumbnail":{"file_id":"STKTH-file","file_unique_id":"STKTH-uniq","file_size":4109,"width":320,"height":320},"thumb":{"file_id":"STKTH-file","file_unique_id":"STKTH-uniq","file_size":4109,"width":320,"height":320},"file_id":"STK-file","file_unique_id":"STK-uniq","file_size":1961}},"voter_count":0},{"persistent_id":"4","text":"video","media":{"video":{"duration":1,"width":320,"height":240,"file_name":"v.mp4","mime_type":"video/mp4","thumbnail":{"file_id":"VIDTH-file","file_unique_id":"VIDTH-uniq","file_size":733,"width":320,"height":240},"thumb":{"file_id":"VIDTH-file","file_unique_id":"VIDTH-uniq","file_size":733,"width":320,"height":240},"file_id":"VID-file","file_unique_id":"VID-uniq","file_size":663}},"voter_count":0},{"persistent_id":"5","text":"live","media":{"live_photo":{"photo":[{"file_id":"PH90-file","file_unique_id":"PH90-uniq","file_size":341,"width":90,"height":90},{"file_id":"PH100-file","file_unique_id":"PH100-uniq","file_size":361,"width":100,"height":100}],"duration":1,"width":320,"height":240,"mime_type":"video/mp4","file_id":"LIVE-file","file_unique_id":"LIVE-uniq","file_size":663}},"voter_count":0}],"total_voter_count":0,"is_closed":false,"is_anonymous":false,"allows_multiple_answers":false,"allows_revoting":true,"members_only":false,"type":"regular"}}`
 
 func polls100Send(t *testing.T, req sender.SendPollRequest) (string, map[string]string) {
@@ -39,7 +39,7 @@ func polls100Req() sender.SendPollRequest {
 		Options: []sender.InputPollOption{{Text: "A"}, {Text: "B"}}}
 }
 
-// T-s-1: each new field alone and both together; the whole argument list is compared (T1-02).
+// T-s-1: each new field alone and both together; the whole argument list is compared.
 func TestPolls100_SendPollWire(t *testing.T) {
 	base := map[string]string{"chat_id": "-1001234567890", "question": "Q?", "options": `[{"text":"A"},{"text":"B"}]`}
 	with := func(kv ...string) map[string]string {
@@ -120,7 +120,7 @@ func polls100Options(n int) []string {
 	return o
 }
 
-// T-s-4: every count 1..12 is sent, with its options in order (T1-03).
+// T-s-4: every count 1..12 is sent, with its options in order.
 func TestPolls100_SimpleValidCounts(t *testing.T) {
 	for n := 1; n <= 12; n++ {
 		t.Run(strconv.Itoa(n), func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestPolls100_SimpleValidCounts(t *testing.T) {
 	}
 }
 
-// T-s-5: 0 and 13 or more options are refused before any request, with the whole error text (T1-03).
+// T-s-5: 0 and 13 or more options are refused before any request, with the whole error text.
 func TestPolls100_SimpleInvalidCounts(t *testing.T) {
 	for _, n := range []int{0, 13, 14, 20} {
 		t.Run(strconv.Itoa(n), func(t *testing.T) {
@@ -197,5 +197,5 @@ func TestPolls100_SendPollReply(t *testing.T) {
 		From: &tg.User{ID: 123456789, IsBot: true, FirstName: "Test Bot", Username: "testbot"},
 		Chat: &tg.Chat{ID: 123456789, Title: "Test Chat", IsForum: true, Type: "supergroup"},
 		Poll: &tg.Poll{ID: "poll-21", Question: "probe100c option media", Options: want, Type: "regular",
-			AllowsRevoting: true}}, *msg) // the whole message (c1 C1-03)
+			AllowsRevoting: true}}, *msg) // the whole message
 }

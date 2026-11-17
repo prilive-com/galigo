@@ -120,7 +120,7 @@ func TestAPI100Scenarios(t *testing.T) {
 		assert.Equal(t, []string{"S57-SendLivePhoto", "S58-LivePhotoAlbum", "S59-EditToLivePhoto"}, names)
 	})
 
-	t.Run("registry sendLivePhoto", func(t *testing.T) { // API100B T-tb-1 (T3-07: the whole entry)
+	t.Run("registry sendLivePhoto", func(t *testing.T) { // API100B T-tb-1 (the whole entry)
 		var found []registry.Method
 		for _, m := range registry.AllMethods {
 			if m.Name == "sendLivePhoto" {
@@ -171,7 +171,7 @@ func api100Scenario(t *testing.T, name string) engine.Scenario {
 	return nil
 }
 
-// T-tb-8 (API100D, T1-02 google): the T-tb-6 view reads the bytes of every upload, top level, option and nested
+// T-tb-8 (API100D): the T-tb-6 view reads the bytes of every upload, top level, option and nested
 // live-photo still, so a changed byte makes it unequal and two fresh builds are equal.
 func TestAPI100D_ViewSeesBytes(t *testing.T) {
 	t.Run("S64", func(t *testing.T) {

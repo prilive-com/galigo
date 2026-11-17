@@ -40,7 +40,7 @@ var b48c2Methods = []struct {
 }
 
 // b48c2Errors are the API errors U4 gives each method. The first two are the 400 texts the server returned on
-// 2026-11-12 in the test supergroup (E29/lookups/probe-b48c2-raw-console.txt): a plain message, and a message id
+// 2026-11-12 in the test supergroup: a plain message, and a message id
 // with no message. The others are synthetic: an error of another code, or one that maps to a sentinel, reaches the
 // caller unchanged, with its sentinel.
 var b48c2Errors = []struct {
@@ -125,15 +125,15 @@ func TestB48C2_U1b_Optional(t *testing.T) {
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "ok 🙂"})
 			}},
 		{"comment_spaces", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"  OK Привет  "}`, `"comment":"  OK Привет  "`,
-			func(ctx context.Context, c *sender.Client) error { // E-0117: a value a normaliser (trim, case fold; O-T3-01) would change is sent as given
+			func(ctx context.Context, c *sender.Client) error { // a value a normaliser (trim, case fold) would change is sent as given
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "  OK Привет  "})
 			}},
 		{"comment_blank", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"   "}`, `"comment":"   "`,
-			func(ctx context.Context, c *sender.Client) error { // C2-02: a comment of spaces only is sent as given, not dropped
+			func(ctx context.Context, c *sender.Client) error { // a comment of spaces only is sent as given, not dropped
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "   "})
 			}},
 		{"comment_markup", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"<b>a & b</b>"}`, "",
-			func(ctx context.Context, c *sender.Client) error { // A-C3-01: markup characters are sent as given, not HTML-escaped
+			func(ctx context.Context, c *sender.Client) error { // markup characters are sent as given, not HTML-escaped
 				return c.DeclineSuggestedPost(ctx, sender.DeclineSuggestedPostRequest{ChatID: api100Chat, MessageID: 42, Comment: "<b>a & b</b>"})
 			}},
 		{"comment_long", "declineSuggestedPost", `{"chat_id":-1001234567890,"message_id":42,"comment":"` + strings.Repeat("x", 129) + `"}`, "",
@@ -158,7 +158,7 @@ func TestB48C2_U1b_Optional(t *testing.T) {
 	}
 }
 
-// U2: a bad id is refused locally with the field it names, before any request (E-0074, E-0143).
+// U2: a bad id is refused locally with the field it names, before any request.
 func TestB48C2_U2_Validation(t *testing.T) {
 	inputs := []struct {
 		name  string
@@ -201,7 +201,7 @@ func TestB48C2_U3_ValidEdges(t *testing.T) {
 		{5000000001, 2, `{"chat_id":5000000001,"message_id":2}`},
 		{api100Chat, 1, `{"chat_id":-1001234567890,"message_id":1}`},
 	}
-	if strconv.IntSize == 64 { // a message id above 2^31 (A-C1-01); int is 32 bits on 386, where no such id fits
+	if strconv.IntSize == 64 { // a message id above 2^31; int is 32 bits on 386, where no such id fits
 		cases = append(cases, struct {
 			chat int64
 			msg  int
@@ -410,7 +410,7 @@ func TestB48C2_U8_LimiterKey(t *testing.T) {
 }
 
 // U8c: each method waits on the bucket an existing method (UnbanChatMember) already uses for the same chat, for a
-// group and a per-chat id, small and beyond int32 (E-0121: a different key string for the same chat would get a fresh
+// group and a per-chat id, small and beyond int32 (a different key string for the same chat would get a fresh
 // bucket).
 func TestB48C2_U8c_SharedBucket(t *testing.T) {
 	for _, m := range b48c2Methods {

@@ -82,7 +82,7 @@ type b100Val[T any] struct {
 
 // b100Values: full (every field distinct, the fake token), empty_token (the same fill, no token, no shared slices),
 // zero, and empty_lists (full with every list empty but not nil, also lists reached through a pointer: %#v prints {}
-// for it, not nil, and the JSON prints []; rounds t1 O-T1-01, t2 Grok T2-01).
+// for it, not nil, and the JSON prints []).
 func b100Values[T any](k b100Kind[T]) []b100Val[T] {
 	var full T
 	b100Fill(&full)
@@ -118,8 +118,8 @@ func b100EmptyLists(v reflect.Value) {
 
 // b100Fill sets every exported field of the struct *p, and of every struct it reaches through pointers and lists (three
 // pointer or list steps down; a struct field is no step, so ReplyMarkup.InlineKeyboard is filled), to a value no other
-// field has, so a wrong Format that drops, swaps, re-encodes or writes through a field changes the output or the JSON
-// (B-101 rounds t1-c2; B-100 round t1 O-T1-02, round t2 M26s): strings hold an invalid UTF-8 byte and a space at each
+// field has, so a wrong Format that drops, swaps, re-encodes or writes through a field changes the output or the JSON:
+// strings hold an invalid UTF-8 byte and a space at each
 // end, every second number is negative, bools are true, a list has two items in descending order, an interface holds an
 // int64. Another kind panics, so a new field type cannot go untested. The caller sets the token.
 func b100Fill(p any) {
@@ -188,12 +188,12 @@ var b100Directives = []struct{ name, d string }{
 	{"space_v", "% v"}, {"minus_s", "%-12s|"}, {"minus_d", "%-8d|"},
 }
 
-// b100Matrix is the one generated cross product of the directive axes (E-0162; round t1 O-T1-03): every ASCII letter
+// b100Matrix is the one generated cross product of the directive axes: every ASCII letter
 // as the verb (known and unknown verbs; not T, p and w, which never reach Format: TestB100_SenderLimits) × every subset
 // of the five flags × no width or precision, width 10, precision .0 or .2, 10.2 × no argument index or [1]. TopLevel, Pointer
 // and Concurrent use it (with b100Directives: b100AllDirectives), and Bools and ReadOnly except in a race build
-// (b100ValueDirectives), for all three types; Nested uses the short verb list b100Verbs over its shapes (rounds t2 T2-03,
-// t3 G-T3-03). The other test file holds the same list; the twin gate checks it.
+// (b100ValueDirectives), for all three types; Nested uses the short verb list b100Verbs over its shapes.
+// The other test file holds the same list; the twin gate checks it.
 var b100Matrix = func() (m []string) {
 	for _, verb := range "abcdefghijklmnoqrstuvxyzABCDEFGHIJKLMNOPQRSUVWXYZ" {
 		for flags := range 32 {
@@ -203,7 +203,7 @@ var b100Matrix = func() (m []string) {
 					mod += string(c)
 				}
 			}
-			for _, wp := range []string{"", "10", ".0", ".2", "10.2"} { // .0: round c1 C1-01
+			for _, wp := range []string{"", "10", ".0", ".2", "10.2"} { // .0: a zero precision
 				for _, idx := range []string{"", "[1]"} {
 					m = append(m, "%"+mod+wp+idx+string(verb)+"|")
 				}
@@ -228,7 +228,7 @@ var b100Race bool
 // b100ValueDirectives: the directives of the rows that check values, not races (Bools, ReadOnly). In a race build they
 // are the named list: the race build adds race checks, not value checks, and the matrix there takes minutes (Go's own
 // tests change what they run under the race detector: go1.27.4 fmt/fmt_test.go:1526). Every CI job without -race and
-// the mutation engine run the whole list (round t2 T2-01, T2-03). Concurrent always uses the whole list.
+// the mutation engine run the whole list. Concurrent always uses the whole list.
 func b100ValueDirectives() []string {
 	if !b100Race {
 		return b100AllDirectives()
@@ -241,7 +241,7 @@ func b100ValueDirectives() []string {
 }
 
 // b100Each checks each directive and stops at the first wrong one: the others repeat it, and one diff per directive
-// (12,544) made each red log of draft t2c about 4.2 GB. Each directive first prints the prime values (round t3 O-T3-01).
+// (12,544) made one red test log about 4.2 GB. Each directive first prints the prime values.
 func b100Each(t *testing.T, dirs []string, want, got any, prime ...any) {
 	t.Helper()
 	for _, d := range dirs {
@@ -319,7 +319,7 @@ func b100Pointer[T any](t *testing.T, k b100Kind[T]) {
 	})
 }
 
-// TestB100_TgIndexException pins AC2's one named exception (B-101 round p2 P2-01): a digit or * verb after an
+// TestB100_TgIndexException pins AC2's one named exception: a digit or * verb after an
 // argument index when fmt holds no width other than 0 and no precision. Format prints %!(NOVERB), after fmt's own
 // prefix, where the baseline printed bad-verb text. No token prints either way.
 func TestB100_TgIndexException(t *testing.T) {
@@ -336,7 +336,7 @@ func b100IndexException[T any](t *testing.T, k b100Kind[T]) {
 		{"zero_width_star", "%*[2]*", 0, "%!(BADWIDTH)%!(NOVERB)"},
 		{"bad_prec_digit", "%.*[2]5", -1, "%!(BADPREC)%!(NOVERB)"},
 		{"non_int_prec_digit", "%.*[2]5", "x", "%!(BADPREC)%!(NOVERB)"},
-		// fmt takes any integer that fits an int as a * argument (PLAN AC2, plan round p3 O-P3-03).
+		// fmt takes any integer that fits an int as a * argument (PLAN AC2).
 		{"int64_zero_width_digit", "%*[2]0", int64(0), "%!(NOVERB)"},
 		{"uint_zero_width_digit", "%*[2]0", uint(0), "%!(NOVERB)"},
 	}
@@ -352,7 +352,7 @@ func b100IndexException[T any](t *testing.T, k b100Kind[T]) {
 					}
 				})
 			}
-			// Not the exception: a width before the index reaches Format, which redacts (PLAN AC2, plan round p3 G-P3-03).
+			// Not the exception: a width before the index reaches Format, which redacts (PLAN AC2).
 			t.Run("width_then_index_digit", func(t *testing.T) {
 				for _, x := range []any{c.v, &c.v} {
 					assert.Equal(t, fmt.Sprintf(b100WI, k.plain(c.v)), fmt.Sprintf(b100WI, x))
@@ -436,7 +436,7 @@ func b100KeyWant(verb, in, typ string) string {
 var b100Verbs = []string{"v", "+v", "#v", "s", "q", "x", "X", "d", "10.3v", "-8s"}
 
 // TestB100_TgNested (AC4): below the top level a request prints its fields with the token redacted, as at the top
-// level; the whole text equals the shape around the oracle's text (E-0148).
+// level; the whole text equals the shape around the oracle's text.
 func TestB100_TgNested(t *testing.T) {
 	t.Run(b100Inv.name, func(t *testing.T) { b100Nested(t, b100Inv) })
 }
@@ -510,20 +510,20 @@ func TestB100_TgContentField(t *testing.T) {
 	}
 }
 
-// TestB100_TgBools: each bool alone, so a copy that swaps two bools fails (E-0062, E-0151).
+// TestB100_TgBools: each bool alone, so a copy that swaps two bools fails.
 func TestB100_TgBools(t *testing.T) {
 	t.Run(b100Inv.name, func(t *testing.T) { b100Bools(t, b100Inv) })
 }
 
 func b100Bools[T any](t *testing.T, k b100Kind[T]) {
 	for _, c := range b100BoolValues(k) {
-		t.Run(c.name, func(t *testing.T) { // a swap behind one directive shows (rounds t1 O-T1-04, t2 T2-01)
+		t.Run(c.name, func(t *testing.T) { // a swap behind one directive shows
 			b100Each(t, b100ValueDirectives(), k.plain(c.v), c.v)
 		})
 	}
 }
 
-// b100BoolValues: each bool field alone true in the zero request, named by the field; the fake token, " \t" every 2nd row (C1-02).
+// b100BoolValues: each bool field alone true in the zero request, named by the field; the fake token, " \t" every 2nd row.
 func b100BoolValues[T any](k b100Kind[T]) (vs []b100Val[T]) {
 	typ := reflect.TypeFor[T]()
 	for i := range typ.NumField() {
@@ -654,14 +654,14 @@ func TestB100_TgLiteral(t *testing.T) {
 	})
 }
 
-// TestB100_TgReadOnly: printing changes nothing, full and empty, value and pointer (E-0158): Format's receiver is a
+// TestB100_TgReadOnly: printing changes nothing, full and empty, value and pointer: Format's receiver is a
 // copy. The %#v of the raw copy and the JSON see every field, the token row reads the token.
 func TestB100_TgReadOnly(t *testing.T) {
 	t.Run(b100Inv.name, func(t *testing.T) { b100ReadOnly(t, b100Inv) })
 }
 
 func b100ReadOnly[T any](t *testing.T, k b100Kind[T]) {
-	for _, c := range b100Values(k) { // every value: empty_lists holds the empty nested lists (round t2 Grok T2-01)
+	for _, c := range b100Values(k) { // every value: empty_lists holds the empty nested lists
 		t.Run(c.name, func(t *testing.T) {
 			v := c.v
 			tok, before := *k.token(&v), fmt.Sprintf("%#v", k.raw(v))
@@ -690,8 +690,8 @@ func b100ReadOnly[T any](t *testing.T, k b100Kind[T]) {
 	}
 	// For each field but the token, a copy with only that field changed prints its own text with every directive, each
 	// right after full with the same directive: a cache keyed by some fields, even with one entry per directive, returns
-	// full's stale text (E-0158; rounds t1 O-T1-05, t2 T2-03, t3 O-T3-01). The copy's lists share v's arrays, so a print
-	// that writes through them changes the oracle too: the copy's %#v must not change (round t3 G-T3-01).
+	// full's stale text. The copy's lists share v's arrays, so a print
+	// that writes through them changes the oracle too: the copy's %#v must not change.
 	t.Run("print_change_print", func(t *testing.T) {
 		all := b100ValueDirectives()
 		v := b100Values(k)[0].v
@@ -739,7 +739,7 @@ func TestB100_TgConcurrent(t *testing.T) {
 }
 
 func b100Concurrent[T any](t *testing.T, k b100Kind[T]) {
-	var ps []*T // every value class and each bool alone (as in Bools): a write may depend on the value (round t3 O-T3-02)
+	var ps []*T // every value class and each bool alone (as in Bools): a write may depend on the value
 	want := "["
 	for _, c := range append(b100Values(k), b100BoolValues(k)...) {
 		ps, want = append(ps, &c.v), want+fmt.Sprintf("%v ", k.plain(c.v))
@@ -755,7 +755,7 @@ func b100Concurrent[T any](t *testing.T, k b100Kind[T]) {
 		}
 	}
 	// The goroutines print one directive at once: fmt's sync.Pool orders prints that do not overlap in time, so the race
-	// detector misses a write between them (round t3 G-T3-02: one pass per goroutine caught M33s in 2 runs of 5).
+	// detector misses a write between them (with one pass per goroutine, the detector caught a writing Format in only 2 runs of 5).
 	for _, d := range b100AllDirectives() {
 		w, start := fmt.Sprintf(d, ps), make(chan struct{})
 		for range 4 {

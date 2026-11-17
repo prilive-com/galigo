@@ -57,7 +57,7 @@ func b103Refused(t *testing.T, b *galigo.Bot, err error) {
 }
 
 // b103Built checks that New built a Bot whose webhook handler keeps want as its secret: only want is accepted, and a
-// refused request delivers nothing (E-0159).
+// refused request delivers nothing.
 func b103Built(t *testing.T, b *galigo.Bot, err error, want string) {
 	t.Helper()
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestB103_NewTokenFirst(t *testing.T) {
 
 // b103RunChild runs this test binary again with only the test name, and b103Child set to name. It requires exit 0,
 // an empty stderr, the marker once, and that every stdout line is one of the test framework's own lines for name
-// (Go's exact coverage line included, internal/coverage/cformat/format.go) or the marker: the whole output (E-0148).
+// (Go's exact coverage line included, internal/coverage/cformat/format.go) or the marker: the whole output.
 func b103RunChild(t *testing.T, name, marker string) {
 	t.Helper()
 	exe, err := os.Executable()
@@ -193,7 +193,7 @@ func b103CleanupGoroutines() int {
 }
 
 // TestB103_NewStartsNothing: a refused New leaves no sender goroutine running, in both final modes and when a later
-// option makes the secret bad (AC2, E-0159). The count runs in a child process, where no sender existed before: Close
+// option makes the secret bad (AC2). The count runs in a child process, where no sender existed before: Close
 // does not wait for its goroutine to end, so an in-process count could hide a new goroutine behind one that is
 // ending. It checks what is left running, not the order of the code: that the check runs before the sender is built
 // is the change-stage gate d3-order.
@@ -291,8 +291,8 @@ func b103Handlers(logger *slog.Logger, secret string) func(bool, chan tg.Update)
 	}
 }
 
-// TestB103_NoOtherOutput: the B-103 entry points write nothing outside the logger they are given (AC4; E-0148: the
-// whole output, not a list of forbidden strings; E-0129: every path). In a child process, with slog.Default() replaced
+// TestB103_NoOtherOutput: the B-103 entry points write nothing outside the logger they are given (AC4: the
+// whole output, not a list of forbidden strings, on every path). In a child process, with slog.Default() replaced
 // by a recorder and os.Stdout and os.Stderr replaced by pipes, it runs over the matrix: receiver.LoadConfig in both
 // modes; the testbot's config.Load (it keeps the value as the environment returns it); New in both final modes, with a
 // later good or empty WithWebhook, after a good one, and with three bad tokens (with no logger and with WithLogger),

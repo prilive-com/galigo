@@ -97,7 +97,7 @@ func TestB98_ClientSlogJSON(t *testing.T) {
 		text, _ := testutil.SlogLines("c", c)
 		assert.Equal(t, "level=INFO msg=m c="+b98Text+"\n", text)
 	})
-	// Controls (the same on the baseline): JSON is {} for a non-nil pointer and null for a nil one (round p3 O-P3-03).
+	// Controls (the same on the baseline): JSON is {} for a non-nil pointer and null for a nil one.
 	t.Run("slog_json", func(t *testing.T) {
 		_, js := testutil.SlogLines("c", c)
 		assert.Equal(t, `{"level":"INFO","msg":"m","c":{}}`+"\n", js)

@@ -57,7 +57,7 @@ const (
 	b48aMsgBase    = `{"message_id":1001,"date":1700000000,"chat":{"id":-1001234567890,"type":"supergroup","title":"Test Chat"}`
 	b48aMsgForward = b48aMsgBase + `,"forward_origin":` + b48aOriginUser + `}`
 	b48aMsgQuote   = b48aMsgBase + `,"reply_to_message":{"message_id":1000,"date":1700000000,"chat":{"id":-1001234567890,"type":"supergroup","title":"Test Chat"},"text":"the source text"},"quote":` + b48aQuote + `}`
-	// The server still sends the old forward keys beside forward_origin (P1-02); only keys galigo's Message has are
+	// The server still sends the old forward keys beside forward_origin; only keys galigo's Message has are
 	// used (the server also sends forward_from_message_id and forward_signature for a channel, which Message lacks).
 	b48aMsgOldUser    = b48aMsgBase + `,"forward_from":{"id":5000000001,"is_bot":true,"first_name":"Bot"},"forward_date":4102444800,"forward_origin":` + b48aOriginUser + `}`
 	b48aMsgOldChannel = b48aMsgBase + `,"forward_from_chat":{"id":-1009876543210,"type":"channel","title":"C"},"forward_date":4102444803,"forward_origin":` + b48aOriginChannel + `}`
@@ -382,7 +382,7 @@ func TestB48A_ZeroEncode(t *testing.T) {
 	}
 }
 
-// The spec key lists, in spec order (E20/lookups/sec-b48a.txt), without the left-out keys.
+// The spec key lists, in spec order, without the left-out keys.
 var b48aSpecKeys = map[string][]string{
 	"MessageOrigin": {"type", "date", "sender_user", "sender_user_name", "sender_chat", "author_signature", "chat", "message_id"},
 	"TextQuote":     {"text", "entities", "position", "is_manual"},
@@ -467,7 +467,7 @@ func TestB48A_Shapes(t *testing.T) {
 			assert.Equal(t, 0, reflect.PointerTo(rt).NumMethod(), "no pointer methods")
 		})
 	}
-	// The three holders on Message: their own subtest, so a mutant that breaks only them is seen on this row (T2-04).
+	// The three holders on Message: their own subtest, so a mutant that breaks only them is seen on this row.
 	t.Run("Message", func(t *testing.T) {
 		mt := reflect.TypeOf(tg.Message{})
 		for _, h := range []struct {

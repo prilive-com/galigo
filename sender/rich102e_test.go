@@ -71,12 +71,12 @@ func TestAPI102E_InputMediaJSON(t *testing.T) {
 	loc.HorizontalAccuracy = 3.5
 	venue := sender.NewInputMediaVenue(1.5, 2.5, "T", "A")
 	venue.FoursquareID = "F"
-	venueFull := venue // every existing venue field set, each with its own value (t1 O-T1-04)
+	venueFull := venue // every existing venue field set, each with its own value
 	venueFull.HorizontalAccuracy = 4.5
 	venueFull.FoursquareType = "FT"
 	venueFull.GooglePlaceID = "G"
 	venueFull.GooglePlaceType = "GT"
-	sticker := sender.NewInputMediaSticker(sender.FromFileID("S")).WithCaption("sc").WithParseMode("HTML") // t3 O-T3-03
+	sticker := sender.NewInputMediaSticker(sender.FromFileID("S")).WithCaption("sc").WithParseMode("HTML")
 	sticker.Emoji = "e"
 	rows := []struct {
 		name string
@@ -85,7 +85,7 @@ func TestAPI102E_InputMediaJSON(t *testing.T) {
 	}{
 		{"photo", sender.NewInputMediaPhoto(sender.FromFileID("P")).WithCaption("c").WithParseMode("HTML"),
 			`{"caption":"c","media":"P","parse_mode":"HTML","type":"photo"}`},
-		// each file kind with its own caption and parse mode (t2 O-T2-03)
+		// each file kind with its own caption and parse mode
 		{"video-url", sender.NewInputMediaVideo(sender.FromURL("https://x/v.mp4")).WithCaption("vdc").WithParseMode("HTML"),
 			`{"caption":"vdc","media":"https://x/v.mp4","parse_mode":"HTML","type":"video"}`},
 		{"audio", sender.NewInputMediaAudio(sender.FromFileID("A")).WithCaption("auc").WithParseMode("Markdown"),
@@ -153,7 +153,7 @@ func TestAPI102E_InputMediaUploadRefused(t *testing.T) {
 		{"photo-on-photo", func(c *api102eCounter) sender.InputMedia {
 			return sender.NewInputMediaPhoto(sender.FromFileID("P").WithPhoto(c.source("p")))
 		}},
-		// each file kind with its own constructor (t1 O-T1-02: a kind exempted from the check must fail)
+		// each file kind with its own constructor (a kind exempted from the check must fail)
 		{"video-source", func(c *api102eCounter) sender.InputMedia { return sender.NewInputMediaVideo(c.source("x")) }},
 		{"audio-reader", func(c *api102eCounter) sender.InputMedia { return sender.NewInputMediaAudio(c.reader("x")) }},
 		{"animation-source", func(c *api102eCounter) sender.InputMedia { return sender.NewInputMediaAnimation(c.source("x")) }},
@@ -303,7 +303,7 @@ func TestAPI102E_SendMediaUploads(t *testing.T) {
 			}
 			before := make([]tg.InputRichMessageMedia, len(media))
 			copy(before, media)
-			reader := audio.Media.Reader // the caller's reader object (t3 O-T3-01): the image holds only "set"
+			reader := audio.Media.Reader // the caller's reader object: the image holds only "set"
 			imgs := make([]api102eImg, len(media))
 			for i := range media {
 				imgs[i] = api102eImage(media[i].Media)
@@ -330,7 +330,7 @@ func TestAPI102E_SendMediaUploads(t *testing.T) {
 				"file3": {FileName: "v.ogg", Data: []byte("vo")},
 			}, files)
 			// The caller's slice, every item (a value or the pointed-to media) and the live photo's photo are not
-			// changed, field by field (t2 O-T2-02, X-T2-01); the images are taken before the call.
+			// changed, field by field; the images are taken before the call.
 			require.Len(t, media, len(before))
 			for i := range media {
 				assert.Equal(t, before[i].ID, media[i].ID)
@@ -387,7 +387,7 @@ func api102eImage(media any) api102eImg {
 	return img
 }
 
-// T-rm-7 (t2 O-T2-01, t3 O-T3-02 X-T3-01, c1 C1-01): the message flags survive the multipart path, each alone and
+// T-rm-7: the message flags survive the multipart path, each alone and
 // both together, with each form (html, markdown, blocks), for each caller.
 func TestAPI102E_SendMediaFlags(t *testing.T) {
 	list := `"media":[{"id":"a","media":{"media":"attach://file0","type":"photo"}}]}`
@@ -484,7 +484,7 @@ func TestAPI102E_UploadElsewhereRefused(t *testing.T) {
 		for _, k := range []string{"animation", "audio", "photo", "video", "voice_note", "in-collage", "beside-list-upload"} {
 			t.Run(c.name+"/"+k, func(t *testing.T) {
 				var cnt api102eCounter
-				var b tg.InputRichBlock // each block holds an upload of its own kind (t1 O-T1-02)
+				var b tg.InputRichBlock // each block holds an upload of its own kind
 				switch k {
 				case "animation":
 					b = tg.InputRichBlockAnimation{Animation: sender.NewInputMediaAnimation(cnt.source("x"))}
@@ -581,7 +581,7 @@ func TestAPI102E_PathUploads(t *testing.T) {
 			assert.Equal(t, 1, server.CaptureCount())
 			server.LastCapture().AssertContentType(t, "multipart/form-data")
 		})
-		t.Run(c.name+"/shares", func(t *testing.T) { // t2 O-T2-04: the chat's own limiter, not another key
+		t.Run(c.name+"/shares", func(t *testing.T) { // the chat's own limiter, not another key
 			server := testutil.NewMockServer(t)
 			server.On(api101dPath("sendMessage"), func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyMessage(w, 4241) })
 			server.On(api101dPath(c.method), func(w http.ResponseWriter, _ *http.Request) { reply[c.method](w) })
@@ -689,7 +689,7 @@ func TestAPI102E_ZeroEditMedia(t *testing.T) {
 	assert.Equal(t, 0, server.CaptureCount())
 }
 
-// T-rm-8 (c2 C2-01): a nil *tg.InputRichMessage held in an `any` field is not removed by the zero-value skip (the
+// T-rm-8: a nil *tg.InputRichMessage held in an `any` field is not removed by the zero-value skip (the
 // interface is not nil). The builder writes it as JSON null, as before Bot API 10.2e and as the JSON body does; no
 // file, no multipart, no panic.
 func TestAPI102E_TypedNilRichInAny(t *testing.T) {
@@ -727,7 +727,7 @@ func TestAPI102E_TypedNilRichInAny(t *testing.T) {
 // MarshalJSON; an upload in it is refused.
 type api102eWrapped struct{ sender.InputMedia }
 
-// T-rm-9 (c2 C2-02): a caller's own InputRichMedia type keeps its encoding when the list also holds an upload (the
+// T-rm-9: a caller's own InputRichMedia type keeps its encoding when the list also holds an upload (the
 // request goes multipart, and the builder must leave that item as it is); an upload inside such a type is refused
 // before any request, and its reader is not opened.
 func TestAPI102E_SendMediaWrapper(t *testing.T) {
@@ -760,7 +760,7 @@ func TestAPI102E_SendMediaWrapper(t *testing.T) {
 	}
 }
 
-// T-rm-10 (c3 C3-01, E-0117): on the multipart path the rebuilt items keep every string as given: the id, the
+// T-rm-10: on the multipart path the rebuilt items keep every string as given: the id, the
 // caption, the parse mode and a file_id with edge whitespace, for a value and a pointer item, for each caller (the
 // server checks them, plan §4).
 func TestAPI102E_SendMediaAsGiven(t *testing.T) {

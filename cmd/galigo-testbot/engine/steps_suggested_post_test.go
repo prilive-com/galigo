@@ -109,7 +109,7 @@ func TestB48C1_Step(t *testing.T) {
 				assert.Equal(t, []string{"galigo suggested post"}, f.texts)
 			}
 		})
-		t.Run(method+"/refused_wrapped", func(t *testing.T) { // the wanted 400 inside a wrapper passes too [O-T2-04]
+		t.Run(method+"/refused_wrapped", func(t *testing.T) { // the wanted 400 inside a wrapper passes too
 			rt, res, err := run(t, &fakeSuggested{err: fmt.Errorf("wrapper: %w", wrongChat)})
 			require.NoError(t, err)
 			assert.Equal(t, map[string]any{"error_code": 400, "description": wrongChat.Description}, res.Evidence)
@@ -152,7 +152,7 @@ func TestB48C1_Step(t *testing.T) {
 			{"other_text", &tg.APIError{Code: 400, Description: "Bad Request: " + SuggestedPostWrongAmount}},
 			{"other_code", &tg.APIError{Code: 403, Description: "Forbidden: " + SuggestedPostWrongChat}},
 			{"not_api", errors.New(SuggestedPostWrongChat)},
-			// the wanted text only in a wrapper around an unrelated 400: the API error's own text decides [O-T3-06]
+			// the wanted text only in a wrapper around an unrelated 400: the API error's own text decides
 			{"wrapper_text", fmt.Errorf("%s: %w", SuggestedPostWrongChat, &tg.APIError{Code: 400, Description: "Bad Request: unrelated"})},
 		} {
 			t.Run(method+"/"+bad.name, func(t *testing.T) {
@@ -214,7 +214,7 @@ func TestB48C1_StepThroughAdapter(t *testing.T) {
 }
 
 // The real adapter with no option or a nil option sends no suggested_post_parameters, a non-nil empty value as {},
-// and other values unchanged, on both methods [A-T2-01 = O-T2-03, A-T3-02 = O-T3-04].
+// and other values unchanged, on both methods.
 func TestB48C1_AdapterOption(t *testing.T) {
 	for _, method := range []string{"sendMessage", "sendPhoto"} {
 		for _, r := range []struct {

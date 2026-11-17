@@ -238,7 +238,7 @@ func TestB48C2_ZeroEncode(t *testing.T) {
 	assert.NotContains(t, keys, "is_paid_post")
 }
 
-// The spec key lists, in spec order (E29/lookups/api.html).
+// The spec key lists, in spec order.
 var b48c2SpecKeys = map[string][]string{
 	"SuggestedPostInfo":           {"state", "price", "send_date"},
 	"SuggestedPostApproved":       {"suggested_post_message", "price", "send_date"},

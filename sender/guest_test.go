@@ -47,7 +47,7 @@ func TestAPI100_AnswerGuestQuery(t *testing.T) {
 	})
 	_, err = testutil.NewTestClient(t, bad.BaseURL()).AnswerGuestQuery(context.Background(),
 		sender.AnswerGuestQueryRequest{GuestQueryID: "gq-100", Result: api100Article()})
-	// a malformed result: callJSON's wrap names the method and keeps the decode error (A-C1-03)
+	// a malformed result: callJSON's wrap names the method and keeps the decode error
 	require.Error(t, err)
 	assert.True(t, strings.HasPrefix(err.Error(), "galigo: answerGuestQuery: failed to parse response: "), err.Error())
 	var ute *json.UnmarshalTypeError
@@ -73,7 +73,7 @@ func TestAPI100_AnswerGuestQuery_Validation(t *testing.T) {
 			var ve *tg.ValidationError
 			require.True(t, errors.As(err, &ve), "error %v", err)
 			assert.Equal(t, r.field, ve.Field)
-			assert.Equal(t, r.text, err.Error()) // the whole text (A-C1-02)
+			assert.Equal(t, r.text, err.Error()) // the whole text
 			assert.Equal(t, 0, server.CaptureCount())
 		})
 	}

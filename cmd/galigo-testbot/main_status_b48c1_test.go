@@ -13,17 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// B-48c1 [C1-01]: every scenario group that `--run all` runs is also counted by `--status`. main.go builds the lists
+// B-48c1: every scenario group that `--run all` runs is also counted by `--status`. main.go builds the lists
 // by hand in four places (the "all" case of runSuiteCommand and of handleRun, showCoverageStatus, handleStatus), so a
 // new group added to "all" and not to the two status lists is never counted. The test reads main.go's syntax tree:
 // the set of groups in each "all" case must be a subset of the set in each status function.
 //
-// [C2-01 Codex, C2-03 Claude] A group counts only when its call is an argument of the one supported shape,
+// A group counts only when its call is an argument of the one supported shape,
 // `scenarios := append(suites.AllXScenarios(), suites.AllYScenarios()...)` (`=` in the "all" cases) or
 // `scenarios = append(scenarios, suites.AllXScenarios()...)`. Any other write to `scenarios`, and any
 // suites.All*Scenarios call outside that shape (a discarded result, a loop), fails the test; in an "all" case every
 // statement must have that shape, so a group reached through a helper fails too. A new shape needs this test changed.
-// [C3-01, C3-02 Claude, C3-01 Codex] Each supported append must be a top-level statement of the list's own block (the
+// Each supported append must be a top-level statement of the list's own block (the
 // function body, or the "all" case body), so an append inside an `if` or in a nested block with a second `scenarios`
 // fails; and the two-group append must be the first one, and only the first, so starting the list again fails.
 func TestB48C1_StatusListsCoverAll(t *testing.T) {

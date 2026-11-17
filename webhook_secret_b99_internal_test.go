@@ -46,7 +46,7 @@ func TestB99_BotSecretFields(t *testing.T) {
 // TestB99_BotWebhookAuth: the handler of a Bot made with WithWebhook(port, secret) accepts only the secret and rejects
 // every other header, for every value Telegram accepts; with WithWebhook(port, "") it accepts every request (AC4). A new Bot per
 // request. It passes on the baseline too: behaviour kept. An accepted request delivers its update and a refused one
-// delivers nothing (round t3 O-T3-01).
+// delivers nothing.
 func TestB99_BotWebhookAuth(t *testing.T) {
 	serve := func(t *testing.T, secret string, header *string) (int, int) {
 		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"update_id":1}`))

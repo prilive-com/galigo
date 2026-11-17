@@ -24,7 +24,7 @@ import (
 
 const b30Chat = int64(-1001) // a group chat (fake id)
 
-// b30Call is one cleanup call the fake saw, with its context state at the call (E-0123).
+// b30Call is one cleanup call the fake saw, with its context state at the call.
 type b30Call struct {
 	key         string // "msg:<chat>/<id>", "set:<name>", "tag:<chat>/<user>/<tag>"
 	at          time.Time
@@ -418,7 +418,7 @@ func TestB30_R17_TransientKept(t *testing.T) {
 	}
 }
 
-// [t3a] O-T3-01: a failed after-stop sticker-set delete or tag clear stays tracked; the next CleanupStep retries it.
+// a failed after-stop sticker-set delete or tag clear stays tracked; the next CleanupStep retries it.
 func TestB30_R17_TransientKeptSetAndTag(t *testing.T) {
 	for name, c := range map[string]struct {
 		key  string
@@ -444,7 +444,7 @@ func TestB30_R17_TransientKeptSetAndTag(t *testing.T) {
 	}
 }
 
-// [t3a] A-T3-01: the carry adds up over two failed attempts (TESTBOT_MAX_429_RETRIES defaults to 2).
+// the carry adds up over two failed attempts (TESTBOT_MAX_429_RETRIES defaults to 2).
 func TestB30_R23_CarryOverTwoFailedAttempts(t *testing.T) {
 	f := newB30Fake()
 	f.script["msg:-1001/2"] = []error{api429(time.Millisecond), api429(time.Millisecond)}
@@ -536,9 +536,9 @@ func TestB30_R16_S36PhotoCleaned(t *testing.T) {
 	assert.Empty(t, rt.CreatedMessages)
 }
 
-// ---- O rows: 429-first ordering of CleanupStep's joined errors (AC5, O-P3-01) ----
+// ---- O rows: 429-first ordering of CleanupStep's joined errors (AC5) ----
 
-// [t3a] A-T3-03: the S36 success path keeps LastMessage and tracks the photo after the move.
+// the S36 success path keeps LastMessage and tracks the photo after the move.
 func TestB30_R16b_S36PhotoSuccess(t *testing.T) {
 	f := newB30Fake()
 	rt := NewRuntime(b30FakeEnt{f}, b30Chat, 555)
@@ -624,7 +624,7 @@ func TestB30_O4_LongestRetryAfterFirst(t *testing.T) {
 
 // ---- §3 CleanupStep and deleteTracked ----
 
-// [t3] A-T2-02: a 429 without RetryAfter (sender builds it when retry_after is missing) still goes first. Guard: the
+// a 429 without RetryAfter (sender builds it when retry_after is missing) still goes first. Guard: the
 // base returns the last error, which is this 429.
 func TestB30_O5_429WithoutRetryAfterFirst(t *testing.T) {
 	f := newB30Fake()
@@ -639,7 +639,7 @@ func TestB30_O5_429WithoutRetryAfterFirst(t *testing.T) {
 	assert.Equal(t, 429, apiErr.Code)
 }
 
-// [t3] A-T2-03: two CleanupSteps in one scenario; the first is repeated after a 429. The second counts only its own work.
+// two CleanupSteps in one scenario; the first is repeated after a 429. The second counts only its own work.
 func TestB30_R22_TwoCleanupStepsOneScenario(t *testing.T) {
 	f := newB30Fake()
 	f.script["msg:-1001/2"] = []error{api429(time.Millisecond)}
@@ -694,7 +694,7 @@ func TestB30_C3_KeptInOrder(t *testing.T) {
 	rt := b30RT(f, 500, 501, 502)
 	sr, err := (&CleanupStep{}).Execute(context.Background(), rt)
 	require.Error(t, err)
-	// [t3] O-T2-01: the returned error wraps every item's error, one line per item
+	// the returned error wraps every item's error, one line per item
 	assert.ErrorIs(t, err, e500)
 	assert.ErrorIs(t, err, e502)
 	assert.Equal(t, "cleanup: message -1001/500: e500\nmessage -1001/502: e502", err.Error())
@@ -705,7 +705,7 @@ func TestB30_C3_KeptInOrder(t *testing.T) {
 func TestB30_C4_StickerSetFailureKept(t *testing.T) {
 	f := newB30Fake()
 	f.always["set:a"] = errors.New("set-a")
-	f.always["set:c"] = errors.New("set-c") // [t3a] A-T3-04: two failures, kept in order
+	f.always["set:c"] = errors.New("set-c") // two failures, kept in order
 	rt := b30RT(f)
 	rt.TrackStickerSet("a")
 	rt.TrackStickerSet("b")
@@ -799,7 +799,7 @@ func TestB30_C9_AllKindsCounted(t *testing.T) {
 func TestB30_C10_TagClearFailureKept(t *testing.T) {
 	f := newB30Fake()
 	f.script["tag:-1001/555/"] = []error{errors.New("tag-x")}
-	f.script["tag:-1001/777/"] = []error{errors.New("tag-z")} // [t3a] A-T3-04: two failures, kept in order
+	f.script["tag:-1001/777/"] = []error{errors.New("tag-z")} // two failures, kept in order
 	rt := b30RT(f)
 	for _, u := range []int64{555, 666, 777} {
 		rt.TestUserID = u
@@ -828,7 +828,7 @@ func TestB30_C11_TwoChats(t *testing.T) {
 	assert.Empty(t, rt.CreatedMessages)
 }
 
-// [t3] O-T2-02, S-T2-01: tag records are kept per (chat, user) pair; the real SetChatMemberTagStep writes them.
+// tag records are kept per (chat, user) pair; the real SetChatMemberTagStep writes them.
 func TestB30_C12_TagPairs(t *testing.T) {
 	tag := func(t *testing.T, rt *Runtime, chat, user int64, v string) {
 		t.Helper()
@@ -867,7 +867,7 @@ func TestB30_C12_TagPairs(t *testing.T) {
 		assert.Equal(t, []string{"tag:-1001/555/t", "tag:-1001/777/t", "tag:-1001/555/", "tag:-1001/777/"}, f.keys())
 		assert.Equal(t, map[string]any{"deleted_count": 0, "tags_cleared": 1}, evMap(t, *sr))
 	})
-	t.Run("second cleared first kept", func(t *testing.T) { // [t3a] register A-T3-02 and O-T3-02
+	t.Run("second cleared first kept", func(t *testing.T) {
 		f := newB30Fake()
 		rt := b30RT(f)
 		tag(t, rt, b30Chat, 555, "t")
@@ -878,7 +878,7 @@ func TestB30_C12_TagPairs(t *testing.T) {
 		assert.Equal(t, []string{"tag:-1001/555/t", "tag:-1001/777/t", "tag:-1001/777/", "tag:-1001/555/"}, f.keys())
 		assert.Equal(t, map[string]any{"deleted_count": 0, "tags_cleared": 1}, evMap(t, *sr))
 	})
-	t.Run("repeat write one record", func(t *testing.T) { // [t3a] O-T3-03
+	t.Run("repeat write one record", func(t *testing.T) {
 		f := newB30Fake()
 		rt := b30RT(f)
 		tag(t, rt, b30Chat, 555, "t")

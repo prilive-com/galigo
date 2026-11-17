@@ -55,7 +55,7 @@ func withTopic[T any](req T, topic int64) T {
 	return req
 }
 
-// T1: the Go shape of the four new fields (E-0126, E-0132).
+// T1: the Go shape of the four new fields.
 func TestB82_Shapes(t *testing.T) {
 	for _, r := range []struct {
 		typ            any
@@ -141,9 +141,9 @@ func TestB82_MediaGroupWire(t *testing.T) {
 }
 
 // T4: promoteChatMember: the option (true, false, unset), PromoteChatMemberWithRights (true, false, nil, and
-// FullAdminRights) and DemoteChatMember (false) at every layer that copies the right (E-0149). The right is checked as
+// FullAdminRights) and DemoteChatMember (false) at every layer that copies the right. The right is checked as
 // raw JSON too (a quoted "true" fails). The demote row compares the whole body: the chat, the user and every right
-// DemoteChatMember clears, so a wrong user or a neighbour line replaced by the new one fails (E-0072).
+// DemoteChatMember clears, so a wrong user or a neighbour line replaced by the new one fails.
 func TestB82_PromoteWire(t *testing.T) {
 	yes, no := true, false
 	demoteBody := map[string]string{"chat_id": wireChatID, "user_id": "456"}
@@ -170,7 +170,7 @@ func TestB82_PromoteWire(t *testing.T) {
 	// right must get a value). The new right stays nil. It returns the rights, the whole body WithRights must send (no
 	// key for a nil pointer right, never the new key), the keys of the other rights and which of them are pointers.
 	// So a WithRights copy that, for a nil new right, derives a value from other rights fails in a pass where that
-	// derivation fires (E-0132, E-0143); which passes run is the leaf's choice ("rights nil others each").
+	// derivation fires; which passes run is the leaf's choice ("rights nil others each").
 	rightsNilOthers := func(t *testing.T, val func(i int, isPointer bool) *bool) (tg.ChatAdministratorRights, map[string]string, []string, []bool) {
 		var rights tg.ChatAdministratorRights
 		body := map[string]string{"chat_id": wireChatID, "user_id": "456"}
@@ -289,7 +289,7 @@ func TestB82_PromoteWire(t *testing.T) {
 	// The combined-option leaves: PromoteChatMember with the 13 other options and WithCanManageDirectMessages, the new
 	// option last or first, its value true or false. Each leaf runs the passes "others all true", "others all false"
 	// and one pass per other option with only that one true, so no other value is tied to the new value, to the order
-	// or to another option (E-0100, E-0062); every pass compares the whole body, as arguments and as raw JSON. So an
+	// or to another option; every pass compares the whole body, as arguments and as raw JSON. So an
 	// option that clears, overwrites or copies another field, also only for some values, fails.
 	type otherPass struct {
 		name string
@@ -338,7 +338,7 @@ func TestB82_PromoteWire(t *testing.T) {
 		})
 	}
 
-	// The nil-right leaf (change rounds c1 and c2: A-C1-01; O-C2-02, A-C2-01, A-C2-02): WithRights with the new right
+	// The nil-right leaf: WithRights with the new right
 	// nil and the 16 other rights (8 plain bools, 8 pointers) in these passes: all true; all false; exactly one true
 	// (16); exactly one false (16); every pointer right nil with the plain rights all true, and all false (the second is
 	// tg.ChatAdministratorRights{}); exactly one pointer right nil, the others true (8). Every pass compares the whole
@@ -426,7 +426,7 @@ func TestB82_PromoteRightsClass(t *testing.T) {
 	})
 
 	// "all true", "all false", then one pass per right with only that right true: every pair of
-	// rights differs in at least one pass, so a copy from any other right fails (E-0062, E-0072).
+	// rights differs in at least one pass, so a copy from any other right fails.
 	type rightsPass struct {
 		name string
 		val  func(i int) bool

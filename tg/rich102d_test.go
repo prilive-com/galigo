@@ -28,8 +28,8 @@ func rtp102d(s string) *tg.RichText { r := rt102d(s); return &r }
 
 func ip102d(n int) *int { return &n }
 
-// rich102dKinds is the table of the 16 block types of 10.2d and their "type" constants (T-kind). The gate
-// E16/tools/spec102d.py checks this table against the spec text: the same 16 classes, the same constants.
+// rich102dKinds is the table of the 16 block types of 10.2d and their "type" constants (T-kind). This table
+// was checked against the spec text: the same 16 classes, the same constants.
 var rich102dKinds = []struct {
 	goType   string
 	block    tg.InputRichBlock
@@ -96,7 +96,7 @@ func TestAPI102D_Marker(t *testing.T) {
 		assert.False(t, reflect.TypeOf(v).Implements(it), reflect.TypeOf(v).Name())
 	}
 
-	// Census (T1-03): in the package source, exactly the 16 types declare the marker, and exactly the five containers
+	// Census: in the package source, exactly the 16 types declare the marker, and exactly the five containers
 	// declare the children method of the depth walk. A marker on any other type (a read-side block) fails here.
 	receivers := map[string][]string{}
 	files, err := filepath.Glob("*.go")
@@ -187,7 +187,7 @@ func TestAPI102D_BlockJSON(t *testing.T) {
 			{Blocks: []tg.InputRichBlock{para("i2")}}}},
 			`{"type":"list","items":[{"blocks":[{"type":"paragraph","text":"i1"}],"has_checkbox":true,"is_checked":true,"value":5,"type":"A"},{"blocks":[{"type":"paragraph","text":"i2"}]}]}`},
 		{"list/min", tg.InputRichBlockList{}, `{"type":"list","items":null}`},
-		// Each bool of a list item alone (T1-02): a swap of the two values is seen.
+		// Each bool of a list item alone: a swap of the two values is seen.
 		{"list/checkbox-only", tg.InputRichBlockList{Items: []tg.InputRichBlockListItem{{HasCheckbox: true}}},
 			`{"type":"list","items":[{"blocks":null,"has_checkbox":true}]}`},
 		{"list/checked-only", tg.InputRichBlockList{Items: []tg.InputRichBlockListItem{{IsChecked: true}}},
@@ -211,7 +211,7 @@ func TestAPI102D_BlockJSON(t *testing.T) {
 			IsBordered: true, IsStriped: true, Caption: rtp102d("tc")},
 			`{"type":"table","cells":[[{"text":"t1","is_header":true,"align":"left","valign":"top"}],[{"colspan":2,"align":"right","valign":"bottom"}]],"is_bordered":true,"is_striped":true,"caption":"tc"}`},
 		{"table/min", tg.InputRichBlockTable{}, `{"type":"table","cells":null}`},
-		// Each bool of a table alone (T1-02).
+		// Each bool of a table alone.
 		{"table/bordered-only", tg.InputRichBlockTable{IsBordered: true}, `{"type":"table","cells":null,"is_bordered":true}`},
 		{"table/striped-only", tg.InputRichBlockTable{IsStriped: true}, `{"type":"table","cells":null,"is_striped":true}`},
 		{"details/full", tg.InputRichBlockDetails{Summary: rt102d("ds"), Blocks: []tg.InputRichBlock{para("d1")}, IsOpen: true},
@@ -223,7 +223,7 @@ func TestAPI102D_BlockJSON(t *testing.T) {
 		{"map/min", tg.InputRichBlockMap{}, `{"type":"map","location":{"longitude":0,"latitude":0}}`},
 		{"thinking/full", tg.InputRichBlockThinking{Text: rt102d("th")}, `{"type":"thinking","text":"th"}`},
 		{"thinking/min", tg.InputRichBlockThinking{}, `{"type":"thinking","text":""}`},
-		// T3-03: every string of a block is sent as given: spaces and tabs at the edges stay.
+		// every string of a block is sent as given: spaces and tabs at the edges stay.
 		{"paragraph/as-given", tg.InputRichBlockParagraph{Text: rt102d(" p\t")}, `{"type":"paragraph","text":" p\t"}`},
 		{"heading/as-given", tg.InputRichBlockSectionHeading{Text: rt102d(" h\t"), Size: 1}, `{"type":"heading","text":" h\t","size":1}`},
 		{"pre/as-given", tg.InputRichBlockPreformatted{Text: rt102d(" x\t"), Language: " go "}, `{"type":"pre","text":" x\t","language":" go "}`},
@@ -242,7 +242,7 @@ func TestAPI102D_BlockJSON(t *testing.T) {
 		{"table/as-given", tg.InputRichBlockTable{Caption: rtp102d(" t\t")}, `{"type":"table","cells":null,"caption":" t\t"}`},
 		{"details/as-given", tg.InputRichBlockDetails{Summary: rt102d(" s\t")}, `{"type":"details","summary":" s\t","blocks":null}`},
 		{"thinking/as-given", tg.InputRichBlockThinking{Text: rt102d(" t\t")}, `{"type":"thinking","text":" t\t"}`},
-		// T3-04: an optional text set to an empty value is sent ("omitempty" omits only a nil pointer).
+		// an optional text set to an empty value is sent ("omitempty" omits only a nil pointer).
 		{"blockquote/empty-credit", tg.InputRichBlockBlockQuotation{Credit: &tg.RichText{}}, `{"type":"blockquote","blocks":null,"credit":""}`},
 		{"pullquote/empty-credit", tg.InputRichBlockPullQuotation{Credit: &tg.RichText{}}, `{"type":"pullquote","text":"","credit":""}`},
 		{"collage/empty-caption", tg.InputRichBlockCollage{Caption: &tg.RichBlockCaption{Credit: &tg.RichText{}}},
@@ -312,8 +312,8 @@ func TestAPI102D_OptionalInts(t *testing.T) {
 	}
 }
 
-// rich102dShape is every field of the 17 new types: name, Go type, JSON tag (T-shape). The gate E16/tools/spec102d.py
-// checks the tags against the spec text: required fields have no omitempty, optional fields have it.
+// rich102dShape is every field of the 17 new types: name, Go type, JSON tag (T-shape). The tags
+// were checked against the spec text: required fields have no omitempty, optional fields have it.
 var rich102dShape = map[string][]rich101dField{
 	"InputRichBlockParagraph":              {{"Text", "tg.RichText", "text"}},
 	"InputRichBlockSectionHeading":         {{"Text", "tg.RichText", "text"}, {"Size", "int", "size"}},
@@ -491,7 +491,7 @@ func TestAPI102D_Depth(t *testing.T) {
 		cmd.Env = append(os.Environ(), rich102dChildEnv+"=1")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "the child failed or crashed:\n%s", out)
-		// The row list is built from rich102dContainers, so pin that table too (T1-01 of Grok): a container dropped
+		// The row list is built from rich102dContainers, so pin that table too: a container dropped
 		// from it would drop its rows from the child and from this check together.
 		var names []string
 		for _, c := range rich102dContainers {
@@ -572,7 +572,7 @@ func TestAPI102D_Depth(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 3, strings.Count(string(out), `{"type":"paragraph","text":"x"}`))
 		})
-		// A cycle or deep nesting in the SECOND block of a slice (T1-01): the walk must visit every block, not the first.
+		// A cycle or deep nesting in the SECOND block of a slice: the walk must visit every block, not the first.
 		t.Run("second-block-"+c.name, func(t *testing.T) {
 			s := make([]tg.InputRichBlock, 2)
 			s[0] = leaf
@@ -600,14 +600,14 @@ func TestAPI102D_Depth(t *testing.T) {
 		t.Run("depth-101-second-"+c.name, func(t *testing.T) {
 			marshalErr(t, nestSecond(101))
 		})
-		// The cycle in the FIRST block, a leaf after it (T2-01 of Grok): a walk of only the last block misses it.
+		// The cycle in the FIRST block, a leaf after it: a walk of only the last block misses it.
 		t.Run("first-block-"+c.name, func(t *testing.T) {
 			s := make([]tg.InputRichBlock, 2)
 			s[0] = c.make(s)
 			s[1] = leaf
 			marshalErr(t, s[0])
 		})
-		// Two containers side by side, the cycle only in the SECOND one (T2-01 of Grok): a walk that stops after the
+		// Two containers side by side, the cycle only in the SECOND one: a walk that stops after the
 		// first container it walked misses it.
 		t.Run("second-parent-"+c.name, func(t *testing.T) {
 			s := make([]tg.InputRichBlock, 2)
@@ -629,7 +629,7 @@ func TestAPI102D_Depth(t *testing.T) {
 		s[0] = tg.InputRichBlockList{Items: []tg.InputRichBlockListItem{{Blocks: []tg.InputRichBlock{leaf}}, {Blocks: s}}}
 		marshalErr(t, s[0])
 	})
-	// The cycle in the FIRST list item, a normal item after it (T2-01 of Grok).
+	// The cycle in the FIRST list item, a normal item after it.
 	t.Run("cycle-first-item-list", func(t *testing.T) {
 		s := make([]tg.InputRichBlock, 1)
 		s[0] = tg.InputRichBlockList{Items: []tg.InputRichBlockListItem{{Blocks: s}, {Blocks: []tg.InputRichBlock{leaf}}}}

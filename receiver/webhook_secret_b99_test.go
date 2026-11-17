@@ -77,7 +77,7 @@ func b99Config() receiver.Config {
 const b99PlusV = "{Mode: Token:[REDACTED] BaseURL: WebhookPort:0 TLSCertPath: TLSKeyPath: WebhookSecret:[REDACTED] AllowedDomain: WebhookURL: PollingTimeout:0 PollingLimit:0 PollingMaxErrors:0 DeleteWebhookFirst:false AllowedUpdates:[] RetryInitialDelay:0s RetryMaxDelay:0s RetryBackoffFactor:0 UpdateBufferSize:0 RateLimitRequests:0 RateLimitBurst:0 MaxBodySize:0 UpdateDeliveryPolicy:0 UpdateDeliveryTimeout:0s OnUpdateDropped:<nil> BreakerMaxRequests:0 BreakerInterval:0s BreakerTimeout:0s ReadTimeout:0s ReadHeaderTimeout:0s WriteTimeout:0s IdleTimeout:0s DrainDelay:0s ShutdownTimeout:0s}"
 
 // TestB99_ConfigOutput compares the whole output of a Config, a *Config and a struct field holding one with exact
-// text, so no form of the secret (plain, quoted, hex, a prefix) can be in it (AC2, E-0148).
+// text, so no form of the secret (plain, quoted, hex, a prefix) can be in it (AC2).
 func TestB99_ConfigOutput(t *testing.T) {
 	cfg := b99Config()
 	rows := []struct {
@@ -116,7 +116,7 @@ func TestB99_ConfigOutput(t *testing.T) {
 // TestB99_SaveAndReload: a config saved with encoding/json holds [REDACTED], so after a reload the handler rejects
 // the real secret and accepts the public text [REDACTED] as the header (PLAN §9, the upgrade note). With the field
 // still a string, the reload would keep the secret. The channel shows that the refused update is not delivered
-// (round t3 O-T3-01: a 401 alone does not prove it).
+// (a 401 alone does not prove it).
 func TestB99_SaveAndReload(t *testing.T) {
 	saved, err := json.Marshal(map[string]any{"WebhookSecret": b99Config().WebhookSecret})
 	require.NoError(t, err)
@@ -155,14 +155,14 @@ func b99Delivered(want int) int {
 }
 
 // b99SetSecret sets cfg.WebhookSecret from a string variable by reflection (its kind is string before and after the
-// change), so the file builds on the baseline (E-0066).
+// change), so the file builds on the baseline.
 func b99SetSecret(cfg *receiver.Config, secret string) {
 	reflect.ValueOf(cfg).Elem().FieldByName("WebhookSecret").SetString(secret)
 }
 
 // TestB99_HandlerAuth: a handler built from a Config accepts only its secret and rejects every other header, for every
 // value class; with an empty secret it accepts every request (AC4). A new handler per request. An accepted request
-// delivers its update and a refused one delivers nothing (round t3 O-T3-01).
+// delivers its update and a refused one delivers nothing.
 func TestB99_HandlerAuth(t *testing.T) {
 	serve := func(secret string, header *string) (int, int) {
 		cfg := receiver.DefaultConfig()

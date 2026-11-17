@@ -24,7 +24,7 @@ import (
 )
 
 // b48c1SpecMethods are the methods whose spec takes suggested_post_parameters (Bot API 9.2), in the spec's order
-// (E27/lookups/spec-suggested-post.txt, core.telegram.org/bots/api fetched 2026-11-12).
+// (core.telegram.org/bots/api fetched 2026-11-12).
 var b48c1SpecMethods = []string{
 	"sendMessage", "forwardMessage", "copyMessage", "sendPhoto", "sendLivePhoto", "sendAudio", "sendDocument",
 	"sendVideo", "sendAnimation", "sendVoice", "sendVideoNote", "sendPaidMedia", "sendLocation", "sendVenue",
@@ -34,7 +34,7 @@ var b48c1SpecMethods = []string{
 // b48c1Full is the full value the wire rows send, and b48c1FullJSON its JSON (amount 10^13: a TON price in
 // nanograms that does not fit a 32-bit int).
 // b48c1ChannelChat is a channel-style (negative) chat id: the client must not refuse the parameter for a chat kind
-// (AC5: the server checks the chat) [C1-02].
+// (AC5: the server checks the chat).
 const b48c1ChannelChat = int64(-1001234567890)
 
 var b48c1Full = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 10000000000000}, SendDate: 1900000000}
@@ -48,7 +48,7 @@ type b48c1Call struct {
 	req    any
 	paths  []string // the paths the method has: "json" (no upload), "upload" (form), "fileid" (form without an upload: paid
 	// media), "upload-ptr" (form, the rich media upload as a *InputMedia), "thumb-upload" (form: the file by id, only its
-	// thumbnail uploaded) [C1-03], "live-id" / "photo-id" (form: that live photo file by id, the other one uploaded) [C2-01]
+	// thumbnail uploaded), "live-id" / "photo-id" (form: that live photo file by id, the other one uploaded)
 	send func(ctx context.Context, c *sender.Client, path string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error
 }
 
@@ -71,7 +71,7 @@ func b48c1Err[T any](_ T, err error) error { return err }
 
 func b48c1Calls() []b48c1Call {
 	both, jsonOnly := []string{"json", "upload"}, []string{"json"}
-	thumb := []string{"json", "upload", "thumb-upload"} // the five types with a thumbnail [C1-03]
+	thumb := []string{"json", "upload", "thumb-upload"} // the five types with a thumbnail
 	return []b48c1Call{
 		{"sendMessage", sender.SendMessageRequest{}, jsonOnly, func(ctx context.Context, c *sender.Client, _ string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			return b48c1Err(c.SendMessage(ctx, sender.SendMessageRequest{ChatID: chat, Text: "t", DirectMessagesTopicID: topic, SuggestedPostParameters: spp}))
@@ -87,7 +87,7 @@ func b48c1Calls() []b48c1Call {
 		}},
 		{"sendLivePhoto", sender.SendLivePhotoRequest{}, []string{"json", "upload", "live-id", "photo-id"}, func(ctx context.Context, c *sender.Client, up string, chat int64, spp *tg.SuggestedPostParameters, topic int64) error {
 			live, photo := up, up
-			switch up { // one file by id, the other uploaded [C2-01]
+			switch up { // one file by id, the other uploaded
 			case "live-id":
 				live, photo = "json", "upload"
 			case "photo-id":
@@ -183,7 +183,7 @@ func TestB48C1_CallTableIsTheSpecList(t *testing.T) {
 	assert.Len(t, b48c1SpecMethods, 19)
 }
 
-// T-type: the Go shape of the two new types (E-0126).
+// T-type: the Go shape of the two new types.
 func TestB48C1_TypeShapes(t *testing.T) {
 	type field struct{ name, typ, tag string }
 	shape := func(v any) []field {
@@ -225,7 +225,7 @@ func TestB48C1_TypeJSON(t *testing.T) {
 	}
 }
 
-// T-req: each of the 19 request types has both fields with the exact Go type and tag (E-0132, E-0126).
+// T-req: each of the 19 request types has both fields with the exact Go type and tag.
 func TestB48C1_RequestFields(t *testing.T) {
 	for _, c := range b48c1Calls() {
 		t.Run(c.method, func(t *testing.T) {
@@ -245,8 +245,8 @@ func TestB48C1_RequestFields(t *testing.T) {
 	}
 }
 
-// T-census: in the sender package source, each key is carried by exactly its listed request types (E-0105: the
-// whole class, not the instances a reviewer named): suggested_post_parameters by the 19 B-48c1 types,
+// T-census: in the sender package source, each key is carried by exactly its listed request types (the
+// whole class, not only some instances): suggested_post_parameters by the 19 B-48c1 types,
 // direct_messages_topic_id by those 19 plus the three of B-82 (22), can_manage_direct_messages only by
 // PromoteChatMemberRequest (B-88). A type also carries a key that it gets through an embedded field or from the type
 // it is defined as (type X Y), so a key promoted into another request type fails too.
@@ -289,7 +289,7 @@ func TestB48C1_Census(t *testing.T) {
 			if direct[name] == nil {
 				direct[name] = map[string]bool{}
 			}
-			st, ok := b48c1Struct(ts.Type) // also type X (struct{…}) [O-T2-05] and type X = *struct{…} [O-T3-05]
+			st, ok := b48c1Struct(ts.Type) // also type X (struct{…}) and type X = *struct{…}
 			if !ok {
 				if base := b48c1LocalType(ts.Type); base != "" {
 					from[name] = append(from[name], base)
@@ -361,7 +361,7 @@ func b48c1LocalType(expr ast.Expr) string {
 		case *ast.StarExpr:
 			expr = e.X
 			continue
-		case *ast.IndexExpr: // a generic instantiation T[A] [O-T3-05]
+		case *ast.IndexExpr: // a generic instantiation T[A]
 			expr = e.X
 			continue
 		case *ast.IndexListExpr: // T[A, B]
@@ -383,7 +383,7 @@ var b48c1Bad = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currenc
 const b48c1BadJSON = `{"price":{"currency":"ABC","amount":-1},"send_date":1}`
 
 // b48c1PriceOnly (1 Star: below the Stars minimum, with no date) and b48c1DateOnly (a date with no price) send one
-// inner field each: the client sends each as it is, and the other inner field stays absent [O-T2-01, O-T2-02].
+// inner field each: the client sends each as it is, and the other inner field stays absent.
 var (
 	b48c1PriceOnly = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "XTR", Amount: 1}}
 	b48c1DateOnly  = &tg.SuggestedPostParameters{SendDate: 1900000000}
@@ -396,10 +396,10 @@ const (
 
 // The other bounds the server checks (spec: XTR 5-100000, TON 10^7-10^13, a date 300 s to 30 days ahead), each sent
 // unchanged: TON below its minimum and above its maximum, XTR above its maximum, a zero amount (an explicit price, not
-// an absent one), and a date one minute ahead [A-T3-03 = O-T3-01, O-T3-02, O-T3-03, C1-01].
+// an absent one), and a date one minute ahead.
 var (
 	b48c1TONLow   = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 1}}
-	b48c1TONHigh  = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 10000000000001}} // [C1-01]
+	b48c1TONHigh  = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "TON", Amount: 10000000000001}}
 	b48c1XTRHigh  = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "XTR", Amount: 100001}}
 	b48c1ZeroCost = &tg.SuggestedPostParameters{Price: &tg.SuggestedPostPrice{Currency: "XTR", Amount: 0}}
 )
@@ -442,8 +442,8 @@ func TestB48C1_Wire(t *testing.T) {
 				{"xtr_high", b48c1XTRHigh, 0, b48c1XTRHighJSON, 0},
 				{"zero_price", b48c1ZeroCost, 0, b48c1ZeroCostJSON, 0},
 				{"near_date", &tg.SuggestedPostParameters{SendDate: soon}, 0, soonJSON, 0},
-				{"ton_high", b48c1TONHigh, 0, b48c1TONHighJSON, 0},                                    // above the TON maximum [C1-01]
-				{"channel_chat", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON, b48c1ChannelChat}, // a channel chat id [C1-02]
+				{"ton_high", b48c1TONHigh, 0, b48c1TONHighJSON, 0},                                    // above the TON maximum
+				{"channel_chat", b48c1Full, b48c1BigTopic(c.method), b48c1FullJSON, b48c1ChannelChat}, // a channel chat id
 			} {
 				t.Run(c.method+"/"+up+"/"+r.name, func(t *testing.T) {
 					chat := r.chat
@@ -456,7 +456,7 @@ func TestB48C1_Wire(t *testing.T) {
 					assert.Equal(t, strconv.FormatInt(chat, 10), args["chat_id"], "the chat id unchanged")
 					assert.Equal(t, wantType, mediaType)
 					assert.Len(t, files, b48c1Files(c.method, up), "file parts")
-					if m, ok := b48c1Mixed[c.method+"/"+up]; ok { // which file is the upload and which goes by id [C2-02]
+					if m, ok := b48c1Mixed[c.method+"/"+up]; ok { // which file is the upload and which goes by id
 						assert.Contains(t, files, m.upload, "the uploaded part")
 						assert.Equal(t, m.id, args[m.idField], "the file sent by id")
 					}
@@ -516,7 +516,7 @@ var b48c1Mixed = map[string]struct{ upload, idField, id string }{
 // b48c1Files is the number of file parts a call sends on a path.
 func b48c1Files(method, path string) int {
 	if path == "thumb-upload" || path == "live-id" || path == "photo-id" {
-		return 1 // the thumbnail only [C1-03]; the one uploaded live photo file [C2-01]
+		return 1 // the thumbnail only; the one uploaded live photo file
 	}
 	if !strings.HasPrefix(path, "upload") {
 		return 0

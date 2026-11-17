@@ -164,8 +164,8 @@ func TestB48B1_Holders(t *testing.T) {
 		assert.JSONEq(t, b48bPartner, api102aMarshal(t, p))
 	})
 	t.Run("star_transaction", func(t *testing.T) { // through StarTransaction's own Source decode
-		// T3-01: every TransactionPartnerUser key is set, and the whole value must equal the direct strict decode, so a
-		// Source decode that loses any field fails. T2-02: plus a key galigo does not know (the lenient path keeps it).
+		// every TransactionPartnerUser key is set, and the whole value must equal the direct strict decode, so a
+		// Source decode that loses any field fails. Plus a key galigo does not know (the lenient path keeps it).
 		full := strings.Replace(b48bPartner, `"paid_media_payload":"order-42"}`, `"paid_media_payload":"order-42","invoice_payload":"inv-7",`+
 			`"subscription_period":2592000,"gift":{"id":"g1","sticker":{"file_id":"s","file_unique_id":"su","type":"regular",`+
 			`"width":1,"height":1,"is_animated":false,"is_video":false},"star_count":5}}`, 1)
@@ -184,9 +184,9 @@ func TestB48B1_Holders(t *testing.T) {
 		require.Len(t, src.PaidMedia, 2)
 		assert.Equal(t, "preview", src.PaidMedia[1].Type)
 		assert.Equal(t, 480, src.PaidMedia[1].Height)
-		// C1-01: the item list keeps a future kind, a preview with no size, and the source order (not sorted by type).
-		// C3-01 (fixed after the third review, not re-reviewed): plus a video, a live photo and a photo with two sizes,
-		// and the same list without paid_media_payload. C3-02: both through Source and through Receiver.
+		// the item list keeps a future kind, a preview with no size, and the source order (not sorted by type).
+		// Plus a video, a live photo and a photo with two sizes,
+		// and the same list without paid_media_payload. Both through Source and through Receiver.
 		photo2 := `{"type":"photo","photo":[{"file_id":"a","file_unique_id":"au","width":90,"height":90},` +
 			`{"file_id":"b","file_unique_id":"bu","width":320,"height":320}]}`
 		mixed := strings.Replace(src0, `"paid_media":[`, `"paid_media":[{"type":"x","x_new":1},{"type":"preview"},`+
@@ -212,10 +212,10 @@ func TestB48B1_Holders(t *testing.T) {
 			}
 		}
 	})
-	t.Run("star_transaction_fallback", func(t *testing.T) { // P1-02: a paid_media item that does not decode keeps the raw partner
-		// C1-01: one space after the first comma, so Raw must be the source bytes, not a compacted copy.
+	t.Run("star_transaction_fallback", func(t *testing.T) { // a paid_media item that does not decode keeps the raw partner
+		// one space after the first comma, so Raw must be the source bytes, not a compacted copy.
 		bad := `{"type":"user", "user":{"id":5000000002,"is_bot":false,"first_name":"Buyer"},"paid_media":[{"type":"photo","photo":"x"}]}`
-		for _, key := range []string{"source", "receiver"} { // C3-02: the receiver decode too
+		for _, key := range []string{"source", "receiver"} { // the receiver decode too
 			var tx tg.StarTransaction
 			require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-2","amount":1,"date":1700000000,"`+key+`":`+bad+`}`), &tx))
 			p := tx.Source
@@ -239,7 +239,7 @@ func TestB48B1_Holders(t *testing.T) {
 	})
 }
 
-// T-cmp (P2-01): the paid_media slice makes TransactionPartnerUser non-comparable (the planned G-api incompatible line);
+// T-cmp: the paid_media slice makes TransactionPartnerUser non-comparable (the planned G-api incompatible line);
 // the other holders keep their comparability.
 func TestB48B1_Comparable(t *testing.T) {
 	assert.False(t, reflect.TypeOf(tg.TransactionPartnerUser{}).Comparable(), "TransactionPartnerUser")
@@ -247,19 +247,19 @@ func TestB48B1_Comparable(t *testing.T) {
 	assert.True(t, reflect.TypeOf(tg.PaidMediaPurchased{}).Comparable(), "PaidMediaPurchased")
 	assert.False(t, reflect.TypeOf(tg.PaidMediaInfo{}).Comparable(), "PaidMediaInfo")
 	assert.False(t, reflect.TypeOf(tg.PaidMedia{}).Comparable(), "PaidMedia")
-	// P3-01: StarTransaction still compiles with ==, but == on two user partners inside the interface panics at run time.
+	// StarTransaction still compiles with ==, but == on two user partners inside the interface panics at run time.
 	assert.True(t, reflect.TypeOf(tg.StarTransaction{}).Comparable(), "StarTransaction")
 	var tx tg.StarTransaction
 	require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-1","amount":1,"date":1700000000,"source":`+b48bPartner+`}`), &tx))
 	other := tx
 	assert.PanicsWithError(t, "runtime error: comparing uncomparable type tg.TransactionPartnerUser", func() { _ = tx.Source == other.Source })
 	assert.NotPanics(t, func() { _ = tx.Source == nil })
-	// T1-02: a map key that holds the user partner panics too.
+	// a map key that holds the user partner panics too.
 	assert.PanicsWithError(t, "runtime error: hash of unhashable type tg.TransactionPartnerUser", func() {
 		m := map[tg.TransactionPartner]int{}
 		m[tx.Source] = 1
 	})
-	// T2-01: a comparison with a different partner type does not panic (the note says it is safe).
+	// a comparison with a different partner type does not panic (the note says it is safe).
 	var fr tg.StarTransaction
 	require.NoError(t, json.Unmarshal([]byte(`{"id":"tx-3","amount":1,"date":1700000000,"source":{"type":"fragment"}}`), &fr))
 	require.IsType(t, tg.TransactionPartnerFragment{}, fr.Source)
@@ -289,7 +289,7 @@ func TestB48B1_ZeroEncode(t *testing.T) {
 	}
 }
 
-// The spec key lists, in spec order (E25/lookups/sec-b48b.txt); PaidMedia is the flat union of its four kinds, in the
+// The spec key lists, in spec order; PaidMedia is the flat union of its four kinds, in the
 // spec's kind order (live_photo, photo, preview, video).
 var b48bSpecKeys = map[string][]string{
 	"PaidMediaInfo":      {"star_count", "paid_media"},
@@ -351,7 +351,7 @@ func TestB48B1_Shapes(t *testing.T) {
 			}
 		}
 	})
-	// T1-05, T3-02: the full field order of the holders without another full-order row (ExternalReplyInfo: the
+	// the full field order of the holders without another full-order row (ExternalReplyInfo: the
 	// TestB48A_Shapes rows). Base order plus the one planned field (Message: 61 base names, PaidMedia after Document;
 	// B-48c2: IsPaidPost after HasProtectedContent, SuggestedPostInfo after Entities, the five service fields at the end).
 	t.Run("holder_order", func(t *testing.T) {

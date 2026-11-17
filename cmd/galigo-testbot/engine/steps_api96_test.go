@@ -107,14 +107,14 @@ func (f *fake96) SavePreparedKeyboardButton(_ context.Context, userID int64, but
 const api96MsgID = 4242
 
 // api96ReplyID is the id of a reply that a step sends; it differs from the source poll's id (api96MsgID), so a
-// result that reports the source id instead of the sent id fails (O-C1-01).
+// result that reports the source id instead of the sent id fails.
 const api96ReplyID = 4243
 
 func api96Runtime(f *fake96) *Runtime {
 	return NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 }
 
-// options with persistent ids that are not index strings (E-0013)
+// options with persistent ids that are not index strings
 func api96Opts() []tg.PollOption {
 	return []tg.PollOption{{Text: "A", PersistentID: "pa"}, {Text: "B", PersistentID: "pb"}, {Text: "C", PersistentID: "pc"}}
 }

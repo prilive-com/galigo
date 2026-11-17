@@ -31,7 +31,7 @@ const b63Msg = "upload reader is nil (InputFile.Source returned nil, or the read
 
 // b63EscA is the JSON escape of the letter "a" (backslash, u0061). It is built
 // from the rune so that no tool can turn the escape into its letter in this
-// source file (that happened once: test round t1, Claude A-T1-01).
+// source file (that happened once).
 var b63EscA = string(rune(0x5c)) + "u0061"
 
 func b63NilSource(name string) sender.InputFile {
@@ -61,7 +61,7 @@ type b63Slice []byte
 func (b63Slice) Read([]byte) (int, error) { return 0, io.EOF }
 
 // b63Scalar is a pointer reader whose element is not a struct: a typed nil of
-// it is refused like any other (AC2; test round t3, A-T3-02 = O-T3-02).
+// it is refused like any other (AC2).
 type b63Scalar int
 
 func (*b63Scalar) Read([]byte) (int, error) { return 0, io.EOF }
@@ -104,7 +104,7 @@ type b63Row struct {
 }
 
 // b63PathRows: one row per upload path (PLAN §6, sites 1-7), plus the typed-nil
-// rows and the nil part first, last and alone (E-0044).
+// rows and the nil part first, last and alone.
 func b63PathRows() []b63Row {
 	cid := testutil.TestChatID
 	var osFile *os.File
@@ -214,8 +214,7 @@ func b63PathRows() []b63Row {
 			_, err := c.SendDocument(ctx, sender.SendDocumentRequest{ChatID: cid, Document: sender.FromReader((*bytes.Reader)(nil), "a")})
 			return err
 		}},
-		// No file name: the check does not depend on FileName (test round t2,
-		// A-T2-01 = O-T2-01).
+		// No file name: the check does not depend on FileName.
 		{"nameless_nil_source", "document", "document", func(ctx context.Context, c *sender.Client) error {
 			_, err := c.SendDocument(ctx, sender.SendDocumentRequest{ChatID: cid, Document: sender.InputFile{Source: func() io.Reader { return nil }}})
 			return err
@@ -320,39 +319,33 @@ func TestB63_Builder(t *testing.T) {
 		{"no_reference_falls_back", "file1", "file1", payload{}},
 		{"empty_field_name", "", "", payload{}},
 		// A value that does not decode (a number out of float64 range) never
-		// counts, even though most of it would decode (test round t1, Codex O-T1-01).
+		// counts, even though most of it would decode.
 		{"partial_decode_error", "file1", "file1", payload{A: json.RawMessage(`{"bad":1e1000,"media":"attach://file1"}`)}},
 		// Only an exact nested value counts, not a text that ends with the
-		// reference (test round t1, Codex O-T1-02), and not a value that is
-		// equal only after trimming or case folding (test round t2, A-T2-03 =
-		// O-T2-02).
+		// reference, and not a value that is
+		// equal only after trimming or case folding.
 		{"nested_prefix_text_ignored", "file1", "media", payload{A: `{"text":"prefixattach://file1"}`, Media: `{"media":"attach://file1"}`}},
 		{"spaced_ref_ignored", "file1", "media", payload{A: `{"text":" attach://file1 "}`, Media: `{"media":"attach://file1"}`}},
 		{"case_ref_ignored", "file1", "media", payload{A: `{"text":"ATTACH://FILE1"}`, Media: `{"media":"attach://file1"}`}},
 		// The whole value must be JSON: an object followed by text does not
-		// count (test round t2, Claude A-T2-03).
+		// count.
 		{"trailing_text_ignored", "file1", "media", payload{A: `{"media":"attach://file1"} x`, Media: `{"media":"attach://file1"}`}},
 		// A nested value that is not the reference string never counts: null,
-		// a bool, a number, or an object with no reference (change round c1,
-		// Codex O-C1-01).
+		// a bool, a number, or an object with no reference.
 		{"nested_null_ignored", "file1", "media", payload{A: `[null]`, Media: `{"media":"attach://file1"}`}},
 		{"nested_bools_ignored", "file1", "media", payload{A: `[true,false]`, Media: `{"media":"attach://file1"}`}},
 		{"nested_number_ignored", "file1", "media", payload{A: `{"n":0}`, Media: `{"media":"attach://file1"}`}},
 		{"object_without_ref_ignored", "file1", "media", payload{A: `[{"n":"x"}]`, Media: `{"media":"attach://file1"}`}},
 		// Empty containers and nested strings shorter than the reference
-		// never count (change round c2, Codex O-C2-02 = Claude A-C2-03, and
-		// Claude A-C2-01).
+		// never count.
 		{"empty_object_ignored", "file1", "media", payload{A: `{}`, Media: `{"media":"attach://file1"}`}},
 		{"empty_containers_ignored", "file1", "media", payload{A: `[[],{}]`, Media: `{"media":"attach://file1"}`}},
 		{"nested_ref_prefix_ignored", "file1", "media", payload{A: `["","attach://","attach://file"]`, Media: `{"media":"attach://file1"}`}},
-		// JSON allows any of its four white space bytes before the value
-		// (change round c1, Claude A-C1-01; all four since round c2, Codex
-		// O-C2-01 = Claude A-C2-02).
+		// JSON allows any of its four white space bytes before the value.
 		{"leading_whitespace_value", "file1", "media", payload{Media: " \t\r\n" + `[{"type":"photo","media":"attach://file1"}]`}},
 		// White space on one side of the reference only, each JSON white
 		// space byte, and a nested string that is itself JSON holding the
-		// reference: none of them counts (change round c3, Codex O-C3-01,
-		// Claude A-C3-02).
+		// reference: none of them counts.
 		{"leading_only_whitespace_ignored", "file1", "media", payload{A: `[" attach://file1","\tattach://file1","\rattach://file1","\nattach://file1"]`, Media: `{"media":"attach://file1"}`}},
 		{"trailing_only_whitespace_ignored", "file1", "media", payload{A: `["attach://file1 ","attach://file1\t","attach://file1\r","attach://file1\n"]`, Media: `{"media":"attach://file1"}`}},
 		{"nested_json_string_ignored", "file1", "media", payload{A: `{"cb":"{\"media\":\"attach://file1\"}"}`, Media: `{"media":"attach://file1"}`}},
@@ -362,7 +355,7 @@ func TestB63_Builder(t *testing.T) {
 		t.Run(row.name, func(t *testing.T) {
 			row.p.Parts = nilPart(row.part)
 			// 32 times: params is a map, so a lookup that forgets to sort its
-			// keys passes one run by chance (test round t1, Claude A-T1-03).
+			// keys passes one run by chance.
 			for range 32 {
 				_, err := sender.BuildMultipartRequest(row.p)
 				requireB63(t, err, row.field, row.part)
@@ -384,7 +377,7 @@ func TestB63_Builder(t *testing.T) {
 		}
 	})
 
-	// Two nil parts: the first in order is named (test round t1, Codex O-T1-06).
+	// Two nil parts: the first in order is named.
 	t.Run("two_nil_parts_first_wins", func(t *testing.T) {
 		parts := []sender.FilePart{{FieldName: "a", FileName: "x"}, {FieldName: "b", FileName: "x"}}
 		_, err := sender.BuildMultipartRequest(payload{Parts: parts})
@@ -415,10 +408,9 @@ func TestB63_Encode(t *testing.T) {
 		{"alone", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{nilPart("a")}}},
 		{"nameless", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{{FieldName: "a"}}}},
 		// An empty field name, with a file name, so the two name fields are
-		// tested apart (test round t3, A-T3-01 = O-T3-01 = LT3-01).
+		// tested apart.
 		{"empty_field_name", "", "", sender.MultipartRequest{Files: []sender.FilePart{{FileName: "x"}}}},
-		// A blank part: no field name and no file name at once (change
-		// round c3, Claude A-C3-01).
+		// A blank part: no field name and no file name at once.
 		{"blank_part", "", "", sender.MultipartRequest{Files: []sender.FilePart{{}}}},
 		{"typed_nil_scalar", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{{FieldName: "a", FileName: "x", Reader: (*b63Scalar)(nil)}}}},
 		{"typed_nil", "a", "a", sender.MultipartRequest{Files: []sender.FilePart{{FieldName: "a", FileName: "x", Reader: typedNil}}}},
@@ -453,7 +445,7 @@ func TestB63_Encode(t *testing.T) {
 }
 
 // TestB63_Retry: the error is not retried, and a retry re-checks the new
-// reader (PLAN AC1, AC3; E-0118).
+// reader (PLAN AC1, AC3).
 func TestB63_Retry(t *testing.T) {
 	t.Run("nil_on_first_attempt", func(t *testing.T) {
 		srv := b63Server(t)
@@ -499,8 +491,7 @@ func TestB63_Controls(t *testing.T) {
 		"value_reader":     sender.FromReader(b63Value{}, "a"),
 		"nil_slice_reader": sender.FromReader(b63Slice(nil), "a"),
 		"non_nil_pointer":  sender.FromReader(bytes.NewReader([]byte("x")), "a"),
-		// A non-nil pointer to a zero value is not nil (AC2, AC5; test round
-		// t2, Claude A-T2-02).
+		// A non-nil pointer to a zero value is not nil (AC2, AC5).
 		"zero_value_pointer": sender.FromReader(new(bytes.Buffer), "a"),
 		// The same non-struct pointer type as typed_nil_scalar, not nil.
 		"non_nil_scalar_pointer":  sender.FromReader(new(b63Scalar), "a"),

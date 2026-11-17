@@ -40,7 +40,7 @@ func TestB48C1_Scenario(t *testing.T) {
 		assert.Equal(t, w, steps[i], "step %d", i)
 	}
 	assert.IsType(t, &engine.CleanupStep{}, steps[len(want)])
-	// the two server texts, as probed live on 2026-11-12 (E27/lookups/probe-b48c-raw-console.txt)
+	// the two server texts, as probed live on 2026-11-12
 	assert.Equal(t, "suggested posts can be sent only to channel direct messages", engine.SuggestedPostWrongChat)
 	assert.Equal(t, "invalid amount of Telegram Stars specified", engine.SuggestedPostWrongAmount)
 }

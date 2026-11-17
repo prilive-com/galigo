@@ -47,7 +47,7 @@ const b48c2Chat = int64(-1001234567890)
 var b48c2BigTarget int64 = 3000000000
 
 // b48c2Target is the target message id of S1 and S5: above 2^31 where int has 64 bits, so a step or an adapter that
-// narrows message_id through int32 fails (C2-01); 70 where int has 32 bits.
+// narrows message_id through int32 fails; 70 where int has 32 bits.
 func b48c2Target() int {
 	if strconv.IntSize == 64 {
 		return int(b48c2BigTarget)
@@ -70,7 +70,7 @@ func b48c2Refusal(text string) error {
 type b48c2CtxKey struct{}
 
 // b48c2Comment and the send dates of 2200000000 (above 2^31) in S1 and S5 show that the step and the adapter pass the
-// values on unchanged: no trimming, no case change, no int32 narrowing (O-C1-01).
+// values on unchanged: no trimming, no case change, no int32 narrowing.
 const b48c2Comment = "  OK Привет  "
 
 // S1: each step sends one request with the target id (or the target id + 1000000 with Missing) and its own value,
@@ -109,11 +109,10 @@ func TestB48C2_Step_Requests(t *testing.T) {
 	}, f.declines)
 }
 
-// b48c2Markup is a comment with HTML markup characters: an HTML-escaping layer would change it (A-C3-01).
+// b48c2Markup is a comment with HTML markup characters: an HTML-escaping layer would change it.
 const b48c2Markup = "<b>a & b</b>"
 
-// S1b: the step passes a negative send date, a comment of spaces only and a comment with markup on unchanged
-// (O-C3-01, A-C3-01).
+// S1b: the step passes a negative send date, a comment of spaces only and a comment with markup on unchanged.
 func TestB48C2_Step_OptionalValues(t *testing.T) {
 	tgt := b48c2Target()
 	for _, tc := range []struct {
@@ -155,7 +154,7 @@ func TestB48C2_Step_Outcomes(t *testing.T) {
 			{"", false, SuggestedPostNotUsable, SuggestedPostNotFound, 70},
 			{"missing_", true, SuggestedPostNotFound, SuggestedPostNotUsable, 1000070},
 		} {
-			inText := &tg.APIError{Code: 400, Description: "Bad Request: x " + mode.want + " (y)"} // review findings A-T3-02 and O-T3-03
+			inText := &tg.APIError{Code: 400, Description: "Bad Request: x " + mode.want + " (y)"}
 			for _, tc := range []struct {
 				name    string
 				err     error
@@ -213,7 +212,7 @@ func TestB48C2_Step_Names(t *testing.T) {
 	assert.Equal(t, "approveSuggestedPost (9.2), missing message", (&DecideSuggestedPostStep{Method: "approveSuggestedPost", Missing: true}).Name())
 	assert.Equal(t, "declineSuggestedPost (9.2)", (&DecideSuggestedPostStep{Method: "declineSuggestedPost"}).Name())
 	assert.Equal(t, "declineSuggestedPost (9.2), missing message", (&DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true}).Name())
-	// the two server texts, as probed live on 2026-11-12 (E29/lookups/probe-b48c2-raw-console.txt)
+	// the two server texts, as probed live on 2026-11-12
 	assert.Equal(t, "message can't be used in the method", SuggestedPostNotUsable)
 	assert.Equal(t, "suggested post not found", SuggestedPostNotFound)
 }
@@ -221,7 +220,7 @@ func TestB48C2_Step_Names(t *testing.T) {
 // S5: the step with the real adapter and sender over a fake server that answers as the live server does in the test
 // chat (MEASURED): NotFound when message_id is absent or names no message, NotUsable for the target.
 func TestB48C2_StepThroughAdapter(t *testing.T) {
-	tgt := b48c2Target() // C2-01: a large target id and a full-width chat id through the step and the real adapter
+	tgt := b48c2Target() // a large target id and a full-width chat id through the step and the real adapter
 	for _, tc := range []struct {
 		name string // fixed, not step.Name(): a mutant of Name() must not rename the leaves
 		step *DecideSuggestedPostStep
@@ -236,7 +235,7 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
 		{"decline_missing", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Missing: true, WantError: SuggestedPostNotFound},
 			"declineSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d}`, tgt+1000000)},
-		// O-C3-01, A-C3-01: a negative date, a comment of spaces only and a comment with markup reach the server unchanged
+		// a negative date, a comment of spaces only and a comment with markup reach the server unchanged
 		{"approve_negative_date", &DecideSuggestedPostStep{Method: "approveSuggestedPost", SendDate: -1, WantError: SuggestedPostNotUsable},
 			"approveSuggestedPost", fmt.Sprintf(`{"chat_id":-1001234567890,"message_id":%d,"send_date":-1}`, tgt)},
 		{"decline_blank", &DecideSuggestedPostStep{Method: "declineSuggestedPost", Comment: "   ", WantError: SuggestedPostNotUsable},
@@ -269,7 +268,7 @@ func TestB48C2_StepThroughAdapter(t *testing.T) {
 
 // S5c: through the real adapter and sender, the server's other answers fail the step: success ("took message <id>",
 // so the adapter cannot turn a success into a refusal), another 400 text and another code. Both methods, both target
-// modes (O-T3-02; E-0123).
+// modes.
 func TestB48C2_StepThroughAdapterOutcomes(t *testing.T) {
 	for _, method := range []string{"approveSuggestedPost", "declineSuggestedPost"} {
 		for _, mode := range []struct {
@@ -308,7 +307,7 @@ func TestB48C2_StepThroughAdapterOutcomes(t *testing.T) {
 }
 
 // S5b: a cancelled context reaches the sender through the step and the real adapter: the step fails with
-// context.Canceled and sends no request (E-0123: the adapter's ctx argument).
+// context.Canceled and sends no request (the adapter passes its ctx argument on).
 func TestB48C2_StepThroughAdapterCancel(t *testing.T) {
 	for _, tc := range []struct {
 		name string

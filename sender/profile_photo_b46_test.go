@@ -143,7 +143,7 @@ func TestB46_ReferenceAsGiven(t *testing.T) {
 }
 
 // T-3: a nil photo, also a typed nil pointer in the interface, is a
-// validation error before any request, never a panic (E-0133).
+// validation error before any request, never a panic.
 func TestB46_NilPhoto(t *testing.T) {
 	rows := []struct {
 		name  string
@@ -196,8 +196,8 @@ func TestB46_BadPhoto(t *testing.T) {
 	}
 }
 
-// T-4b: the resolver returns a JSON encoding error before any request
-// (C1-01): an infinite MainFrameTime is not valid JSON.
+// T-4b: the resolver returns a JSON encoding error before any request:
+// an infinite MainFrameTime is not valid JSON.
 func TestB46_MarshalError(t *testing.T) {
 	for _, c := range b46Callers() {
 		t.Run(c.name, func(t *testing.T) {
@@ -287,7 +287,7 @@ func TestB46_BusinessIsPublic(t *testing.T) {
 }
 
 // T-7: one request per call; no retry on 429 or 5xx (callJSON), for the
-// three calls this slice touches (Codex T3-03).
+// three calls this slice touches.
 func TestB46_NoRetry(t *testing.T) {
 	replies := map[string]http.HandlerFunc{
 		"429": func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyRateLimit(w, 1) },

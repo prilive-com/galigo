@@ -16,6 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/sony/gobreaker/v2"
@@ -1081,6 +1082,8 @@ type deleteWebhookRecorder struct {
 	deleteBody      string
 	deleteRedirect  bool                  // answer deleteWebhook with a 302 to /redirected, which answers deleteBody
 	onDelete        func(r *http.Request) // optional; runs before the deleteWebhook answer
+	deleteStatus    int                   // the deleteWebhook answer's HTTP status; 0: 200
+	deleteReadErr   string                // when set, reading the deleteWebhook answer fails with this text after deleteBody
 	mu              sync.Mutex
 	reqs            []recordedRequest
 	ctxs            []reqCtx // per request, in the order of reqs
@@ -1119,6 +1122,9 @@ func (rec *deleteWebhookRecorder) serve(sent *http.Request, w http.ResponseWrite
 			w.Header().Set("Location", "/redirected")
 			w.WriteHeader(http.StatusFound)
 			return
+		}
+		if rec.deleteStatus != 0 {
+			w.WriteHeader(rec.deleteStatus)
 		}
 		_, _ = io.WriteString(w, rec.deleteBody)
 	case rec.deleteRedirect && r.URL.Path == "/redirected":
@@ -1224,6 +1230,9 @@ func (ht handlerTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 	resp := w.Result()
 	resp.Request = req
+	if ht.rec.deleteReadErr != "" && strings.HasSuffix(sreq.URL.Path, "/deleteWebhook") {
+		resp.Body = io.NopCloser(io.MultiReader(resp.Body, iotest.ErrReader(errors.New(ht.rec.deleteReadErr))))
+	}
 	return resp, nil
 }
 
@@ -1240,8 +1249,15 @@ const (
 	b112DeleteOK  = `{"ok":true,"result":true}`
 	b112Delete401 = `{"ok":false,"error_code":401,"description":"Unauthorized"}`
 	// b112Delete401Echo is a 401 whose description repeats the request path,
-	// token included, as a proxy or server may do.
-	b112Delete401Echo = `{"ok":false,"error_code":401,"description":"Unauthorized: ` + b112DeletePath + `"}`
+	// token included, and a piece of the token, as a proxy or server may do.
+	b112Delete401Echo = `{"ok":false,"error_code":401,"description":"Unauthorized: ` + b112DeletePath + ` (key ` + b112TokenPiece + `)"}`
+
+	// b112TokenPiece is a piece of b112Token, longer than 4 bytes.
+	b112TokenPiece = "FakeB112Token"
+
+	// b112ReadErr is a body-read error text that repeats the request path
+	// and a piece of the token, as a malformed trailer line can.
+	b112ReadErr = "malformed trailer line: " + b112DeletePath + " key " + b112TokenPiece
 
 	// b112BaseURL is the main Config.BaseURL, used as given. Its path is not
 	// "/bot" and has no "bot" segment, so a fix that swaps only the host of the
@@ -1318,6 +1334,8 @@ func TestPolling_Start_DeleteWebhookTarget(t *testing.T) {
 		cancel     string           // "before": ctx cancelled before Start; "during": cancelled while deleteWebhook is in flight
 		redirect   string           // deleteWebhook answers 302; the client's policy "refuse"s or "follow"s it
 		deleteBody string           // the deleteWebhook answer (or the redirect target's); empty: b112DeleteOK
+		deleteCode int              // the deleteWebhook answer's HTTP status; 0: 200
+		readErr    string           // reading the deleteWebhook answer fails with this text after deleteBody
 		wantCalls  []redirectCall   // the redirect policy's calls
 		wantErr    error            // Start must fail with this (errors.Is)
 		wantErrTxt string           // Start must fail with exactly this text
@@ -1366,7 +1384,13 @@ func TestPolling_Start_DeleteWebhookTarget(t *testing.T) {
 				Path: "/redirected", Cookie: "b112=jar", Tag: "polling-client"},
 			wantCalls: b112RedirectCalls},
 		{name: "D12 option on 401 description repeats the token", opts: on, baseURL: b112BaseURL, timeout: b112Timeout,
-			deleteBody: b112Delete401Echo, wantErrTxt: "failed to delete webhook: telegram API error 401: Unauthorized: /custom/[REDACTED]/deleteWebhook", wantAPI: 401,
+			deleteBody: b112Delete401Echo, deleteCode: http.StatusUnauthorized, wantAPI: 401,
+			wantErrTxt: "failed to delete webhook: telegram API error 401: Unauthorized: /custom/[REDACTED]/deleteWebhook (key [REDACTED])",
+			wantDelete: &recordedRequest{Scheme: "http", URLHost: b112Host, Method: http.MethodGet, Host: b112Host,
+				Path: b112DeletePath, RawQuery: "drop_pending_updates=false", Cookie: "b112=jar", Tag: "polling-client"}},
+		{name: "D13 option on body read error repeats the token", opts: on, baseURL: b112BaseURL, timeout: b112Timeout,
+			deleteBody: `{"ok":false,`, readErr: b112ReadErr,
+			wantErrTxt: "failed to delete webhook: failed to decode response: malformed trailer line: /custom/[REDACTED]/deleteWebhook key [REDACTED]",
 			wantDelete: &recordedRequest{Scheme: "http", URLHost: b112Host, Method: http.MethodGet, Host: b112Host,
 				Path: b112DeletePath, RawQuery: "drop_pending_updates=false", Cookie: "b112=jar", Tag: "polling-client"}},
 	}
@@ -1378,6 +1402,7 @@ func TestPolling_Start_DeleteWebhookTarget(t *testing.T) {
 			}
 			rec := newDeleteWebhookRecorder(body)
 			rec.deleteRedirect = tt.redirect != ""
+			rec.deleteStatus, rec.deleteReadErr = tt.deleteCode, tt.readErr
 			cfg := pollingTestConfig()
 			cfg.BaseURL = tt.baseURL
 			hc := rec.client(tt.timeout)

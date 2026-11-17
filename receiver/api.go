@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -104,12 +105,18 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 
 // DeleteWebhook removes the webhook from Telegram.
 func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, dropPending bool) error {
+	return deleteWebhookAt(ctx, client, telegramAPIBaseURL, token, dropPending)
+}
+
+// deleteWebhookAt sends deleteWebhook to baseURL, which ends where the token
+// begins (for example "https://api.telegram.org/bot").
+func deleteWebhookAt(ctx context.Context, client *http.Client, baseURL string, token tg.SecretToken, dropPending bool) error {
 	if client == nil {
 		client = defaultAPIClient
 	}
 
 	apiURL := fmt.Sprintf("%s%s/deleteWebhook?drop_pending_updates=%t",
-		telegramAPIBaseURL, token.Value(), dropPending)
+		baseURL, token.Value(), dropPending)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
@@ -127,13 +134,16 @@ func DeleteWebhook(ctx context.Context, client *http.Client, token tg.SecretToke
 
 	var result apiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		// A body-read error can quote what the server sent (a trailer line).
+		return fmt.Errorf("failed to decode response: %w", scrub.TokenFromError(err, token))
 	}
 
 	if !result.OK {
+		// The server at baseURL may repeat the request path, token included,
+		// in its description.
 		return &APIError{
 			Code:        result.ErrorCode,
-			Description: result.Description,
+			Description: scrub.TokenFromError(errors.New(result.Description), token).Error(),
 		}
 	}
 

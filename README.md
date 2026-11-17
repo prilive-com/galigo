@@ -240,7 +240,7 @@ client.SendMessage(ctx, sender.SendMessageRequest{
 import "github.com/prilive-com/galigo/receiver"
 
 updates := make(chan tg.Update, 100)
-poller := receiver.NewPollingClient(token, updates, logger, cfg)
+poller := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, cfg)
 poller.Start(ctx)
 ```
 

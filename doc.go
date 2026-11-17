@@ -24,7 +24,9 @@
 //
 //	// Only receive updates
 //	import "github.com/prilive-com/galigo/receiver"
-//	recv, _ := receiver.New(token)
+//	updates := make(chan tg.Update, 100)
+//	recv := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, receiver.DefaultConfig())
+//	err := recv.Start(ctx)
 //
 //	// Only send messages
 //	import "github.com/prilive-com/galigo/sender"

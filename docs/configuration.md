@@ -170,23 +170,25 @@ msg, err := client.SendPhoto(ctx, sender.SendPhotoRequest{
 ### Receiver-Only Example
 
 ```go
-import "github.com/prilive-com/galigo/receiver"
-
-poller, err := receiver.NewPollingClient(token,
-    receiver.WithPollingTimeout(30),
-    receiver.WithPollingLimit(100),
+import (
+    "github.com/prilive-com/galigo/receiver"
+    "github.com/prilive-com/galigo/tg"
 )
-if err != nil {
+
+cfg := receiver.DefaultConfig()
+cfg.PollingTimeout = 30
+cfg.PollingLimit = 100
+
+// You make the channel; the receiver never closes it.
+updates := make(chan tg.Update, 100)
+poller := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, cfg)
+if err := poller.Start(ctx); err != nil {
     log.Fatal(err)
 }
 defer poller.Stop()
 
-if err := poller.Start(ctx); err != nil {
-    log.Fatal(err)
-}
-
-for update := range poller.Updates() {
-    // Process update
+for update := range updates {
+    process(update) // your code
 }
 ```
 

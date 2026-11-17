@@ -18,7 +18,7 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// api100bProbe01 is the probe 01 reply of 2026-11-05 (E9/lookups/probe100b/01-sendLivePhoto.json) with the same
+// api100bProbe01 is the probe 01 reply of 2026-11-05 with the same
 // edits as tg/api100_test.go: testutil bot and chat, synthetic file ids; the rest byte-exact.
 const api100bProbe01 = `{"message_id":1047,"from":{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"},` +
 	`"chat":{"id":123456789,"title":"Test Chat","is_forum":true,"type":"supergroup"},"date":1793904606,` +

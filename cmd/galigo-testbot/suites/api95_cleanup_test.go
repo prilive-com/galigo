@@ -165,7 +165,7 @@ func TestB30_T8_CreatorRequiredSkip(t *testing.T) {
 }
 
 // S67 and S68 in a group: the draft skips after the scenario's own CleanupStep, so nothing is left and the runner adds
-// no fallback cleanup (guards; REGISTER-plan O-note-2).
+// no fallback cleanup (guards).
 func TestB30_S67S68_NoFallbackCleanup(t *testing.T) {
 	t.Run("S67", func(t *testing.T) {
 		f := &fake101dGroup{}

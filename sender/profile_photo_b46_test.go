@@ -196,7 +196,7 @@ func TestB46_BadPhoto(t *testing.T) {
 	}
 }
 
-// T-4b: the resolver returns a JSON encoding error before any request
+// T-4b: the resolver returns a JSON encoding error before any request:
 // an infinite MainFrameTime is not valid JSON.
 func TestB46_MarshalError(t *testing.T) {
 	for _, c := range b46Callers() {

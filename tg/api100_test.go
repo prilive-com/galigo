@@ -14,11 +14,11 @@ import (
 
 // Bot API 10.0 part a decode and encode tests (B-25 slice 2a, TEST-PLAN §2, rows T-tg-1 … T-tg-11).
 //
-// Live fixtures: replies of 2026-11-04 (E8/lookups/probe100a/01 getMe, 04 getChat). The only edit is the identity
+// Live fixtures: replies of 2026-11-04 (probe 01 getMe, 04 getChat). The only edit is the identity
 // fields, replaced by internal/testutil values because the repository is public: bot id -> testutil.TestBotID, bot
 // first_name -> "Test Bot", bot username -> testutil.TestBotUsername. Only probe 04's "permissions" object is
 // embedded (no chat id, title, description or invite link). Every 10.0 field is byte-exact. Fixtures named
-// "synthetic" are built from the API reference tables (E8/lookups/sec-10.0.txt); there is no live sample for them.
+// "synthetic" are built from the API reference tables; there is no live sample for them.
 
 const (
 	// probe 01: getMe, identity fields replaced.
@@ -331,7 +331,7 @@ func TestAPI100_RoundTrip(t *testing.T) {
 
 // ================== Bot API 10.0 part b: live photos (B-25 10.0b, TEST-PLAN §2, rows T-tg-1 … T-tg-7) ==================
 //
-// Live fixtures: replies of 2026-11-05 (E9/lookups/probe100b/01 sendLivePhoto upload, 02 sendLivePhoto by file id,
+// Live fixtures: replies of 2026-11-05 (probe 01 sendLivePhoto upload, 02 sendLivePhoto by file id,
 // 07 editMessageMedia into a live photo). Edits, and only these: "from" -> the testutil bot (id
 // testutil.TestBotID, first name "Test Bot", username testutil.TestBotUsername); "chat" -> testutil.TestChatID and
 // title "Test Chat"; every file_id / file_unique_id -> a synthetic value (LPV-* the video, LPS90-* and LPS100-* the

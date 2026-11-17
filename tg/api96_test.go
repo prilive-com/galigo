@@ -15,11 +15,11 @@ import (
 
 // Bot API 9.6 decode and encode tests (B-25 slice 1, TEST-PLAN §2, rows T-tg-1 … T-tg-14).
 //
-// Live fixtures: replies of 2026-11-04 (E7/lookups/probe/01, 02, 04, 05, 06). The only edit is the identity
+// Live fixtures: replies of 2026-11-04 (probes 01, 02, 04, 05, 06). The only edit is the identity
 // fields, replaced by internal/testutil values because the repository is public: bot id 8434949118 ->
 // testutil.TestBotID, bot first_name -> "Test Bot", bot username -> testutil.TestBotUsername, chat id ->
 // testutil.TestChatID, chat title -> "Test Chat". Every 9.6 field is byte-exact. Fixtures named "synthetic"
-// are built from the API reference tables (E7/lookups/sec-*.txt); there is no live sample for them.
+// are built from the API reference tables; there is no live sample for them.
 
 const (
 	api96From = `{"id":123456789,"is_bot":true,"first_name":"Test Bot","username":"testbot"}`

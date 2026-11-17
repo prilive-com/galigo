@@ -327,7 +327,7 @@ func TestB48B2_Validation(t *testing.T) {
 		{"star_count -1", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID, StarCount: -1, Media: []sender.InputPaidMedia{good}}, "star_count", "galigo: validation: star_count - must be positive"},
 		{"media nil", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID, StarCount: 1}, "media", "galigo: validation: media - required"},
 		{"media empty", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID, StarCount: 1, Media: []sender.InputPaidMedia{}}, "media", "galigo: validation: media - required"},
-		// request-level order (PLAN D4): chat id, then star_count, then the list and its items (LT3-02)
+		// request-level order (PLAN D4): chat id, then star_count, then the list and its items
 		{"order: chat id before star_count", sender.SendPaidMediaRequest{ChatID: int64(0), Media: []sender.InputPaidMedia{good}}, "", "galigo: chat_id cannot be zero"},
 		{"order: star_count before media", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID}, "star_count", "galigo: validation: star_count - must be positive"},
 		{"order: star_count before items", sender.SendPaidMediaRequest{ChatID: testutil.TestChatID, Media: []sender.InputPaidMedia{{Type: "photo"}}}, "star_count", "galigo: validation: star_count - must be positive"},

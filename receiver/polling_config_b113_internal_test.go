@@ -430,40 +430,52 @@ func TestNewPollingClient_ConfigValues(t *testing.T) {
 // TestNewPollingClient_ConfigAllowedUpdatesCopied checks that the client
 // keeps its own copy of Config.AllowedUpdates, for a one-element list with
 // no spare capacity (custom base) and a two-element list with one spare slot
-// (empty Config.BaseURL): NewPollingClient leaves the caller's slice as it
-// was, and writing an element of it after NewPollingClient (before Start, or
-// while the first getUpdates is served) does not change the requests.
+// (empty Config.BaseURL), with no options and with an option that does not
+// set the list (WithPollingDeleteWebhook(false), the field's own value):
+// NewPollingClient leaves the caller's slice as it was, spare capacity
+// included, and writing an element of it after NewPollingClient (before
+// Start, or while the first getUpdates is served) does not change the
+// requests.
 func TestNewPollingClient_ConfigAllowedUpdatesCopied(t *testing.T) {
 	for _, size := range []string{"one", "two"} {
 		for _, when := range []string{"before start", "between polls"} {
-			t.Run(size+" "+when, func(t *testing.T) {
-				orig := []string{"message", "callback_query"}
-				if size == "one" {
-					orig = orig[:1]
+			for _, withOpt := range []bool{false, true} {
+				name := size + " " + when
+				var opts []PollingOption
+				if withOpt {
+					name += " with option"
+					opts = []PollingOption{WithPollingDeleteWebhook(false)}
 				}
-				// one spare slot for the two-element list, none for the one-element list
-				list := make([]string, len(orig), 2*len(orig)-1)
-				copy(list, orig)
-				tgt := b113Base
-				if size == "two" {
-					tgt = b113Default
-				}
-				srv := newB113Server()
-				cfg := b113Config(ModeLongPolling, tgt.base)
-				cfg.AllowedUpdates = list
-				updates := make(chan tg.Update, 10)
-				c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg)
-				assert.Equal(t, orig, list, "b113 client: NewPollingClient must not change the caller's list")
-				write := func() { list[0] = "poll" }
-				var between func()
-				if when == "before start" {
-					between = write
-				} else {
-					srv.afterFirst = write
-				}
-				b113Run(t, srv, c, updates, between, nil, 11*time.Second,
-					b113Expect{tgt: tgt, list: orig, timeout: 1, limit: 100})
-			})
+				t.Run(name, func(t *testing.T) {
+					orig := []string{"message", "callback_query"}
+					if size == "one" {
+						orig = orig[:1]
+					}
+					// one spare slot for the two-element list, none for the one-element list
+					list := make([]string, len(orig), 2*len(orig)-1)
+					copy(list, orig)
+					whole := append(slices.Clone(orig), make([]string, cap(list)-len(list))...)
+					tgt := b113Base
+					if size == "two" {
+						tgt = b113Default
+					}
+					srv := newB113Server()
+					cfg := b113Config(ModeLongPolling, tgt.base)
+					cfg.AllowedUpdates = list
+					updates := make(chan tg.Update, 10)
+					c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg, opts...)
+					assert.Equal(t, whole, list[:cap(list)], "b113 client: NewPollingClient must not change the caller's list or its spare capacity")
+					write := func() { list[0] = "poll" }
+					var between func()
+					if when == "before start" {
+						between = write
+					} else {
+						srv.afterFirst = write
+					}
+					b113Run(t, srv, c, updates, between, nil, 11*time.Second,
+						b113Expect{tgt: tgt, list: orig, timeout: 1, limit: 100})
+				})
+			}
 		}
 	}
 }

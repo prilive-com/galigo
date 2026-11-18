@@ -108,6 +108,10 @@ func TestServerTextScrubbed(t *testing.T) {
 		{name: "decode piece", token: b71Token, rt: &b71RT{status: 400, body: `{"ok":false,"error_code":123456789123456789123,"description":"x"}`},
 			want: "failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", decode: true,
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int"},
+		// the envelope is decoded before the status is looked at: an undecodable reply at 200 is scrubbed the same way
+		{name: "decode piece, status 200", token: b71Token, rt: &b71RT{status: 200, body: `{"ok":false,"error_code":123456789123456789123,"description":"x"}`},
+			want: "failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", decode: true,
+			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int"},
 		{name: "description whole", token: b71Token, rt: &b71RT{status: 400, body: descWhole},
 			want: "galigo: getMe failed: Bad Request: echo /bot[REDACTED]/getMe (code=400)", code: 400, desc: "Bad Request: echo /bot[REDACTED]/getMe"},
 		{name: "description piece", token: b71Token, rt: &b71RT{status: 400, body: descPiece},
@@ -246,6 +250,14 @@ func TestResultDecodeScrubbed(t *testing.T) {
 	const numUser = "failed to unmarshal chat member (member): json: cannot unmarshal number [REDACTED]123 into Go struct field ChatMemberMember.user.id of type int64"
 	ctx := context.Background()
 	chat := tg.ChatID(int64(1))
+	// GetChatMember with a nil member check: on an error it must return no member at all
+	getMember := func(c *sender.Client) error {
+		m, err := c.GetChatMember(ctx, chat, 1)
+		if m != nil {
+			return fmt.Errorf("member %T returned with the error %v", m, err)
+		}
+		return err
+	}
 	num := func(field string) string {
 		return "json: cannot unmarshal number [REDACTED]123 into Go struct field " + field
 	}
@@ -296,9 +308,9 @@ func TestResultDecodeScrubbed(t *testing.T) {
 			"galigo: getChatAdministrators: unknown chat member status: \"key [REDACTED]\"", "unknown chat member status: \"key [REDACTED]\"", false, chainStatus, ""},
 		{"getChatAdministrators valid status, number", `[` + memberNum + `]`, func(c *sender.Client) error { _, err := c.GetChatAdministrators(ctx, chat); return err }, "getChatAdministrators",
 			"galigo: getChatAdministrators: " + numUser, numUser, true, chainMemberNum, ""},
-		{"getChatMember whole", member, func(c *sender.Client) error { _, err := c.GetChatMember(ctx, chat, 1); return err }, "getChatMember", "unknown chat member status: \"/bot[REDACTED]/getChatMember\"", "", false, chainStatus, ""},
-		{"getChatMember piece", memberPiece, func(c *sender.Client) error { _, err := c.GetChatMember(ctx, chat, 1); return err }, "getChatMember", "unknown chat member status: \"key [REDACTED]\"", "", false, chainStatus, ""},
-		{"getChatMember valid status, number", memberNum, func(c *sender.Client) error { _, err := c.GetChatMember(ctx, chat, 1); return err }, "getChatMember", numUser, "", true, chainMemberNum, ""},
+		{"getChatMember whole", member, getMember, "getChatMember", "unknown chat member status: \"/bot[REDACTED]/getChatMember\"", "", false, chainStatus, ""},
+		{"getChatMember piece", memberPiece, getMember, "getChatMember", "unknown chat member status: \"key [REDACTED]\"", "", false, chainStatus, ""},
+		{"getChatMember valid status, number", memberNum, getMember, "getChatMember", numUser, "", true, chainMemberNum, ""},
 		// one pass: label71Token holds "pars" and "REDACTED", so a scrub of the label or a second pass changes the text
 		{"callJSON getChat, one pass", `{"id":` + b71Big + `}`, func(c *sender.Client) error { _, err := c.GetChat(ctx, chat); return err }, "getChat",
 			"galigo: getChat: failed to parse response: " + num("ChatFullInfo.id of type int64"), num("ChatFullInfo.id of type int64"), true, chainNum, label71Token},

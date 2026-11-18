@@ -153,25 +153,43 @@ func TestWebhookAPIServerTextScrubbed(t *testing.T) {
 	}
 }
 
-// The poll loop logs fetch errors; the log line must not hold the token.
+// The poll loop logs fetch errors; the logged error is the scrubbed one, and the log holds no token piece.
 func TestPollingLogServerTextScrubbed(t *testing.T) {
-	logs := &lockedBuffer{}
-	cfg := pollingTestConfig()
-	cfg.BaseURL = "http://b71.example.test/bot"
-	cfg.PollingMaxErrors = 1
-	rt := &b71RT{status: 200, body: b71DescWhole}
-	c := receiver.NewPollingClient(tg.SecretToken(b71Token), make(chan tg.Update, 1),
-		slog.New(slog.NewTextHandler(logs, nil)), cfg, receiver.WithPollingHTTPClient(&http.Client{Transport: rt}))
+	rows := []struct {
+		name    string
+		body    string
+		readErr error
+		want    string // the exact logged error
+	}{
+		{name: "description whole", body: b71DescWhole, want: "telegram API error 400: Bad Request: echo /bot[REDACTED]/getMe"},
+		{name: "read whole", body: `{"ok":`, readErr: errB71ReadWhole,
+			want: "telegram API error 0: request failed: malformed trailer line: /bot[REDACTED]"},
+		{name: "decode piece", body: b71Decode,
+			want: "telegram API error 0: failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field getUpdatesResponse.error_code of type int"},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			logs := &lockedBuffer{}
+			cfg := pollingTestConfig()
+			cfg.BaseURL = "http://b71.example.test/bot"
+			cfg.PollingMaxErrors = 1
+			rt := &b71RT{status: 200, body: r.body, readErr: r.readErr}
+			c := receiver.NewPollingClient(tg.SecretToken(b71Token), make(chan tg.Update, 1),
+				slog.New(slog.NewTextHandler(logs, nil)), cfg, receiver.WithPollingHTTPClient(&http.Client{Transport: rt}))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	require.NoError(t, c.Start(ctx))
-	require.Eventually(t, func() bool { return !c.Running() }, 5*time.Second, 10*time.Millisecond)
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			require.NoError(t, c.Start(ctx))
+			require.Eventually(t, func() bool { return !c.Running() }, 5*time.Second, 10*time.Millisecond)
 
-	out := logs.String()
-	assert.Contains(t, out, "Bad Request: echo /bot[REDACTED]/getMe")
-	assert.NotContains(t, out, b71Token)
-	assert.NotContains(t, out, "FakeB71Token")
+			out := logs.String()
+			assert.Contains(t, out, `msg="fetch updates failed" error="`+r.want+`"`)
+			assert.NotContains(t, out, b71Token)
+			assert.NotContains(t, out, "FakeB71Token")
+			assert.NotContains(t, out, "123456789123456789123") // the raw number in b71Decode
+			assert.Equal(t, []string{"/bot" + b71Token + "/getUpdates"}, rt.paths())
+		})
+	}
 }
 
 // GetWebhookInfo decodes its result after the envelope; that decode error is scrubbed too.

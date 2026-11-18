@@ -114,8 +114,5 @@ func (c *Client) GetChatMember(ctx context.Context, chatID tg.ChatID, userID int
 	}
 
 	member, err := tg.UnmarshalChatMember(resp.Result)
-	if err != nil {
-		return nil, scrub.TokenFromError(err, c.config.Token)
-	}
-	return member, nil
+	return member, scrub.TokenFromError(err, c.config.Token)
 }

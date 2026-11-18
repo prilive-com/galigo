@@ -181,6 +181,31 @@ func b113Config(mode Mode, base string) Config {
 
 func b113Logger() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
+// b113New calls NewPollingClient and checks that it left the caller's
+// Config.AllowedUpdates as it was, spare capacity included (AC6): the
+// constructor must neither change nor clear the caller's list.
+func b113New(t *testing.T, token tg.SecretToken, updates chan tg.Update, cfg Config, opts ...PollingOption) *PollingClient {
+	t.Helper()
+	before := slices.Clone(cfg.AllowedUpdates[:cap(cfg.AllowedUpdates)])
+	c := NewPollingClient(token, updates, b113Logger(), cfg, opts...)
+	assert.Equal(t, before, cfg.AllowedUpdates[:cap(cfg.AllowedUpdates)],
+		"b113 client: NewPollingClient must not change the caller's list or its spare capacity")
+	return c
+}
+
+// b113Spare returns a copy of list with one spare slot that holds a
+// caller's value, so a check of the caller's whole slice also sees a write
+// into its spare capacity. A nil list stays nil.
+func b113Spare(list []string) []string {
+	if list == nil {
+		return nil
+	}
+	out := make([]string, len(list), len(list)+1)
+	copy(out, list)
+	out[:cap(out)][len(out)] = "b113-caller-spare"
+	return out
+}
+
 // b113Run checks that NewPollingClient sent nothing. With optClient nil it
 // checks the HTTP client NewPollingClient built (clientTimeout, and a
 // default *http.Transport with TLS 1.2 at least), keeps it and sets only its
@@ -213,12 +238,12 @@ func b113Run(t *testing.T, srv *b113Server, c *PollingClient, updates chan tg.Up
 	}
 	// The client must not share the caller's Config.AllowedUpdates (AC6) in
 	// any row: write it before Start (want keeps the row's own list) and
-	// check after the run that the client did not write it.
-	var callerAfter []string
+	// check after the run that the client did not write the caller's whole
+	// slice, spare capacity included, also when its length is zero.
 	if len(caller) > 0 {
 		caller[0] = "b113-caller"
-		callerAfter = slices.Clone(caller[:cap(caller)])
 	}
+	callerAfter := slices.Clone(caller[:cap(caller)])
 	if between != nil {
 		between()
 	}
@@ -243,9 +268,7 @@ func b113Run(t *testing.T, srv *b113Server, c *PollingClient, updates chan tg.Up
 		c.wg.Wait()
 		c.Stop()
 	}
-	if len(caller) > 0 {
-		assert.Equal(t, callerAfter, caller[:cap(caller)], "b113 client: the client must not write the caller's list")
-	}
+	assert.Equal(t, callerAfter, caller[:cap(caller)], "b113 client: the client must not write the caller's list")
 	got := srv.requests()
 	if !assert.Equal(t, b113Want(t, want), got, "b113 requests: every request the client sent") {
 		b, err := json.Marshal(got)
@@ -276,7 +299,8 @@ type b113List struct {
 // in both directions (an option given as false, nil or empty included). A
 // row with both options absent passes no option at all. Every combination
 // is one row. The client gets copies of the fixture lists, so a constructor
-// that changed its input could not change the expected requests.
+// that changed its input could not change the expected requests; each
+// non-nil list field (the empty one too) has one spare slot.
 func TestNewPollingClient_ConfigFields(t *testing.T) {
 	modes := []Mode{ModeLongPolling, ModeWebhook}
 	delFields := []bool{false, true}
@@ -305,7 +329,7 @@ func TestNewPollingClient_ConfigFields(t *testing.T) {
 							srv := newB113Server()
 							cfg := b113Config(mode, b113Base.base)
 							cfg.DeleteWebhookFirst = df
-							cfg.AllowedUpdates = slices.Clone(lf.list)
+							cfg.AllowedUpdates = b113Spare(lf.list)
 							var opts []PollingOption
 							want := b113Expect{tgt: b113Base, del: df, list: lf.list, timeout: 1, limit: 100}
 							if do != b113Absent {
@@ -317,7 +341,7 @@ func TestNewPollingClient_ConfigFields(t *testing.T) {
 								want.list = lo.list
 							}
 							updates := make(chan tg.Update, 10)
-							c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg, opts...)
+							c := b113New(t, tg.SecretToken(b113Token), updates, cfg, opts...)
 							b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, 11*time.Second, want)
 						})
 					}
@@ -349,7 +373,7 @@ func TestNewPollingClient_ConfigFieldsModeBase(t *testing.T) {
 				cfg.DeleteWebhookFirst = true
 				cfg.AllowedUpdates = []string{"message", "callback_query"}
 				updates := make(chan tg.Update, 10)
-				c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg)
+				c := b113New(t, tg.SecretToken(b113Token), updates, cfg)
 				b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, 11*time.Second,
 					b113Expect{tgt: b.tgt, del: true, list: []string{"message", "callback_query"}, timeout: 1, limit: 100})
 			})
@@ -388,7 +412,7 @@ func TestNewPollingClient_ConfigFieldsOptionsDefaultBase(t *testing.T) {
 				opts = append(opts, WithPollingDeleteWebhook(tt.del))
 			}
 			updates := make(chan tg.Update, 10)
-			c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg, opts...)
+			c := b113New(t, tg.SecretToken(b113Token), updates, cfg, opts...)
 			b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, 11*time.Second,
 				b113Expect{tgt: b113Default, del: tt.wantDel, list: tt.list, timeout: 1, limit: 100})
 		})
@@ -406,7 +430,7 @@ func TestNewPollingClient_ConfigFieldsOptionClient(t *testing.T) {
 	cfg.AllowedUpdates = []string{"message", "callback_query"}
 	updates := make(chan tg.Update, 10)
 	hc := &http.Client{Transport: srv}
-	c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg, WithPollingHTTPClient(hc))
+	c := b113New(t, tg.SecretToken(b113Token), updates, cfg, WithPollingHTTPClient(hc))
 	b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, hc, 0,
 		b113Expect{tgt: b113Base, del: true, list: []string{"message", "callback_query"}, timeout: 1, limit: 100})
 }
@@ -423,7 +447,7 @@ func TestNewPollingClient_ConfigValues(t *testing.T) {
 		srv := newB113Server()
 		updates := make(chan tg.Update, 10)
 		cfg := Config{DeleteWebhookFirst: true, AllowedUpdates: []string{"edited_message\t", " B113_custom ", "message\r"}}
-		c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg)
+		c := b113New(t, tg.SecretToken(b113Token), updates, cfg)
 		b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, 10*time.Second,
 			b113Expect{tgt: b113Default, del: true, list: []string{"edited_message\t", " B113_custom ", "message\r"}, timeout: 0, limit: 0})
 	})
@@ -432,7 +456,7 @@ func TestNewPollingClient_ConfigValues(t *testing.T) {
 		cfg := b113Config(ModeLongPolling, b113Base.base)
 		cfg.AllowedUpdates = []string{"message", "message", "", "callback_query\n"}
 		updates := make(chan tg.Update, 10)
-		c := NewPollingClient(tg.SecretToken(b113Token), updates, b113Logger(), cfg)
+		c := b113New(t, tg.SecretToken(b113Token), updates, cfg)
 		b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, 11*time.Second,
 			b113Expect{tgt: b113Base, list: []string{"message", "message", "", "callback_query\n"}, timeout: 1, limit: 100})
 	})
@@ -556,7 +580,7 @@ func TestNewPollingClient_LoadConfigFields(t *testing.T) {
 			require.Empty(t, cfg.BaseURL, "b113 setup: LoadConfig sets no BaseURL")
 			srv := newB113Server()
 			updates := make(chan tg.Update, 10)
-			c := NewPollingClient(cfg.Token, updates, b113Logger(), *cfg)
+			c := b113New(t, cfg.Token, updates, *cfg)
 			b113Run(t, srv, c, updates, cfg.AllowedUpdates, nil, nil, time.Duration(tt.timeout+10)*time.Second,
 				b113Expect{tgt: b113Default, del: tt.wantDel, list: tt.wantList, timeout: tt.timeout, limit: 100})
 		})

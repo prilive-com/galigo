@@ -45,6 +45,7 @@ type b71RT struct {
 	status  int
 	body    string
 	readErr error
+	header  http.Header // extra response headers
 
 	mu   sync.Mutex
 	seen []string
@@ -62,9 +63,13 @@ func (rt *b71RT) RoundTrip(req *http.Request) (*http.Response, error) {
 	if rt.readErr != nil {
 		body = io.MultiReader(body, iotest.ErrReader(rt.readErr))
 	}
+	h := http.Header{"Content-Type": {"application/json"}}
+	for k, v := range rt.header {
+		h[k] = v
+	}
 	return &http.Response{
 		StatusCode: rt.status,
-		Header:     http.Header{"Content-Type": {"application/json"}},
+		Header:     h,
 		Body:       io.NopCloser(body),
 		Request:    req,
 	}, nil
@@ -112,6 +117,10 @@ func TestServerTextScrubbed(t *testing.T) {
 			want: "galigo: getMe failed: Bad Request: echo /bot[REDACTED]/getMe (code=400)", code: 400, desc: "Bad Request: echo /bot[REDACTED]/getMe"},
 		{name: "description whole, retry branch", token: b71Token,
 			rt:   &b71RT{status: 429, body: `{"ok":false,"error_code":429,"description":"Too Many Requests: echo /bot` + b71Token + `/getMe","parameters":{"retry_after":7}}`},
+			want: "galigo: getMe failed: Too Many Requests: echo /bot[REDACTED]/getMe (code=429, retry_after=7s)", code: 429, retry: 7 * time.Second, sentinel: tg.ErrTooManyRequests, desc: "Too Many Requests: echo /bot[REDACTED]/getMe"},
+		// retry_after only in the HTTP header (the fallback source): the description is scrubbed the same way
+		{name: "description whole, retry header only", token: b71Token,
+			rt:   &b71RT{status: 429, body: `{"ok":false,"error_code":429,"description":"Too Many Requests: echo /bot` + b71Token + `/getMe"}`, header: http.Header{"Retry-After": {"7"}}},
 			want: "galigo: getMe failed: Too Many Requests: echo /bot[REDACTED]/getMe (code=429, retry_after=7s)", code: 429, retry: 7 * time.Second, sentinel: tg.ErrTooManyRequests, desc: "Too Many Requests: echo /bot[REDACTED]/getMe"},
 		{name: "sentinel from the original text", token: chat71Token, rt: &b71RT{status: 400, body: `{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}`},
 			want: "galigo: getMe failed: Bad Request: [REDACTED] not found (code=400)", code: 400, sentinel: tg.ErrChatNotFound, desc: "Bad Request: [REDACTED] not found"},
@@ -354,9 +363,10 @@ func TestResultDecodeScrubbed(t *testing.T) {
 }
 
 // The list decode in getChatAdministrators cannot quote a value, but its fixed wording can hold a token piece:
-// this token holds "string", the word the decoder uses for a JSON string result.
+// this token holds "string", the word the decoder uses for a JSON string result. It also holds "pars" (in the fixed
+// label) and "REDACTED" (in the marker), so a scrub of the label or a second pass would change the text.
 func TestChatAdministratorsListDecodeScrubbed(t *testing.T) {
-	const string71Token = "123456789:AAstringQ0000000000000000000"
+	const string71Token = "123456789:AAstringparsREDACTED00000000"
 	rt := &b71RT{status: 200, body: `{"ok":true,"result":"x"}`}
 	c, err := sender.New(string71Token,
 		sender.WithHTTPClient(&http.Client{Transport: rt}),

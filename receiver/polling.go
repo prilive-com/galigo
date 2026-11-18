@@ -561,7 +561,7 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 		limitedReader := io.LimitReader(resp.Body, maxPollResponseSize+1)
 		body, readErr := io.ReadAll(limitedReader)
 		if readErr != nil {
-			return nil, readErr
+			return nil, scrub.TokenFromError(readErr, c.token)
 		}
 
 		if int64(len(body)) > maxPollResponseSize {
@@ -581,13 +581,13 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 
 	var response getUpdatesResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, &APIError{Description: "failed to parse response", Err: err}
+		return nil, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	if !response.OK {
 		return nil, &APIError{
 			Code:        response.ErrorCode,
-			Description: response.Description,
+			Description: scrub.TokenFromText(response.Description, c.token),
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -17,7 +18,7 @@ func (c *Client) GetMe(ctx context.Context) (*tg.User, error) {
 	}
 	var user tg.User
 	if err := json.Unmarshal(resp.Result, &user); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return &user, nil
 }
@@ -45,7 +46,7 @@ func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendVideo sends a video.
@@ -54,7 +55,7 @@ func (c *Client) SendVideo(ctx context.Context, req SendVideoRequest) (*tg.Messa
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendAudio sends an audio file.
@@ -63,7 +64,7 @@ func (c *Client) SendAudio(ctx context.Context, req SendAudioRequest) (*tg.Messa
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendVoice sends a voice message.
@@ -72,7 +73,7 @@ func (c *Client) SendVoice(ctx context.Context, req SendVoiceRequest) (*tg.Messa
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendAnimation sends an animation (GIF or H.264/MPEG-4 AVC video without sound).
@@ -81,7 +82,7 @@ func (c *Client) SendAnimation(ctx context.Context, req SendAnimationRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendVideoNote sends a video note (round video up to 1 minute).
@@ -90,7 +91,7 @@ func (c *Client) SendVideoNote(ctx context.Context, req SendVideoNoteRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendSticker sends a sticker.
@@ -99,7 +100,7 @@ func (c *Client) SendSticker(ctx context.Context, req SendStickerRequest) (*tg.M
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendMediaGroup sends a group of photos, videos, documents or audios as an album.
@@ -110,7 +111,7 @@ func (c *Client) SendMediaGroup(ctx context.Context, req SendMediaGroupRequest) 
 	}
 	var messages []*tg.Message
 	if err := json.Unmarshal(resp.Result, &messages); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return messages, nil
 }
@@ -125,7 +126,7 @@ func (c *Client) GetFile(ctx context.Context, fileID string) (*tg.File, error) {
 	}
 	var file tg.File
 	if err := json.Unmarshal(resp.Result, &file); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return &file, nil
 }
@@ -151,7 +152,7 @@ func (c *Client) GetUserProfilePhotos(ctx context.Context, userID int64, opts ..
 	}
 	var photos tg.UserProfilePhotos
 	if err := json.Unmarshal(resp.Result, &photos); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return &photos, nil
 }
@@ -169,7 +170,7 @@ func (c *Client) GetUserProfileAudios(ctx context.Context, userID int64, opts ..
 	}
 	var audios tg.UserProfileAudios
 	if err := json.Unmarshal(resp.Result, &audios); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return &audios, nil
 }
@@ -195,7 +196,7 @@ func (c *Client) SendLocation(ctx context.Context, req SendLocationRequest) (*tg
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendVenue sends a venue.
@@ -204,7 +205,7 @@ func (c *Client) SendVenue(ctx context.Context, req SendVenueRequest) (*tg.Messa
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendContact sends a phone contact.
@@ -213,7 +214,7 @@ func (c *Client) SendContact(ctx context.Context, req SendContactRequest) (*tg.M
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendPoll sends a native poll.
@@ -222,7 +223,7 @@ func (c *Client) SendPoll(ctx context.Context, req SendPollRequest) (*tg.Message
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // SendDice sends an animated emoji that displays a random value.
@@ -235,7 +236,7 @@ func (c *Client) SendDice(ctx context.Context, chatID tg.ChatID, opts ...SendDic
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // ================== Bulk Operations ==================
@@ -248,7 +249,7 @@ func (c *Client) ForwardMessages(ctx context.Context, req ForwardMessagesRequest
 	}
 	var ids []tg.MessageID
 	if err := json.Unmarshal(resp.Result, &ids); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return ids, nil
 }
@@ -261,7 +262,7 @@ func (c *Client) CopyMessages(ctx context.Context, req CopyMessagesRequest) ([]t
 	}
 	var ids []tg.MessageID
 	if err := json.Unmarshal(resp.Result, &ids); err != nil {
-		return nil, err
+		return nil, scrub.TokenFromError(err, c.config.Token)
 	}
 	return ids, nil
 }

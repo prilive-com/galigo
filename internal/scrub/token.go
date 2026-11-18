@@ -23,15 +23,24 @@ func TokenFromError(err error, token tg.SecretToken) error {
 	if err == nil {
 		return nil
 	}
-	tokenVal := token.Value()
-	if tokenVal == "" {
+	if token.Value() == "" {
 		return err
 	}
 	msg := err.Error()
-	if out := redact(msg, tokenVal); out != msg {
+	if out := TokenFromText(msg, token); out != msg {
 		return &scrubbedError{msg: out, err: err}
 	}
 	return err
+}
+
+// TokenFromText returns s with the bot token removed by the same rule as TokenFromError. Use it for text that
+// is not an error, such as a server's error description.
+func TokenFromText(s string, token tg.SecretToken) string {
+	tokenVal := token.Value()
+	if tokenVal == "" {
+		return s
+	}
+	return redact(s, tokenVal)
 }
 
 // redact replaces every run of bytes in s that is covered by windows of n bytes (n = minPiece, or

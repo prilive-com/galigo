@@ -66,8 +66,8 @@ type Config struct {
 	PollingTimeout     int           // Seconds to wait (0-60)
 	PollingLimit       int           // Max updates per request (1-100)
 	PollingMaxErrors   int           // Max consecutive errors (0 = unlimited)
-	DeleteWebhookFirst bool          // Delete webhook before starting
-	AllowedUpdates     []string      // Filter update types
+	DeleteWebhookFirst bool          // Delete the webhook in Start; NewPollingClient reads it, WithPollingDeleteWebhook overrides it
+	AllowedUpdates     []string      // Update types for getUpdates; NewPollingClient copies it, WithPollingAllowedUpdates overrides it; nil or empty sends none, so Telegram keeps its stored filter
 	RetryInitialDelay  time.Duration // Initial retry delay
 	RetryMaxDelay      time.Duration // Maximum retry delay
 	RetryBackoffFactor float64       // Backoff multiplier

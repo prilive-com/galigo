@@ -126,3 +126,6 @@ type scrubbedError struct {
 
 func (e *scrubbedError) Error() string { return e.msg }
 func (e *scrubbedError) Unwrap() error { return e.err }
+
+// TokenFromText is the red-run stub: no redaction.
+func TokenFromText(s string, token tg.SecretToken) string { return s }

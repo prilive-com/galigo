@@ -362,3 +362,47 @@ func TestTokenFromError_LastWindow(t *testing.T) {
 	assert.Equal(t, "failure [REDACTED]", scrub.TokenFromError(errors.New("failure WXYZ"), tok).Error())
 	assert.Equal(t, "[REDACTED]", scrub.TokenFromError(errors.New("WXYZ"), tok).Error())
 }
+
+func TestTokenFromText(t *testing.T) {
+	const tok = tg.SecretToken("123456789:AAFakeB71TokenForUnitUse00000000")
+	const clean = tg.SecretToken("987654321:AAxyzTokenNoWindows0000000000000")
+	rows := []struct {
+		name  string
+		s     string
+		token tg.SecretToken
+		want  string
+	}{
+		{"empty token", "abc /botX", "", "abc /botX"},
+		{"no match", "Bad Request: chat not found", clean, "Bad Request: chat not found"},
+		{"whole", "x /bot" + string(tok) + "/getMe", tok, "x /bot[REDACTED]/getMe"},
+		{"piece", "key FakeB71Token", tok, "key [REDACTED]"},
+		{"escaped", "x " + url.QueryEscape(string(tok)), tok, "x [REDACTED]"}, // the ":" is "%3A" here
+		// every covered run is redacted, not only the first
+		{"two runs and escaped", "a FakeB71Token b /bot" + string(tok) + "/x c " + url.QueryEscape(string(tok)), tok,
+			"a [REDACTED] b /bot[REDACTED]/x c [REDACTED]"},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			got := scrub.TokenFromText(r.s, r.token)
+			assert.Equal(t, r.want, got)
+			assert.Equal(t, scrub.TokenFromError(errors.New(r.s), r.token).Error(), got)
+		})
+	}
+}
+
+func TestTokenFromError_UnchangedReturnsSame(t *testing.T) {
+	e := errors.New("Bad Request: chat not found")
+	assert.Same(t, e, scrub.TokenFromError(e, tg.SecretToken("987654321:AAxyzTokenNoWindows0000000000000")))
+}
+
+// countingError counts its Error calls.
+type countingError struct{ calls int }
+
+func (e *countingError) Error() string { e.calls++; return "x" }
+
+// With no token, TokenFromError returns the error without building its text (the empty-token fast path).
+func TestTokenFromError_EmptyTokenNoErrorCall(t *testing.T) {
+	e := &countingError{}
+	assert.Same(t, error(e), scrub.TokenFromError(e, ""))
+	assert.Equal(t, 0, e.calls)
+}

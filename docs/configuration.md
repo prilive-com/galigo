@@ -197,6 +197,8 @@ for {
 }
 ```
 
+`NewPollingClient` also uses `cfg.DeleteWebhookFirst` and `cfg.AllowedUpdates` (`LoadConfig` sets them from `POLLING_DELETE_WEBHOOK` and `ALLOWED_UPDATES`); the options `WithPollingDeleteWebhook` and `WithPollingAllowedUpdates` override them. Telegram keeps an `allowed_updates` filter it has stored until a request sends another one, so an empty `AllowedUpdates` keeps the old filter.
+
 ## Type Helpers
 
 ### ChatID

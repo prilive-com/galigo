@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -94,14 +95,17 @@ func WithPollingMaxErrors(max int) PollingOption {
 	}
 }
 
-// WithPollingAllowedUpdates sets the update types to receive.
+// WithPollingAllowedUpdates sets the update types to receive. It overrides
+// Config.AllowedUpdates, also when types is nil or empty: then getUpdates
+// sends no allowed_updates, and Telegram keeps the filter it stored before.
 func WithPollingAllowedUpdates(types []string) PollingOption {
 	return func(c *PollingClient) {
 		c.allowedUpdates = types
 	}
 }
 
-// WithPollingDeleteWebhook enables webhook deletion before starting.
+// WithPollingDeleteWebhook sets whether Start deletes the webhook before the
+// first getUpdates. It overrides Config.DeleteWebhookFirst, true or false.
 func WithPollingDeleteWebhook(delete bool) PollingOption {
 	return func(c *PollingClient) {
 		c.deleteWebhookOnStart = delete
@@ -144,7 +148,10 @@ func WithUpdateDroppedCallback(fn func(updateID int, reason string)) PollingOpti
 	}
 }
 
-// NewPollingClient creates a new long polling client.
+// NewPollingClient creates a new long polling client from cfg's polling
+// fields, DeleteWebhookFirst and a copy of AllowedUpdates included. The
+// options in opts run after that, so they override those fields. It sends no
+// request; Start does.
 // Note: The updates channel must be bidirectional (chan tg.Update) if using DeliveryPolicyDropOldest.
 func NewPollingClient(
 	token tg.SecretToken,
@@ -163,21 +170,23 @@ func NewPollingClient(
 	}
 
 	c := &PollingClient{
-		token:              token,
-		baseURL:            baseURL,
-		updates:            updates,
-		logger:             logger,
-		timeout:            cfg.PollingTimeout,
-		limit:              cfg.PollingLimit,
-		maxErrors:          cfg.PollingMaxErrors,
-		retryInitialDelay:  cfg.RetryInitialDelay,
-		retryMaxDelay:      cfg.RetryMaxDelay,
-		retryBackoffFactor: cfg.RetryBackoffFactor,
-		deliveryPolicy:     cfg.UpdateDeliveryPolicy,
-		deliveryTimeout:    cfg.UpdateDeliveryTimeout,
-		onUpdateDropped:    cfg.OnUpdateDropped,
-		client:             defaultPollingHTTPClient(cfg.PollingTimeout),
-		stopCh:             make(chan struct{}),
+		token:                token,
+		baseURL:              baseURL,
+		updates:              updates,
+		logger:               logger,
+		timeout:              cfg.PollingTimeout,
+		limit:                cfg.PollingLimit,
+		maxErrors:            cfg.PollingMaxErrors,
+		retryInitialDelay:    cfg.RetryInitialDelay,
+		retryMaxDelay:        cfg.RetryMaxDelay,
+		retryBackoffFactor:   cfg.RetryBackoffFactor,
+		deliveryPolicy:       cfg.UpdateDeliveryPolicy,
+		deliveryTimeout:      cfg.UpdateDeliveryTimeout,
+		onUpdateDropped:      cfg.OnUpdateDropped,
+		allowedUpdates:       slices.Clone(cfg.AllowedUpdates),
+		deleteWebhookOnStart: cfg.DeleteWebhookFirst,
+		client:               defaultPollingHTTPClient(cfg.PollingTimeout),
+		stopCh:               make(chan struct{}),
 	}
 
 	// Default circuit breaker

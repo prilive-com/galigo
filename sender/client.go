@@ -439,7 +439,7 @@ func (c *Client) EditMessageText(ctx context.Context, req EditMessageTextRequest
 	if err != nil {
 		return nil, err
 	}
-	return parseEditResult(resp)
+	return c.parseEditResult(resp)
 }
 
 // EditMessageCaption edits message caption.
@@ -450,7 +450,7 @@ func (c *Client) EditMessageCaption(ctx context.Context, req EditMessageCaptionR
 	if err != nil {
 		return nil, err
 	}
-	return parseEditResult(resp)
+	return c.parseEditResult(resp)
 }
 
 // EditMessageReplyMarkup edits message reply markup.
@@ -461,7 +461,7 @@ func (c *Client) EditMessageReplyMarkup(ctx context.Context, req EditMessageRepl
 	if err != nil {
 		return nil, err
 	}
-	return parseEditResult(resp)
+	return c.parseEditResult(resp)
 }
 
 // EditMessageMedia edits the media content of a message.
@@ -472,7 +472,7 @@ func (c *Client) EditMessageMedia(ctx context.Context, req EditMessageMediaReque
 	if err != nil {
 		return nil, err
 	}
-	return parseEditResult(resp)
+	return c.parseEditResult(resp)
 }
 
 // DeleteMessage deletes a message.
@@ -487,7 +487,7 @@ func (c *Client) ForwardMessage(ctx context.Context, req ForwardMessageRequest) 
 	if err != nil {
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 // CopyMessage copies a message.
@@ -498,7 +498,7 @@ func (c *Client) CopyMessage(ctx context.Context, req CopyMessageRequest) (*tg.M
 	}
 	var result tg.MessageID
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse result: %w", err)
+		return nil, fmt.Errorf("failed to parse result: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 	return &result, nil
 }
@@ -606,7 +606,7 @@ func (c *Client) sendMessageOnce(ctx context.Context, req SendMessageRequest) (*
 		}
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.Message, error) {
@@ -617,7 +617,7 @@ func (c *Client) sendPhotoOnce(ctx context.Context, req SendPhotoRequest) (*tg.M
 		}
 		return nil, err
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
 func (c *Client) executeRequest(ctx context.Context, method string, payload any, chatIDs ...string) (*apiResponse, error) {
@@ -699,7 +699,7 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 	limitedReader := io.LimitReader(resp.Body, maxResponseSize+1)
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, fmt.Errorf("failed to read response: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 
 	if int64(len(body)) > maxResponseSize {
@@ -708,16 +708,21 @@ func (c *Client) doRequest(ctx context.Context, method string, payload any) (*ap
 
 	var apiResp apiResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return nil, fmt.Errorf("failed to parse response: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 
 	if !apiResp.OK {
 		// Parse retry_after: JSON body (primary) + HTTP header (fallback)
 		retryAfter := parseRetryAfter(&apiResp, resp)
+		// The sentinel is detected on the server's own text; the text the caller sees is scrubbed.
+		var apiErr *APIError
 		if retryAfter > 0 {
-			return nil, NewAPIErrorWithRetry(method, apiResp.ErrorCode, apiResp.Description, retryAfter)
+			apiErr = NewAPIErrorWithRetry(method, apiResp.ErrorCode, apiResp.Description, retryAfter)
+		} else {
+			apiErr = NewAPIError(method, apiResp.ErrorCode, apiResp.Description)
 		}
-		return nil, NewAPIError(method, apiResp.ErrorCode, apiResp.Description)
+		apiErr.Description = scrub.TokenFromText(apiResp.Description, c.config.Token)
+		return nil, apiErr
 	}
 
 	return &apiResp, nil
@@ -884,17 +889,17 @@ func extractChatID(chatID tg.ChatID) string {
 
 // parseEditResult parses the result of an edit method: the edited Message,
 // or nil for an inline message, where the Bot API returns True.
-func parseEditResult(resp *apiResponse) (*tg.Message, error) {
+func (c *Client) parseEditResult(resp *apiResponse) (*tg.Message, error) {
 	if string(resp.Result) == "true" {
 		return nil, nil
 	}
-	return parseMessage(resp)
+	return c.parseMessage(resp)
 }
 
-func parseMessage(resp *apiResponse) (*tg.Message, error) {
+func (c *Client) parseMessage(resp *apiResponse) (*tg.Message, error) {
 	var msg tg.Message
 	if err := json.Unmarshal(resp.Result, &msg); err != nil {
-		return nil, fmt.Errorf("failed to parse message: %w", err)
+		return nil, fmt.Errorf("failed to parse message: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 	return &msg, nil
 }

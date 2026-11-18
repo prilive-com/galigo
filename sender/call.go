@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/prilive-com/galigo/internal/scrub"
 )
 
 // callJSON is the unified internal helper for all API calls.
@@ -25,7 +27,7 @@ func (c *Client) callJSON(ctx context.Context, method string, payload any, out a
 		return nil // For methods that return bool/void
 	}
 	if err := json.Unmarshal(resp.Result, out); err != nil {
-		return fmt.Errorf("galigo: %s: failed to parse response: %w", method, err)
+		return fmt.Errorf("galigo: %s: failed to parse response: %w", method, scrub.TokenFromError(err, c.config.Token))
 	}
 	return nil
 }

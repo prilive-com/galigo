@@ -747,10 +747,10 @@ func (a *SenderAdapter) GetUpdates(ctx context.Context, offset int64, limit int,
 		Description string      `json:"description,omitempty"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode getUpdates response: %w", err)
+		return nil, fmt.Errorf("failed to decode getUpdates response: %w", scrub.TokenFromError(err, a.token))
 	}
 	if !result.OK {
-		return nil, fmt.Errorf("getUpdates failed: %d %s", result.ErrorCode, result.Description)
+		return nil, fmt.Errorf("getUpdates failed: %d %s", result.ErrorCode, scrub.TokenFromText(result.Description, a.token))
 	}
 	return result.Result, nil
 }

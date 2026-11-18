@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/prilive-com/galigo/internal/scrub"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -67,14 +68,14 @@ func (c *Client) getChatAdministrators(ctx context.Context, chatID tg.ChatID, re
 	// Custom unmarshaling for ChatMember union type
 	var rawMembers []json.RawMessage
 	if err := json.Unmarshal(resp.Result, &rawMembers); err != nil {
-		return nil, fmt.Errorf("galigo: getChatAdministrators: failed to parse response: %w", err)
+		return nil, fmt.Errorf("galigo: getChatAdministrators: failed to parse response: %w", scrub.TokenFromError(err, c.config.Token))
 	}
 
 	members := make([]tg.ChatMember, 0, len(rawMembers))
 	for _, raw := range rawMembers {
 		member, err := tg.UnmarshalChatMember(raw)
 		if err != nil {
-			return nil, fmt.Errorf("galigo: getChatAdministrators: %w", err)
+			return nil, fmt.Errorf("galigo: getChatAdministrators: %w", scrub.TokenFromError(err, c.config.Token))
 		}
 		members = append(members, member)
 	}
@@ -112,5 +113,9 @@ func (c *Client) GetChatMember(ctx context.Context, chatID tg.ChatID, userID int
 		return nil, err
 	}
 
-	return tg.UnmarshalChatMember(resp.Result)
+	member, err := tg.UnmarshalChatMember(resp.Result)
+	if err != nil {
+		return nil, scrub.TokenFromError(err, c.config.Token)
+	}
+	return member, nil
 }

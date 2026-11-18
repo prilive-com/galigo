@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -90,13 +89,13 @@ func SetWebhook(ctx context.Context, client *http.Client, token tg.SecretToken, 
 
 	var result apiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("failed to decode response: %w", scrub.TokenFromError(err, token))
 	}
 
 	if !result.OK {
 		return &APIError{
 			Code:        result.ErrorCode,
-			Description: result.Description,
+			Description: scrub.TokenFromText(result.Description, token),
 		}
 	}
 
@@ -143,7 +142,7 @@ func deleteWebhookAt(ctx context.Context, client *http.Client, baseURL string, t
 		// in its description.
 		return &APIError{
 			Code:        result.ErrorCode,
-			Description: scrub.TokenFromError(errors.New(result.Description), token).Error(),
+			Description: scrub.TokenFromText(result.Description, token),
 		}
 	}
 
@@ -174,19 +173,19 @@ func GetWebhookInfo(ctx context.Context, client *http.Client, token tg.SecretTok
 
 	var result apiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf("failed to decode response: %w", scrub.TokenFromError(err, token))
 	}
 
 	if !result.OK {
 		return nil, &APIError{
 			Code:        result.ErrorCode,
-			Description: result.Description,
+			Description: scrub.TokenFromText(result.Description, token),
 		}
 	}
 
 	var info WebhookInfo
 	if err := json.Unmarshal(result.Result, &info); err != nil {
-		return nil, fmt.Errorf("failed to parse webhook info: %w", err)
+		return nil, fmt.Errorf("failed to parse webhook info: %w", scrub.TokenFromError(err, token))
 	}
 
 	return &info, nil

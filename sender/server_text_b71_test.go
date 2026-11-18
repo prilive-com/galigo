@@ -254,7 +254,7 @@ func TestResultDecodeScrubbed(t *testing.T) {
 	getMember := func(c *sender.Client) error {
 		m, err := c.GetChatMember(ctx, chat, 1)
 		if m != nil {
-			return fmt.Errorf("member %T returned with the error %v", m, err)
+			return fmt.Errorf("member %T returned with the error %w", m, err)
 		}
 		return err
 	}

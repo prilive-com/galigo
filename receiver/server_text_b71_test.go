@@ -116,7 +116,14 @@ func TestWebhookAPIServerTextScrubbed(t *testing.T) {
 		{name: "decode piece, one pass", token: label71Token, status: 200, body: b71Decode,
 			want:  "failed to decode response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int",
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", typed: true},
+		// the status does not choose the path: an undecodable reply at an error status is scrubbed the same way
+		{name: "decode piece, status 400", token: b71Token, status: 400, body: b71Decode,
+			want:  "failed to decode response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int",
+			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", typed: true},
 		{name: "description whole", token: b71Token, status: 400, body: b71DescWhole,
+			want: "telegram API error 400: Bad Request: echo /bot[REDACTED]/getMe", code: 400},
+		// and a description sent with status 200 is scrubbed the same way
+		{name: "description whole, status 200", token: b71Token, status: 200, body: b71DescWhole,
 			want: "telegram API error 400: Bad Request: echo /bot[REDACTED]/getMe", code: 400},
 		{name: "description piece", token: b71Token, status: 400, body: b71DescPiece,
 			want: "telegram API error 400: Bad Request: echo key [REDACTED]", code: 400},
@@ -153,7 +160,9 @@ func TestWebhookAPIServerTextScrubbed(t *testing.T) {
 	}
 }
 
-// The poll loop logs fetch errors; the logged error is the scrubbed one, and the log holds no token piece.
+// The poll loop logs fetch errors; the logged error is the scrubbed one, and the log holds nothing else. Every record
+// is compared whole (fields and records in any order), so a token piece in another field fails too. The JSON handler
+// prints an error value with Error(), as the text handler does for an error without its own Format or marshaler.
 func TestPollingLogServerTextScrubbed(t *testing.T) {
 	rows := []struct {
 		name    string
@@ -174,8 +183,15 @@ func TestPollingLogServerTextScrubbed(t *testing.T) {
 			cfg.BaseURL = "http://b71.example.test/bot"
 			cfg.PollingMaxErrors = 1
 			rt := &b71RT{status: 200, body: r.body, readErr: r.readErr}
+			noTime := func(groups []string, a slog.Attr) slog.Attr {
+				if len(groups) == 0 && a.Key == slog.TimeKey {
+					return slog.Attr{}
+				}
+				return a
+			}
 			c := receiver.NewPollingClient(tg.SecretToken(b71Token), make(chan tg.Update, 1),
-				slog.New(slog.NewTextHandler(logs, nil)), cfg, receiver.WithPollingHTTPClient(&http.Client{Transport: rt}))
+				slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{ReplaceAttr: noTime})), cfg,
+				receiver.WithPollingHTTPClient(&http.Client{Transport: rt}))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
@@ -183,7 +199,22 @@ func TestPollingLogServerTextScrubbed(t *testing.T) {
 			require.Eventually(t, func() bool { return !c.Running() }, 5*time.Second, 10*time.Millisecond)
 
 			out := logs.String()
-			assert.Contains(t, out, `msg="fetch updates failed" error="`+r.want+`"`)
+			var got []map[string]any
+			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+				var rec map[string]any
+				require.NoError(t, json.Unmarshal([]byte(line), &rec), line)
+				if rec["msg"] == "fetch updates failed" {
+					_, ok := rec["retry_delay"].(float64) // nanoseconds; the value comes from the backoff
+					assert.True(t, ok, "retry_delay: %v", rec["retry_delay"])
+					delete(rec, "retry_delay")
+				}
+				got = append(got, rec)
+			}
+			assert.ElementsMatch(t, []map[string]any{
+				{"level": "INFO", "msg": "long polling started", "timeout": float64(1), "limit": float64(100), "max_errors": float64(1)},
+				{"level": "ERROR", "msg": "fetch updates failed", "error": r.want, "consecutive_errors": float64(1)},
+				{"level": "ERROR", "msg": "max consecutive errors exceeded", "max_errors": float64(1)},
+			}, got)
 			assert.NotContains(t, out, b71Token)
 			assert.NotContains(t, out, "FakeB71Token")
 			assert.NotContains(t, out, "123456789123456789123") // the raw number in b71Decode

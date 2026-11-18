@@ -99,6 +99,10 @@ func TestAdapterGetUpdatesServerTextScrubbed(t *testing.T) {
 		{name: "decode piece", token: b71Token, status: 200, body: b71Decode,
 			want:  "failed to decode getUpdates response: json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int",
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int", typed: true, chain: []string{"*json.UnmarshalTypeError"}},
+		// the status does not choose the path: an undecodable reply at an error status is scrubbed the same way
+		{name: "decode piece, status 400", token: b71Token, status: 400, body: b71Decode,
+			want:  "failed to decode getUpdates response: json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int",
+			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int", typed: true, chain: []string{"*json.UnmarshalTypeError"}},
 		{name: "decode whole (nested chat member)", token: b71Token, status: 200, body: b71Nested,
 			want:  "failed to decode getUpdates response: old_chat_member: unknown chat member status: \"/bot[REDACTED]/getUpdates\"",
 			cause: "old_chat_member: unknown chat member status: \"/bot[REDACTED]/getUpdates\"", chain: []string{"*fmt.wrapError", "*errors.errorString"}},
@@ -110,6 +114,9 @@ func TestAdapterGetUpdatesServerTextScrubbed(t *testing.T) {
 			want:  "failed to decode getUpdates response: json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int",
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field .error_code of type int", typed: true, chain: []string{"*json.UnmarshalTypeError"}},
 		{name: "description whole", token: b71Token, status: 400, body: b71DescWhole,
+			want: "getUpdates failed: 400 Bad Request: echo /bot[REDACTED]/getMe"},
+		// and a description sent with status 200 is scrubbed the same way
+		{name: "description whole, status 200", token: b71Token, status: 200, body: b71DescWhole,
 			want: "getUpdates failed: 400 Bad Request: echo /bot[REDACTED]/getMe"},
 		{name: "description piece", token: b71Token, status: 400, body: b71DescPiece,
 			want: "getUpdates failed: 400 Bad Request: echo key [REDACTED]"},

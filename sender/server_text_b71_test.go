@@ -108,7 +108,7 @@ func TestServerTextScrubbed(t *testing.T) {
 		{name: "decode piece", token: b71Token, rt: &b71RT{status: 400, body: `{"ok":false,"error_code":123456789123456789123,"description":"x"}`},
 			want: "failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", decode: true,
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int"},
-		// the envelope is decoded before the status is looked at: an undecodable reply at 200 is scrubbed the same way
+		// the envelope decode does not depend on the HTTP status: an undecodable reply at 200 is scrubbed the same way
 		{name: "decode piece, status 200", token: b71Token, rt: &b71RT{status: 200, body: `{"ok":false,"error_code":123456789123456789123,"description":"x"}`},
 			want: "failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int", decode: true,
 			cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field apiResponse.error_code of type int"},

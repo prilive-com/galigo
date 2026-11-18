@@ -179,7 +179,7 @@ func b113Config(mode Mode, base string) Config {
 	return cfg
 }
 
-func b113Logger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+func b113Logger() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
 // b113Run checks that NewPollingClient sent nothing. With optClient nil it
 // checks the HTTP client NewPollingClient built (clientTimeout, and a

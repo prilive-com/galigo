@@ -147,8 +147,24 @@ func b49Names(ss []engine.Scenario) []string {
 // baseline switch tag, so U+0130 maps to "i" and the Kelvin sign U+212A to "k" (register A-C1-01).
 var b49Unicode = map[string][]string{"identity": {"\u0130dentity"}, "smoke": {"SMO\u212aE"}}
 
+// b49Want returns the expected scenarios of the b49Routes row with this label, and fails the test when there is none
+// (register O-C3-02, A-C3-01: a row's position or a renamed label must not pick or skip a row silently).
+func b49Want(t *testing.T, label string) func() []engine.Scenario {
+	t.Helper()
+	for _, r := range b49Routes {
+		if r.label == label {
+			return r.want
+		}
+	}
+	t.Fatalf("no b49Routes row %q", label)
+	return nil
+}
+
 // T-route: every accepted label, in lower and upper case (and b49Unicode), selects the expected scenarios in order.
 func TestB49_SuiteRoutes(t *testing.T) {
+	for label := range b49Unicode {
+		b49Want(t, label)
+	}
 	for _, r := range b49Routes {
 		want := b49Names(r.want())
 		require.NotEmpty(t, want, r.label)
@@ -414,7 +430,7 @@ func TestB49_CLIRun(t *testing.T) {
 		assert.True(t, os.IsNotExist(err), "%q", in)
 	}
 
-	rows := []b49Input{{"Api101", suites.AllAPI101Scenarios}, {"SMOKE", b49Routes[0].want}}
+	rows := []b49Input{{"Api101", b49Want(t, "api101")}, {"SMOKE", b49Want(t, "smoke")}}
 	for _, r := range b49Routes {
 		rows = append(rows, b49Input{r.label, r.want})
 	}

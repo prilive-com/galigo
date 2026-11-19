@@ -1019,7 +1019,7 @@ cmd/galigo-testbot/
    }
    ```
 
-5. **Register suite** in `main.go` switch cases and help text
+5. **Register suite** in `suiteScenarios` (`main.go`; both `--run` and `/run` use it), add its row to `b49Routes` in `main_suites_b49_test.go`, and, if it should be listed, add it to every help and usage text that lists suites (`availableSuites` and `b49SuiteList`, the `-run` flag help, the `/run` usage reply, `/help`)
 
 6. **Add target method** in `registry/registry.go` if not already listed
 

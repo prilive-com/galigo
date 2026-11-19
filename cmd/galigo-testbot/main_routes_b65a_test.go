@@ -20,12 +20,13 @@ import (
 	"github.com/prilive-com/galigo/internal/testutil"
 )
 
-// B-65 65a T-routes (register O1-03): S73's group is run by `--run ephemeral` and `--run all` (runSuiteCommand and
-// the bot's handleRun) and counted by both status lists (showCoverageStatus, handleStatus). The B-48c1 test checks
-// only that `all` is a subset of the status lists, so a group missing everywhere passes it. This test reads main.go's
-// syntax tree. It proves the case bodies, not which input reaches a case: `--run ephemeral` is proved live (L1), and
-// the bot's /run route only by this structure. A discarded call in an "all" case passes this count; the B-48c1 test
-// (append shape) refuses it, so the two tests together prove the "all" lists (E-0172, register A2-05).
+// B-65 65a T-routes (register O1-03): S73's group is run by `--run ephemeral` and `--run all` (suiteScenarios, used
+// by runSuiteCommand and the bot's handleRun) and counted by both status lists (showCoverageStatus, handleStatus). The
+// B-48c1 test checks only that `all` is a subset of the status lists, so a group missing everywhere passes it. This
+// test reads main.go's syntax tree. It proves the case bodies, not which input reaches a case: the B-49 tests
+// (main_suites_b49_test.go) run both callers, and `--run ephemeral` is proved live. A discarded call in an "all" case
+// passes this count; the B-48c1 test (append shape) refuses it, so the two tests together prove the "all" lists
+// (E-0172, register A2-05).
 func TestB65A_MainRoutes(t *testing.T) {
 	f, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, parser.SkipObjectResolution)
 	require.NoError(t, err)
@@ -77,7 +78,7 @@ func TestB65A_MainRoutes(t *testing.T) {
 		require.Equal(t, 1, found, "%s: case %q", fd.Name.Name, label)
 		return body
 	}
-	for _, name := range []string{"runSuiteCommand", "handleRun"} {
+	for _, name := range []string{"suiteScenarios"} {
 		fd := funcs[name]
 		require.NotNil(t, fd, name)
 		// `case "ephemeral":` is exactly `scenarios = suites.AllEphemeralScenarios()`.

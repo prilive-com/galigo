@@ -6,7 +6,7 @@ import (
 
 // SendMessageRequest represents a request to send a text message.
 type SendMessageRequest struct {
-	ChatID              tg.ChatID              `json:"chat_id"`
+	ChatID              tg.ChatID              `json:"chat_id,omitempty"`
 	Text                string                 `json:"text"`
 	ParseMode           tg.ParseMode           `json:"parse_mode,omitempty"`
 	LinkPreviewOptions  *tg.LinkPreviewOptions `json:"link_preview_options,omitempty"`
@@ -24,11 +24,14 @@ type SendMessageRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendPhotoRequest represents a request to send a photo.
 type SendPhotoRequest struct {
-	ChatID              tg.ChatID    `json:"chat_id"`
+	ChatID              tg.ChatID    `json:"chat_id,omitempty"`
 	Photo               InputFile    `json:"photo"` // file_id, URL, or upload
 	Caption             string       `json:"caption,omitempty"`
 	ParseMode           tg.ParseMode `json:"parse_mode,omitempty"`
@@ -41,6 +44,9 @@ type SendPhotoRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // EditMessageTextRequest represents a request to edit message text.
@@ -160,7 +166,7 @@ type CloseRequest struct{}
 
 // SendDocumentRequest represents a request to send a document.
 type SendDocumentRequest struct {
-	ChatID                      tg.ChatID    `json:"chat_id"`
+	ChatID                      tg.ChatID    `json:"chat_id,omitempty"`
 	Document                    InputFile    `json:"document"`
 	Thumbnail                   *InputFile   `json:"thumbnail,omitempty"`
 	Caption                     string       `json:"caption,omitempty"`
@@ -175,11 +181,14 @@ type SendDocumentRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendVideoRequest represents a request to send a video.
 type SendVideoRequest struct {
-	ChatID              tg.ChatID    `json:"chat_id"`
+	ChatID              tg.ChatID    `json:"chat_id,omitempty"`
 	Video               InputFile    `json:"video"`
 	Thumbnail           *InputFile   `json:"thumbnail,omitempty"`
 	Duration            int          `json:"duration,omitempty"`
@@ -197,11 +206,14 @@ type SendVideoRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendAudioRequest represents a request to send an audio file.
 type SendAudioRequest struct {
-	ChatID              tg.ChatID    `json:"chat_id"`
+	ChatID              tg.ChatID    `json:"chat_id,omitempty"`
 	Audio               InputFile    `json:"audio"`
 	Thumbnail           *InputFile   `json:"thumbnail,omitempty"`
 	Duration            int          `json:"duration,omitempty"`
@@ -218,11 +230,14 @@ type SendAudioRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendVoiceRequest represents a request to send a voice message.
 type SendVoiceRequest struct {
-	ChatID              tg.ChatID    `json:"chat_id"`
+	ChatID              tg.ChatID    `json:"chat_id,omitempty"`
 	Voice               InputFile    `json:"voice"`
 	Duration            int          `json:"duration,omitempty"`
 	Caption             string       `json:"caption,omitempty"`
@@ -236,11 +251,14 @@ type SendVoiceRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendAnimationRequest represents a request to send an animation.
 type SendAnimationRequest struct {
-	ChatID              tg.ChatID    `json:"chat_id"`
+	ChatID              tg.ChatID    `json:"chat_id,omitempty"`
 	Animation           InputFile    `json:"animation"`
 	Thumbnail           *InputFile   `json:"thumbnail,omitempty"`
 	Duration            int          `json:"duration,omitempty"`
@@ -257,11 +275,14 @@ type SendAnimationRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendVideoNoteRequest represents a request to send a video note.
 type SendVideoNoteRequest struct {
-	ChatID              tg.ChatID  `json:"chat_id"`
+	ChatID              tg.ChatID  `json:"chat_id,omitempty"`
 	VideoNote           InputFile  `json:"video_note"`
 	Thumbnail           *InputFile `json:"thumbnail,omitempty"`
 	Duration            int        `json:"duration,omitempty"`
@@ -275,11 +296,14 @@ type SendVideoNoteRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendStickerRequest represents a request to send a sticker.
 type SendStickerRequest struct {
-	ChatID              tg.ChatID `json:"chat_id"`
+	ChatID              tg.ChatID `json:"chat_id,omitempty"`
 	Sticker             InputFile `json:"sticker"`
 	Emoji               string    `json:"emoji,omitempty"`
 	DisableNotification bool      `json:"disable_notification,omitempty"`
@@ -291,6 +315,9 @@ type SendStickerRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendMediaGroupRequest represents a request to send a media group.
@@ -345,7 +372,7 @@ type GetUserPersonalChatMessagesRequest struct {
 
 // SendLocationRequest represents a request to send a location.
 type SendLocationRequest struct {
-	ChatID               tg.ChatID `json:"chat_id"`
+	ChatID               tg.ChatID `json:"chat_id,omitempty"`
 	Latitude             float64   `json:"latitude"`
 	Longitude            float64   `json:"longitude"`
 	HorizontalAccuracy   float64   `json:"horizontal_accuracy,omitempty"`
@@ -361,11 +388,14 @@ type SendLocationRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendVenueRequest represents a request to send a venue.
 type SendVenueRequest struct {
-	ChatID              tg.ChatID `json:"chat_id"`
+	ChatID              tg.ChatID `json:"chat_id,omitempty"`
 	Latitude            float64   `json:"latitude"`
 	Longitude           float64   `json:"longitude"`
 	Title               string    `json:"title"`
@@ -383,11 +413,14 @@ type SendVenueRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendContactRequest represents a request to send a contact.
 type SendContactRequest struct {
-	ChatID              tg.ChatID `json:"chat_id"`
+	ChatID              tg.ChatID `json:"chat_id,omitempty"`
 	PhoneNumber         string    `json:"phone_number"`
 	FirstName           string    `json:"first_name"`
 	LastName            string    `json:"last_name,omitempty"`
@@ -401,6 +434,9 @@ type SendContactRequest struct {
 	// posts are refused in any other chat).
 	DirectMessagesTopicID   int64                       `json:"direct_messages_topic_id,omitempty"` // required in a direct messages chat
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendDiceRequest represents a request to send a dice.

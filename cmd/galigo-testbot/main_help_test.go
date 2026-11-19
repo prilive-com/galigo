@@ -63,4 +63,6 @@ func TestHandleHelp_Text(t *testing.T) {
 	assert.Contains(t, lines, "  paid-media        - Send paid media: photo, video, live photo (S70)")
 	// B-48c1 T-help, B-48c2: the suggested-posts line.
 	assert.Contains(t, lines, "  suggested-posts   - Suggested post parameters, approve and decline reach the server (S71, S72)")
+	// B-65 65a T-help: the ephemeral line.
+	assert.Contains(t, lines, "  ephemeral         - Ephemeral messages to the admin, sent and deleted (S73; bot must be admin)")
 }

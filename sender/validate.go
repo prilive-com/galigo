@@ -33,6 +33,19 @@ func validateChatID(id tg.ChatID) error {
 	}
 }
 
+// validateSendTarget checks chat_id and ephemeral_message_parameters of a send method that validates its chat id
+// (Bot API 10.4): ChatID may be nil only for an ephemeral reply to a callback query (parameters with CallbackQueryID
+// and no ReceiverUserID; Validate refuses parameters with neither), because the server ignores chat_id then.
+func validateSendTarget(chatID tg.ChatID, p *tg.EphemeralMessageParameters) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if chatID == nil && p != nil && p.ReceiverUserID == 0 {
+		return nil
+	}
+	return validateChatID(chatID)
+}
+
 // validateUserID validates a user ID.
 func validateUserID(id int64) error {
 	if id <= 0 {

@@ -29,7 +29,7 @@ const (
 	b51Refused  = "rate: Wait(n=1) would exceed context deadline"
 )
 
-// b51Class is one input class of executeRequest's chat id (none, "", the fake key "<nil>", a real chat).
+// b51Class is one input class of executeRequest's chat id (none, "", nil, a real chat).
 type b51Class struct {
 	name string
 	call func(context.Context, *sender.Client) error
@@ -139,7 +139,8 @@ func TestB51_TightLimiterBlocksSecondCall(t *testing.T) {
 // R3: a chat call and a chat-less call share the one global token, in both orders.
 func TestB51_SharesGlobalTokenWithChatCalls(t *testing.T) {
 	chat := b51Classes[4]
-	for _, cl := range b51ChatLess {
+	// C4 (a nil-chat inline edit, now chat-less since B-65 65a) shares the global token in both orders too.
+	for _, cl := range b51Classes[:4] {
 		for _, pair := range [][2]b51Class{{chat, cl}, {cl, chat}} {
 			t.Run(pair[0].name+" then "+pair[1].name, func(t *testing.T) {
 				s := b51Server(t)
@@ -154,9 +155,9 @@ func TestB51_SharesGlobalTokenWithChatCalls(t *testing.T) {
 	}
 }
 
-// R4: a chat-less call creates no per-chat limiter; "<nil>" (B-76) and a real chat do.
+// R4: a chat-less call creates no per-chat limiter, also a nil ChatID (B-76, fixed in B-65 65a); a real chat does.
 func TestB51_NoPerChatLimiterWithoutChat(t *testing.T) {
-	want := []int{0, 0, 0, 1, 1}
+	want := []int{0, 0, 0, 0, 1}
 	for i, cl := range b51Classes {
 		t.Run(cl.name, func(t *testing.T) {
 			s := b51Server(t)

@@ -467,7 +467,7 @@ func TestAPI101D_EditMessageTextShape(t *testing.T) {
 func TestAPI101D_RequestShapes(t *testing.T) {
 	assert.Equal(t, []api101dField{
 		{"BusinessConnectionID", "string", "business_connection_id,omitempty"},
-		{"ChatID", "interface {}", "chat_id"},
+		{"ChatID", "interface {}", "chat_id,omitempty"}, // B-65 65a: optional for an ephemeral reply (Bot API 10.4)
 		{"MessageThreadID", "int", "message_thread_id,omitempty"},
 		{"DirectMessagesTopicID", "int", "direct_messages_topic_id,omitempty"},
 		{"RichMessage", "tg.InputRichMessage", "rich_message"},
@@ -477,7 +477,8 @@ func TestAPI101D_RequestShapes(t *testing.T) {
 		{"MessageEffectID", "string", "message_effect_id,omitempty"},
 		{"ReplyParameters", "*tg.ReplyParameters", "reply_parameters,omitempty"},
 		{"ReplyMarkup", "interface {}", "reply_markup,omitempty"},
-		{"SuggestedPostParameters", "*tg.SuggestedPostParameters", "suggested_post_parameters,omitempty"}, // B-48c1
+		{"SuggestedPostParameters", "*tg.SuggestedPostParameters", "suggested_post_parameters,omitempty"},          // B-48c1
+		{"EphemeralMessageParameters", "*tg.EphemeralMessageParameters", "ephemeral_message_parameters,omitempty"}, // B-65 65a
 	}, api101dFields(sender.SendRichMessageRequest{}))
 	assert.Equal(t, []api101dField{
 		{"ChatID", "interface {}", "chat_id"},

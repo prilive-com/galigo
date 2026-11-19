@@ -64,7 +64,8 @@ func (a *SenderAdapter) SendMessage(ctx context.Context, chatID int64, text stri
 		LinkPreviewOptions: options.LinkPreviewOptions,
 		ReplyParameters:    options.ReplyParameters,
 
-		SuggestedPostParameters: options.SuggestedPostParameters,
+		SuggestedPostParameters:    options.SuggestedPostParameters,
+		EphemeralMessageParameters: options.EphemeralMessageParameters,
 	}
 
 	if options.ReplyMarkup != nil {
@@ -141,7 +142,8 @@ func (a *SenderAdapter) SendPhoto(ctx context.Context, chatID int64, photo Media
 		Caption:   options.Caption,
 		ParseMode: tg.ParseMode(options.ParseMode),
 
-		SuggestedPostParameters: options.SuggestedPostParameters,
+		SuggestedPostParameters:    options.SuggestedPostParameters,
+		EphemeralMessageParameters: options.EphemeralMessageParameters,
 	})
 }
 
@@ -815,6 +817,20 @@ func (a *SenderAdapter) ApproveSuggestedPost(ctx context.Context, req sender.App
 // DeclineSuggestedPost declines a suggested post (Bot API 9.2).
 func (a *SenderAdapter) DeclineSuggestedPost(ctx context.Context, req sender.DeclineSuggestedPostRequest) error {
 	return a.client.DeclineSuggestedPost(ctx, req)
+}
+
+// SendEphemeralReply sends a text message as an ephemeral reply to a callback query (Bot API 10.4): no chat_id,
+// ephemeral_message_parameters with only callback_query_id.
+func (a *SenderAdapter) SendEphemeralReply(ctx context.Context, callbackQueryID, text string) (*tg.Message, error) {
+	return a.client.SendMessage(ctx, sender.SendMessageRequest{
+		Text:                       text,
+		EphemeralMessageParameters: &tg.EphemeralMessageParameters{CallbackQueryID: callbackQueryID},
+	})
+}
+
+// DeleteEphemeralMessage deletes an ephemeral message (Bot API 10.2).
+func (a *SenderAdapter) DeleteEphemeralMessage(ctx context.Context, req sender.DeleteEphemeralMessageRequest) error {
+	return a.client.DeleteEphemeralMessage(ctx, req)
 }
 
 // SavePreparedKeyboardButton stores a keyboard button for a user (9.6).

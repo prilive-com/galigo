@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/prilive-com/galigo/sender"
@@ -336,7 +337,7 @@ func (s *SendChatActionStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 	}, nil
 }
 
-// CleanupStep deletes all tracked messages and sticker sets and clears recorded member tags.
+// CleanupStep deletes all tracked messages, sticker sets and ephemeral messages and clears recorded member tags.
 type CleanupStep struct{}
 
 func (s *CleanupStep) Name() string { return "cleanup" }
@@ -354,7 +355,7 @@ func (s *CleanupStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, er
 	result := &StepResult{Method: "deleteMessage", Evidence: ev}
 	if len(failed) > 0 {
 		rt.cleanupCarry = map[string]int{}
-		for _, k := range []string{"deleted_count", "sticker_sets_deleted", "tags_cleared"} {
+		for _, k := range []string{"deleted_count", "sticker_sets_deleted", "tags_cleared", "ephemeral_deleted"} {
 			rt.cleanupCarry[k] = evCount(ev, k)
 		}
 		// errors.Join keeps each *tg.APIError. The runner repeats a step only when the first *tg.APIError that
@@ -381,13 +382,14 @@ func evCount(ev map[string]any, k string) int {
 	return n
 }
 
-// deleteTracked deletes every tracked message and sticker set and clears every recorded member tag, each call with
-// its own 15 s bound (the sender's per-chat limiter waits about 3 s per call in a group). Done items leave the
-// runtime's lists; failed items stay (in order), so a later call retries only them. With dropPermanent, an item whose
-// error is a non-retryable *tg.APIError (for example 400 "message to delete not found") is dropped instead: a retry
-// cannot help it, and it is still reported here. It returns the evidence (deleted_count counts messages only;
-// sticker_sets_deleted, tags_cleared and failed only when non-zero) and one error per failed item, naming the item
-// and wrapping the sender's error (B-30, B-55).
+// deleteTracked deletes every tracked message, sticker set and recorded ephemeral message and clears every recorded
+// member tag, each call with its own 15 s bound (the sender's per-chat limiter waits about 3 s per call in a group).
+// Done items leave the runtime's lists; failed items stay (in order), so a later call retries only them. With
+// dropPermanent, an item whose error is a non-retryable *tg.APIError (for example 400 "message to delete not found")
+// is dropped instead: a retry cannot help it, and it is still reported here. It returns the evidence (deleted_count
+// counts messages only; sticker_sets_deleted, tags_cleared, ephemeral_deleted and failed only when non-zero) and one
+// error per failed item, naming the item (never a user id for an ephemeral message: a positive chat id prints as
+// "private") and wrapping the sender's error (B-30, B-55, B-65 65a).
 func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[string]any, []error) {
 	var failed []error
 	try := func(label string, call func(context.Context) error) (done, keep bool) {
@@ -448,12 +450,37 @@ func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[st
 	}
 	rt.taggedMembers = keptTags
 
+	eph := 0
+	keptEph := rt.ephemeralMessages[:0:0]
+	for _, em := range rt.ephemeralMessages {
+		// The label names the chat and the message, never the receiver (a user id). A positive chat id is a user's
+		// private chat, so it is a user id too, and the label prints "private" (Bot API dialog ids, B-65 65a).
+		chat := strconv.FormatInt(em.chatID, 10)
+		if em.chatID > 0 {
+			chat = "private"
+		}
+		done, keep := try(fmt.Sprintf("ephemeral message %s/%d", chat, em.messageID), func(c context.Context) error {
+			return rt.Sender.DeleteEphemeralMessage(c, sender.DeleteEphemeralMessageRequest{
+				ChatID: em.chatID, ReceiverUserID: em.receiverUserID, EphemeralMessageID: em.messageID,
+			})
+		})
+		if done {
+			eph++
+		} else if keep {
+			keptEph = append(keptEph, em)
+		}
+	}
+	rt.ephemeralMessages = keptEph
+
 	ev := map[string]any{"deleted_count": msgs}
 	if sets > 0 {
 		ev["sticker_sets_deleted"] = sets
 	}
 	if tags > 0 {
 		ev["tags_cleared"] = tags
+	}
+	if eph > 0 {
+		ev["ephemeral_deleted"] = eph
 	}
 	if len(failed) > 0 {
 		lines := make([]string, len(failed))

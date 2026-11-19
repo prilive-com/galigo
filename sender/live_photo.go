@@ -15,7 +15,7 @@ import (
 // photo without live_photo.
 type SendLivePhotoRequest struct {
 	BusinessConnectionID  string              `json:"business_connection_id,omitempty"`
-	ChatID                tg.ChatID           `json:"chat_id"`
+	ChatID                tg.ChatID           `json:"chat_id,omitempty"`
 	MessageThreadID       int                 `json:"message_thread_id,omitempty"`
 	DirectMessagesTopicID int                 `json:"direct_messages_topic_id,omitempty"`
 	LivePhoto             InputFile           `json:"live_photo"`
@@ -35,12 +35,15 @@ type SendLivePhotoRequest struct {
 	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
 	// posts are refused in any other chat).
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendLivePhoto sends a live photo. It is not retried: a resend could post the
 // live photo twice.
 func (c *Client) SendLivePhoto(ctx context.Context, req SendLivePhotoRequest) (*tg.Message, error) {
-	if err := validateChatID(req.ChatID); err != nil {
+	if err := validateSendTarget(req.ChatID, req.EphemeralMessageParameters); err != nil {
 		return nil, err
 	}
 	if req.LivePhoto.IsEmpty() {

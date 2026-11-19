@@ -47,8 +47,11 @@ type StepResult struct {
 	Success    bool          `json:"success"`
 	Error      string        `json:"error,omitempty"`
 	MessageIDs []int         `json:"message_ids,omitempty"`
-	FileIDs    []string      `json:"file_ids,omitempty"`
-	Evidence   any           `json:"evidence,omitempty"`
+	// EphemeralMessageIDs: ephemeral messages the step sent (Bot API 10.3); they count against the message budget
+	// like MessageIDs, and the cleanup deletes them (B-65 65a).
+	EphemeralMessageIDs []int    `json:"ephemeral_message_ids,omitempty"`
+	FileIDs             []string `json:"file_ids,omitempty"`
+	Evidence            any      `json:"evidence,omitempty"`
 }
 
 // ScenarioResult captures the result of running a scenario.
@@ -73,6 +76,12 @@ type CreatedMessage struct {
 
 // taggedMember is a (chat, user) pair whose member tag a step set.
 type taggedMember struct{ chatID, userID int64 }
+
+// ephemeralMessage is an ephemeral message a step sent and did not delete yet (B-65 65a).
+type ephemeralMessage struct {
+	chatID, receiverUserID int64
+	messageID              int
+}
 
 // ChatContext holds probed chat capabilities.
 type ChatContext struct {
@@ -120,6 +129,9 @@ type Runtime struct {
 
 	// taggedMembers: members whose tag a step set and did not clear yet; the runner clears them after a stop (B-55).
 	taggedMembers []taggedMember
+	// ephemeralMessages: ephemeral messages a step sent and did not delete yet; CleanupStep and the stop cleanup
+	// delete them with deleteEphemeralMessage (B-65 65a).
+	ephemeralMessages []ephemeralMessage
 	// cleanupCarry: the counts of a CleanupStep attempt that failed, added by its repeat (the runner keeps only the
 	// last attempt's result); cleared when a scenario starts.
 	cleanupCarry map[string]int
@@ -229,6 +241,11 @@ func (rt *Runtime) recordTag(chatID, userID int64, on bool) {
 	if on {
 		rt.taggedMembers = append(rt.taggedMembers, taggedMember{chatID, userID})
 	}
+}
+
+// recordEphemeral notes an ephemeral message a step sent, so CleanupStep or the stop cleanup deletes it (B-65 65a).
+func (rt *Runtime) recordEphemeral(chatID, receiverUserID int64, messageID int) {
+	rt.ephemeralMessages = append(rt.ephemeralMessages, ephemeralMessage{chatID, receiverUserID, messageID})
 }
 
 // TrackStickerSet adds a sticker set name to the cleanup list.
@@ -373,7 +390,12 @@ type SenderClient interface {
 	// Suggested posts (9.2)
 	ApproveSuggestedPost(ctx context.Context, req sender.ApproveSuggestedPostRequest) error
 	DeclineSuggestedPost(ctx context.Context, req sender.DeclineSuggestedPostRequest) error
+
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
+
+	// Ephemeral messages (Bot API 10.3/10.4)
+	SendEphemeralReply(ctx context.Context, callbackQueryID, text string) (*tg.Message, error)
+	DeleteEphemeralMessage(ctx context.Context, req sender.DeleteEphemeralMessageRequest) error
 
 	// Reactions and administrators (10.0)
 	DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error
@@ -412,7 +434,8 @@ type SendOptions struct {
 	LinkPreviewOptions *tg.LinkPreviewOptions // For sendMessage
 	ReplyParameters    *tg.ReplyParameters    // For sendMessage (9.6)
 
-	SuggestedPostParameters *tg.SuggestedPostParameters // For sendMessage and sendPhoto (9.2)
+	SuggestedPostParameters    *tg.SuggestedPostParameters    // For sendMessage and sendPhoto (9.2)
+	EphemeralMessageParameters *tg.EphemeralMessageParameters // For sendMessage and sendPhoto (10.3)
 }
 
 // WithReplyMarkup sets the reply markup.
@@ -454,6 +477,13 @@ func WithReplyParameters(rp *tg.ReplyParameters) SendOption {
 func WithSuggestedPostParameters(p *tg.SuggestedPostParameters) SendOption {
 	return func(o *SendOptions) {
 		o.SuggestedPostParameters = p
+	}
+}
+
+// WithEphemeralMessageParameters sets ephemeral message parameters for sendMessage and sendPhoto (10.3).
+func WithEphemeralMessageParameters(p *tg.EphemeralMessageParameters) SendOption {
+	return func(o *SendOptions) {
+		o.EphemeralMessageParameters = p
 	}
 }
 

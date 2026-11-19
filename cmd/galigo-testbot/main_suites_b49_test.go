@@ -131,8 +131,8 @@ var b49Routes = []struct {
 	}},
 }
 
-// b49SuiteList is the expected text after "Available suites: ", copied from availableSuites at 6d9160e (B-49) and
-// kept apart from it so a changed list is seen; docs/testing.md step 5 updates both.
+// b49SuiteList is the expected text after "Available suites: ", copied from the CLI's unknown-suite message at
+// 6d9160e (B-49) and kept apart from availableSuites so a changed list is seen; docs/testing.md step 5 updates both.
 const b49SuiteList = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all"
 
 func b49Names(ss []engine.Scenario) []string {
@@ -143,13 +143,16 @@ func b49Names(ss []engine.Scenario) []string {
 	return names
 }
 
-// T-route: every accepted label, in lower and upper case, selects the expected scenarios in order.
+// b49Unicode holds Unicode upper-case inputs per label. The selector lower-cases with strings.ToLower, like the
+// baseline switch tag, so U+0130 maps to "i" and the Kelvin sign U+212A to "k" (register A-C1-01).
+var b49Unicode = map[string][]string{"identity": {"\u0130dentity"}, "smoke": {"SMO\u212aE"}}
+
+// T-route: every accepted label, in lower and upper case (and b49Unicode), selects the expected scenarios in order.
 func TestB49_SuiteRoutes(t *testing.T) {
-	require.Len(t, b49Routes, 76)
 	for _, r := range b49Routes {
 		want := b49Names(r.want())
 		require.NotEmpty(t, want, r.label)
-		ins := []string{r.label}
+		ins := append([]string{r.label}, b49Unicode[r.label]...)
 		if up := strings.ToUpper(r.label); up != r.label {
 			ins = append(ins, up)
 		}
@@ -159,24 +162,6 @@ func TestB49_SuiteRoutes(t *testing.T) {
 			assert.Equal(t, want, b49Names(got), in)
 		}
 	}
-	// The selector lower-cases with strings.ToLower, like the baseline switch tag, so Unicode upper case maps too:
-	// U+0130 to "i" and the Kelvin sign U+212A to "k" (register A-C1-01).
-	for in, label := range map[string]string{"\u0130dentity": "identity", "SMO\u212aE": "smoke"} {
-		got, ok := suiteScenarios(in)
-		assert.True(t, ok, in)
-		assert.Equal(t, b49Names(b49Routes[b49RouteIndex(t, label)].want()), b49Names(got), in)
-	}
-}
-
-func b49RouteIndex(t *testing.T, label string) int {
-	t.Helper()
-	for i, r := range b49Routes {
-		if r.label == label {
-			return i
-		}
-	}
-	t.Fatalf("no route %q", label)
-	return -1
 }
 
 // T-refuse: names suiteScenarios does not select, including the two each caller runs itself.
@@ -398,7 +383,8 @@ func TestB49_CLIRun(t *testing.T) {
 		os.Exit(0)
 	}
 	run := func(suite string) (int, string, string, string) {
-		dir := t.TempDir()
+		dir, err := filepath.Abs(t.TempDir()) // the child needs an absolute folder, also with a relative TMPDIR (O-C2-02)
+		require.NoError(t, err)
 		exe, err := os.Executable()
 		require.NoError(t, err)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

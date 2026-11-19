@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/prilive-com/galigo/sender"
@@ -387,8 +388,8 @@ func evCount(ev map[string]any, k string) int {
 // dropPermanent, an item whose error is a non-retryable *tg.APIError (for example 400 "message to delete not found")
 // is dropped instead: a retry cannot help it, and it is still reported here. It returns the evidence (deleted_count
 // counts messages only; sticker_sets_deleted, tags_cleared, ephemeral_deleted and failed only when non-zero) and one
-// error per failed item, naming the item (never a user id for an ephemeral message) and wrapping the sender's error
-// (B-30, B-55, B-65 65a).
+// error per failed item, naming the item (never a user id for an ephemeral message: a positive chat id prints as
+// "private") and wrapping the sender's error (B-30, B-55, B-65 65a).
 func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[string]any, []error) {
 	var failed []error
 	try := func(label string, call func(context.Context) error) (done, keep bool) {
@@ -452,8 +453,13 @@ func deleteTracked(ctx context.Context, rt *Runtime, dropPermanent bool) (map[st
 	eph := 0
 	keptEph := rt.ephemeralMessages[:0:0]
 	for _, em := range rt.ephemeralMessages {
-		// The label names the chat and the message, not the receiver (a user id).
-		done, keep := try(fmt.Sprintf("ephemeral message %d/%d", em.chatID, em.messageID), func(c context.Context) error {
+		// The label names the chat and the message, never the receiver (a user id). A positive chat id is a user's
+		// private chat, so it is a user id too, and the label prints "private" (Bot API dialog ids, B-65 65a).
+		chat := strconv.FormatInt(em.chatID, 10)
+		if em.chatID > 0 {
+			chat = "private"
+		}
+		done, keep := try(fmt.Sprintf("ephemeral message %s/%d", chat, em.messageID), func(c context.Context) error {
 			return rt.Sender.DeleteEphemeralMessage(c, sender.DeleteEphemeralMessageRequest{
 				ChatID: em.chatID, ReceiverUserID: em.receiverUserID, EphemeralMessageID: em.messageID,
 			})

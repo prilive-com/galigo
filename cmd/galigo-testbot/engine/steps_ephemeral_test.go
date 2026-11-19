@@ -12,6 +12,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ const (
 	b65aAdmin   = int64(5551)         // the configured admin (fake)
 	b65aOther   = int64(4242)         // another receiver the server could name
 	b65aChat2   = -(int64(1)<<40 + 1) // a chat the reply names, not the runtime chat; wider than 32 bits (register O2-04)
-	b65aChatPos = int64(1)<<40 + 3    // a positive chat id the reply names (a private chat; register C2-02)
+	b65aChatPos = int64(1)<<40 - 3    // a positive chat id the reply names: a private chat, so a user id (at most 2^40-1; C2-02, O-C3-01)
 	b65aRefused = "Bad Request: query is too old and response timeout expired or query ID is invalid"
 )
 
@@ -131,11 +132,13 @@ func ephTargets(rt *Runtime) []ephemeralMessage {
 	return append([]ephemeralMessage(nil), rt.ephemeralMessages...)
 }
 
-// noReceiver fails if a receiver id (decimal) appears in any text (A2-04).
+// noReceiver fails if a receiver id (decimal, as a whole number) appears in any text (A2-04). A whole number, so the
+// id 1 is not found inside -1001 (register A-C3-01).
 func noReceiver(t *testing.T, text string, ids ...int64) {
 	t.Helper()
 	for _, id := range ids {
-		assert.NotContains(t, text, strconv.FormatInt(id, 10), "a receiver id in %q", text)
+		re := regexp.MustCompile(`(^|[^0-9])` + regexp.QuoteMeta(strconv.FormatInt(id, 10)) + `([^0-9]|$)`)
+		assert.False(t, re.MatchString(text), "a receiver id %d in %q", id, text)
 	}
 }
 
@@ -306,7 +309,8 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 	type row struct {
 		name      string
 		resp      *b65aResp // nil: the fake's default answer
-		admin     int64
+		admin     int64     // 0: b65aAdmin
+		zeroAdmin bool      // no admin id at all
 		notAdmin  bool
 		wantErr   bool
 		wantSkip  bool
@@ -347,7 +351,12 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 		row{name: "send_fails", resp: &b65aResp{err: b65a429(time.Second)}, wantErr: true, wantSend: true},
 		row{name: "nil_msg", resp: &b65aResp{}, wantErr: true, wantSend: true},
 		row{name: "not_admin", notAdmin: true, wantErr: true, wantSkip: true},
-		row{name: "no_admin_id", admin: -1, wantErr: true},
+		row{name: "no_admin_id", zeroAdmin: true, wantErr: true},
+		// The edges of the positive-id rule: -1 and 1 for the admin, 1 for the reply's receiver (A-C3-01, O-C3-04).
+		row{name: "admin_minus_one", admin: -1, wantErr: true},
+		row{name: "admin_one", admin: 1, wantSend: true, wantEph: []ephemeralMessage{{b30Chat, 1, 9}}, wantEphID: []int{9}},
+		row{name: "receiver_one", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b30Chat}, &tg.User{ID: 1})}, wantErr: true, wantSend: true,
+			wantEph: []ephemeralMessage{{b30Chat, 1, 9}}, wantEphID: []int{9}},
 		// A negative admin id is not a user: refused before any send, so no target the delete refuses (register C2-01).
 		row{name: "negative_admin", admin: -7, wantErr: true},
 	)
@@ -359,10 +368,10 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 					f.sends = []b65aResp{*r.resp}
 				}
 				admin := r.admin
-				switch admin {
-				case 0:
+				if admin == 0 {
 					admin = b65aAdmin
-				case -1:
+				}
+				if r.zeroAdmin {
 					admin = 0
 				}
 				rt := b65aRuntime(f, admin)
@@ -477,6 +486,9 @@ func TestB65A_EphemeralReplyStep(t *testing.T) {
 			wantEph: []ephemeralMessage{{b65aChat2, b65aOther, 8}}, wantEphID: []int{8}},
 		{name: "taken_ephemeral_positive_chat", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChatPos}, &tg.User{ID: b65aOther})}, wantErr: true,
 			wantEph: []ephemeralMessage{{b65aChatPos, b65aOther, 8}}, wantEphID: []int{8}},
+		// taken_ephemeral_receiver_one: the smallest positive receiver is a user, so it is deleted for (A-C3-01).
+		{name: "taken_ephemeral_receiver_one", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, &tg.User{ID: 1})}, wantErr: true,
+			wantEph: []ephemeralMessage{{b65aChat2, 1, 8}}, wantEphID: []int{8}},
 		{name: "taken_ephemeral_no_chat", resp: b65aResp{msg: eph(nil, &tg.User{ID: b65aOther})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_zero_chat", resp: b65aResp{msg: eph(&tg.Chat{}, &tg.User{ID: b65aOther})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_no_receiver", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, nil)}, wantErr: true, wantEphID: []int{8}, noDelete: true},
@@ -614,6 +626,33 @@ func TestB65A_DeleteTrackedEphemeral(t *testing.T) {
 			}
 		})
 	}
+}
+
+// T-clean private_chat_label: a positive chat id is a user's private chat, so a user id (Bot API dialog ids); the
+// label prints "private" for it (register O-C3-01). Chat 1 is the edge; a chat equal to its receiver is the probe
+// of the OpenAI leg.
+func TestB65A_DeleteTrackedPrivateChatLabel(t *testing.T) {
+	f := newB65aFake()
+	rt := b65aRuntime(f, b65aAdmin)
+	err400 := tg.NewAPIError("x", 400, "Bad Request: message to delete not found")
+	targets := []ephemeralMessage{{b65aOther, b65aOther, 12}, {1, 1, 13}, {b65aChatPos, b65aOther, 14}, {b65aChat2, b65aOther, 15}}
+	var wantKeys, wantFailed []string
+	for _, e := range targets {
+		rt.recordEphemeral(e.chatID, e.receiverUserID, e.messageID)
+		f.always[ephKey(e.chatID, e.receiverUserID, e.messageID)] = err400
+		wantKeys = append(wantKeys, ephKey(e.chatID, e.receiverUserID, e.messageID))
+	}
+	wantFailed = []string{"ephemeral message private/12: " + err400.Error(), "ephemeral message private/13: " + err400.Error(),
+		"ephemeral message private/14: " + err400.Error(), fmt.Sprintf("ephemeral message %d/15: %v", b65aChat2, err400)}
+	ev, failed := deleteTracked(context.Background(), rt, true)
+	assert.Equal(t, wantKeys, f.keys(), "each delete keeps the full target")
+	require.Len(t, failed, len(targets))
+	for i, e := range failed {
+		assert.Equal(t, wantFailed[i], e.Error())
+		noReceiver(t, e.Error(), b65aOther, 1, b65aChatPos)
+	}
+	assert.Equal(t, wantFailed, ev["failed"])
+	noReceiver(t, fmt.Sprint(ev), b65aOther, 1, b65aChatPos)
 }
 
 // T-mixed: CleanupStep over all four kinds, with the first ephemeral delete answered 429 (A2-02, O2-03, E-0176).

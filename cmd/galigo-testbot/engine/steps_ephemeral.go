@@ -24,8 +24,8 @@ func (s *SendEphemeralStep) Name() string { return s.Method + " ephemeral_messag
 
 func (s *SendEphemeralStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	res := &StepResult{StepName: s.Name(), Method: s.Method}
-	if rt.AdminUserID == 0 {
-		return res, fmt.Errorf("%s: an ephemeral message needs a receiver; set AdminUserID on Runtime", s.Method)
+	if rt.AdminUserID <= 0 { // a receiver must be a positive user id
+		return res, fmt.Errorf("%s: an ephemeral message needs a receiver (a positive user id); set AdminUserID on Runtime", s.Method)
 	}
 	if err := RequireAdmin(ctx, rt); err != nil {
 		return res, err

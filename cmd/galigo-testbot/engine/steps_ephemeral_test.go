@@ -13,7 +13,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +34,7 @@ const (
 	b65aAdmin   = int64(5551)         // the configured admin (fake)
 	b65aOther   = int64(4242)         // another receiver the server could name
 	b65aChat2   = -(int64(1)<<40 + 1) // a chat the reply names, not the runtime chat; wider than 32 bits (register O2-04)
+	b65aChatPos = int64(1)<<40 + 3    // a positive chat id the reply names (a private chat; register C2-02)
 	b65aRefused = "Bad Request: query is too old and response timeout expired or query ID is invalid"
 )
 
@@ -338,6 +338,8 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 			wantEph: []ephemeralMessage{{b30Chat, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "other_chat", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b65aChat2}, &tg.User{ID: b65aAdmin})}, wantSend: true,
 			wantEph: []ephemeralMessage{{b65aChat2, b65aAdmin, 9}}, wantEphID: []int{9}},
+		row{name: "positive_chat", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b65aChatPos}, &tg.User{ID: b65aAdmin})}, wantSend: true,
+			wantEph: []ephemeralMessage{{b65aChatPos, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "zero_chat", resp: &b65aResp{msg: ephMsg(&tg.Chat{}, &tg.User{ID: b65aAdmin})}, wantSend: true,
 			wantEph: []ephemeralMessage{{b30Chat, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "no_chat", resp: &b65aResp{msg: ephMsg(nil, &tg.User{ID: b65aAdmin})}, wantSend: true,
@@ -346,6 +348,8 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 		row{name: "nil_msg", resp: &b65aResp{}, wantErr: true, wantSend: true},
 		row{name: "not_admin", notAdmin: true, wantErr: true, wantSkip: true},
 		row{name: "no_admin_id", admin: -1, wantErr: true},
+		// A negative admin id is not a user: refused before any send, so no target the delete refuses (register C2-01).
+		row{name: "negative_admin", admin: -7, wantErr: true},
 	)
 	for _, method := range []string{"sendMessage", "sendPhoto"} {
 		for _, r := range rows {
@@ -402,16 +406,21 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 				}
 				assert.Equal(t, r.wantEphID, res.EphemeralMessageIDs)
 				assert.Equal(t, r.wantMsgID, res.MessageIDs)
-				if strings.HasPrefix(r.name, "ok_") || r.name == "other_chat" {
-					assert.Equal(t, map[string]any{"message_id": 0, "ephemeral_message_id": 9, "receiver_is_admin": true}, res.Evidence)
+				// The whole evidence, on every row: an ephemeral message gives the three keys, every other row none
+				// (register C2-02 of the OpenAI leg: no receiver id of any kind gets in).
+				if len(r.wantEphID) > 0 {
+					assert.Equal(t, map[string]any{"message_id": 0, "ephemeral_message_id": 9, "receiver_is_admin": !r.wantErr}, res.Evidence)
+				} else {
+					assert.Nil(t, res.Evidence)
 				}
-				if r.name == "wrong_receiver" {
-					assert.Equal(t, false, res.Evidence.(map[string]any)["receiver_is_admin"])
+				ids := []int64{admin, b65aOther}
+				if r.resp != nil && r.resp.msg != nil && r.resp.msg.ReceiverUser != nil && r.resp.msg.ReceiverUser.ID != 0 {
+					ids = append(ids, r.resp.msg.ReceiverUser.ID) // the reply's own receiver
 				}
 				if err != nil {
-					noReceiver(t, err.Error(), admin, b65aOther)
+					noReceiver(t, err.Error(), ids...)
 				}
-				noReceiver(t, fmt.Sprint(res.Evidence), admin, b65aOther) // A-C1-02
+				noReceiver(t, fmt.Sprint(res.Evidence), ids...) // A-C1-02
 			})
 		}
 	}
@@ -460,10 +469,14 @@ func TestB65A_EphemeralReplyStep(t *testing.T) {
 		{name: "taken_both_ids", resp: b65aResp{msg: &tg.Message{MessageID: 5, EphemeralMessageID: 8, Chat: &tg.Chat{ID: b65aChat2},
 			ReceiverUser: &tg.User{ID: b65aOther}}}, wantErr: true,
 			wantTrack: []CreatedMessage{{ChatID: b65aChat2, MessageID: 5}}, wantMsgID: []int{5}},
+		{name: "taken_positive_chat", resp: b65aResp{msg: pub(&tg.Chat{ID: b65aChatPos})}, wantErr: true,
+			wantTrack: []CreatedMessage{{ChatID: b65aChatPos, MessageID: 5}}, wantMsgID: []int{5}},
 		{name: "taken_no_chat", resp: b65aResp{msg: pub(nil)}, wantErr: true, wantMsgID: []int{5}, noDelete: true},
 		{name: "taken_zero_chat", resp: b65aResp{msg: pub(&tg.Chat{})}, wantErr: true, wantMsgID: []int{5}, noDelete: true},
 		{name: "taken_ephemeral", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, &tg.User{ID: b65aOther})}, wantErr: true,
 			wantEph: []ephemeralMessage{{b65aChat2, b65aOther, 8}}, wantEphID: []int{8}},
+		{name: "taken_ephemeral_positive_chat", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChatPos}, &tg.User{ID: b65aOther})}, wantErr: true,
+			wantEph: []ephemeralMessage{{b65aChatPos, b65aOther, 8}}, wantEphID: []int{8}},
 		{name: "taken_ephemeral_no_chat", resp: b65aResp{msg: eph(nil, &tg.User{ID: b65aOther})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_zero_chat", resp: b65aResp{msg: eph(&tg.Chat{}, &tg.User{ID: b65aOther})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_no_receiver", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, nil)}, wantErr: true, wantEphID: []int{8}, noDelete: true},
@@ -503,8 +516,12 @@ func TestB65A_EphemeralReplyStep(t *testing.T) {
 			if r.noDelete {
 				assert.Contains(t, err.Error(), "cannot be deleted")
 			}
-			noReceiver(t, err.Error(), b65aOther)
-			noReceiver(t, fmt.Sprint(res.Evidence), b65aOther) // A-C1-02
+			assert.Nil(t, res.Evidence, "no evidence on an error (register C2-02)")
+			ids := []int64{b65aOther}
+			if m := r.resp.msg; m != nil && m.ReceiverUser != nil && m.ReceiverUser.ID != 0 {
+				ids = append(ids, m.ReceiverUser.ID) // the reply's own receiver
+			}
+			noReceiver(t, err.Error(), ids...)
 		})
 	}
 	// Through the runner: an incomplete target is counted once and never deleted (O3-03).

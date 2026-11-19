@@ -685,6 +685,9 @@ go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 # Suggested posts (S71, S72; Bot API 9.2)
 go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters, approve and decline reach the server
 
+# Ephemeral messages (S73; Bot API 10.3/10.4; the bot must be an administrator of the test chat)
+go run ./cmd/galigo-testbot --run ephemeral              # ephemeral messages to the first admin, sent and deleted
+
 # Show method coverage
 go run ./cmd/galigo-testbot --status
 ```
@@ -847,6 +850,14 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 
 S71 and S72 run in `--run suggested-posts` and `--run all`. A successful suggested post, approval or decline needs a channel direct messages chat, which the testbot does not have: approve and decline count as covered through S72's refusal-only run, and a successful call is proved by the mock tests only (`sender/suggested_post_b48c2_test.go`).
 
+#### Ephemeral messages (S73)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S73-EphemeralMessages | sendMessage, sendPhoto, deleteEphemeralMessage | First an ephemeral reply to an unknown callback query without `chat_id` (Bot API 10.4) must be refused with 400 `query is too old and response timeout expired or query ID is invalid` (`tg.ErrCallbackExpired`). Then `ephemeral_message_parameters` (10.3) with `receiver_user_id` = the first admin (`TESTBOT_ADMINS`) on the JSON path (`sendMessage`) and the form path (`sendPhoto` upload): the reply must have `message_id` 0, an `ephemeral_message_id` and `receiver_user` = the admin; the cleanup deletes both with `deleteEphemeralMessage`. A message posted for everyone fails the step, and the cleanup deletes it |
+
+S73 runs in `--run ephemeral` and `--run all`. The two sends need the bot to be an administrator of the test chat (an administrator bot can send an ephemeral message to any non-bot member at any time); otherwise the scenario is skipped after the reply step. S73 shows that Telegram accepts the sends for the named receiver, accepts the deletes and refuses the unknown callback query; it does not show what the admin's app displays. The server gives the same refusal when `chat_id` is set, so only the mock tests check that galigo leaves `chat_id` out. A successful ephemeral reply to a callback query needs a real button press (interactive): the mock tests check galigo's request and its handling of a fake success only.
+
 #### Interactive (opt-in, excluded from `--run all`)
 
 | Scenario | Methods | Description |
@@ -868,7 +879,7 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 Current registry: **101 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 87 covered methods and 15 missing. 86 of the 101 registry methods have a scenario; the 87th covered method, `getUserProfileAudios` (S39), is not in the registry. The 15 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the five 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption`, `editEphemeralMessageReplyMarkup` and `deleteEphemeralMessage` need an ephemeral message (10.3 send parameter, B-57) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 88 covered methods and 14 missing. 87 of the 101 registry methods have a scenario; the 88th covered method, `getUserProfileAudios` (S39), is not in the registry. The 14 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the four 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption` and `editEphemeralMessageReplyMarkup` have no live scenario yet (planned with their 10.3 changes) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -886,11 +897,13 @@ All media fixtures are embedded via `go:embed` in `cmd/galigo-testbot/fixtures/`
 
 ### Cleanup
 
-Steps track what they create: messages (`TrackMessage`), sticker sets (`TrackStickerSet`) and member tags (`SetChatMemberTagStep`). A scenario's `CleanupStep` deletes the messages and sticker sets and clears the tags. It keeps every item whose delete fails and then fails, naming each item; a 429 makes the runner repeat the step.
+Steps track what they create: messages (`TrackMessage`), sticker sets (`TrackStickerSet`), member tags (`SetChatMemberTagStep`) and ephemeral messages (`SendEphemeralStep`, S73). A scenario's `CleanupStep` deletes the messages, sticker sets and ephemeral messages (`deleteEphemeralMessage`) and clears the tags. It keeps every item whose delete fails and then fails, naming each item; a 429 makes the runner repeat the step.
 
-When a scenario stops before all its steps succeed (a failed step, a skip, the message budget, the scenario timeout, a cancelled context) or a step panics, the runner deletes everything still tracked. After an early stop it also adds the step `cleanup after stop` to the report. A panic still ends the run and no report is written, so the log is the only record of that cleanup. If an item cannot be deleted, the scenario fails and the step names the item. An item that failed with a permanent Telegram error (not 429 and not 500–504, see `APIError.IsRetryable`) is then no longer tracked; other failures stay tracked for a later cleanup.
+When a scenario stops before all its steps succeed (a failed step, a skip, the message budget, the scenario timeout, a cancelled context) or a step panics, the runner deletes everything still tracked. After an early stop it also adds the step `cleanup after stop` to the report. A panic still ends the run and no report is written, so the log is the only record of that cleanup. If an item cannot be deleted, the scenario fails and the step names the item. An item that failed with a permanent Telegram error (not 429 and not 500–504, see `APIError.IsRetryable`) is then no longer tracked; other failures stay tracked for a later cleanup, except ephemeral messages: an ephemeral message id may be reused, so the runner drops every ephemeral message still tracked when the next scenario starts, and does not delete it then.
 
-Limits: Ctrl-C ends `--run` without cleanup; a scenario whose steps all succeed but leaves something tracked keeps it for a later `CleanupStep`; restore steps (webhook, chat title, photo, permissions) are not run after an early stop.
+The message budget (`TESTBOT_MAX_MESSAGES_PER_RUN`) counts every message and ephemeral message a step reports, also when the step then fails (some older steps report nothing when they fail, and one step can send more than the budget has left). A step that gets a 429 is not repeated once the budget is used. A scenario that reaches the budget before its `CleanupStep` stops, and the runner deletes what it left tracked.
+
+Limits: Ctrl-C ends `--run` without cleanup; a scenario whose steps all succeed but leaves something tracked keeps it for a later `CleanupStep` (an ephemeral message is dropped without a report when the next scenario starts); restore steps (webhook, chat title, photo, permissions) are not run after an early stop.
 
 ### Evidence Reports
 
@@ -942,6 +955,7 @@ cmd/galigo-testbot/
 │   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
 │   ├── steps_suggested_post.go # Suggested post steps: parameters (sendMessage, sendPhoto; S71), approve and decline (S72)
+│   ├── steps_ephemeral.go # Ephemeral message steps: send to the admin (sendMessage, sendPhoto), reply without chat_id (S73)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -965,6 +979,7 @@ cmd/galigo-testbot/
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
 │   ├── api102.go      # Bot API 10.2 (S68: rich message blocks, S69: rich message media)
 │   ├── suggested_post.go # Suggested posts, Bot API 9.2 (S71, S72)
+│   ├── ephemeral.go   # Ephemeral messages, Bot API 10.3/10.4 (S73)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
 │   └── webhook.go     # Webhook scenarios (S13-S14, opt-in)
 ├── fixtures/

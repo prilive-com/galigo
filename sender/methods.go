@@ -42,6 +42,9 @@ func (c *Client) CloseBot(ctx context.Context) error {
 
 // SendDocument sends a document.
 func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendDocument", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -51,6 +54,9 @@ func (c *Client) SendDocument(ctx context.Context, req SendDocumentRequest) (*tg
 
 // SendVideo sends a video.
 func (c *Client) SendVideo(ctx context.Context, req SendVideoRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendVideo", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -60,6 +66,9 @@ func (c *Client) SendVideo(ctx context.Context, req SendVideoRequest) (*tg.Messa
 
 // SendAudio sends an audio file.
 func (c *Client) SendAudio(ctx context.Context, req SendAudioRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendAudio", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -69,6 +78,9 @@ func (c *Client) SendAudio(ctx context.Context, req SendAudioRequest) (*tg.Messa
 
 // SendVoice sends a voice message.
 func (c *Client) SendVoice(ctx context.Context, req SendVoiceRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendVoice", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -78,6 +90,9 @@ func (c *Client) SendVoice(ctx context.Context, req SendVoiceRequest) (*tg.Messa
 
 // SendAnimation sends an animation (GIF or H.264/MPEG-4 AVC video without sound).
 func (c *Client) SendAnimation(ctx context.Context, req SendAnimationRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendAnimation", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -87,6 +102,9 @@ func (c *Client) SendAnimation(ctx context.Context, req SendAnimationRequest) (*
 
 // SendVideoNote sends a video note (round video up to 1 minute).
 func (c *Client) SendVideoNote(ctx context.Context, req SendVideoNoteRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendVideoNote", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -96,6 +114,9 @@ func (c *Client) SendVideoNote(ctx context.Context, req SendVideoNoteRequest) (*
 
 // SendSticker sends a sticker.
 func (c *Client) SendSticker(ctx context.Context, req SendStickerRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendSticker", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -192,6 +213,9 @@ func (c *Client) GetUserPersonalChatMessages(ctx context.Context, req GetUserPer
 
 // SendLocation sends a location.
 func (c *Client) SendLocation(ctx context.Context, req SendLocationRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendLocation", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -201,6 +225,9 @@ func (c *Client) SendLocation(ctx context.Context, req SendLocationRequest) (*tg
 
 // SendVenue sends a venue.
 func (c *Client) SendVenue(ctx context.Context, req SendVenueRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendVenue", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err
@@ -210,6 +237,9 @@ func (c *Client) SendVenue(ctx context.Context, req SendVenueRequest) (*tg.Messa
 
 // SendContact sends a phone contact.
 func (c *Client) SendContact(ctx context.Context, req SendContactRequest) (*tg.Message, error) {
+	if err := req.EphemeralMessageParameters.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := c.executeRequest(ctx, "sendContact", req, extractChatID(req.ChatID))
 	if err != nil {
 		return nil, err

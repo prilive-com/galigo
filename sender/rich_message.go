@@ -9,7 +9,7 @@ import (
 // SendRichMessageRequest represents a sendRichMessage request (Bot API 10.1).
 type SendRichMessageRequest struct {
 	BusinessConnectionID  string              `json:"business_connection_id,omitempty"`
-	ChatID                tg.ChatID           `json:"chat_id"`
+	ChatID                tg.ChatID           `json:"chat_id,omitempty"`
 	MessageThreadID       int                 `json:"message_thread_id,omitempty"`
 	DirectMessagesTopicID int                 `json:"direct_messages_topic_id,omitempty"`
 	RichMessage           tg.InputRichMessage `json:"rich_message"`
@@ -23,11 +23,14 @@ type SendRichMessageRequest struct {
 	// Bot API 9.2: channel direct messages chats and suggested posts (suggested
 	// posts are refused in any other chat).
 	SuggestedPostParameters *tg.SuggestedPostParameters `json:"suggested_post_parameters,omitempty"`
+
+	// Bot API 10.3: an ephemeral message; ChatID may be nil only for an ephemeral reply to a callback query (10.4).
+	EphemeralMessageParameters *tg.EphemeralMessageParameters `json:"ephemeral_message_parameters,omitempty"`
 }
 
 // SendRichMessage sends a rich message (Bot API 10.1). It is not retried: a resend could post the message twice.
 func (c *Client) SendRichMessage(ctx context.Context, req SendRichMessageRequest) (*tg.Message, error) {
-	if err := validateChatID(req.ChatID); err != nil {
+	if err := validateSendTarget(req.ChatID, req.EphemeralMessageParameters); err != nil {
 		return nil, err
 	}
 	if err := validateInputRichMessage(req.RichMessage); err != nil {

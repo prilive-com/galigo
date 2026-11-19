@@ -402,7 +402,7 @@ func (c *Client) ChatLimiterCount() int {
 
 // SendMessage sends a text message.
 func (c *Client) SendMessage(ctx context.Context, req SendMessageRequest) (*tg.Message, error) {
-	if err := validateChatID(req.ChatID); err != nil {
+	if err := validateSendTarget(req.ChatID, req.EphemeralMessageParameters); err != nil {
 		return nil, err
 	}
 	if err := req.LinkPreviewOptions.Validate(); err != nil {
@@ -415,7 +415,7 @@ func (c *Client) SendMessage(ctx context.Context, req SendMessageRequest) (*tg.M
 
 // SendPhoto sends a photo.
 func (c *Client) SendPhoto(ctx context.Context, req SendPhotoRequest) (*tg.Message, error) {
-	if err := validateChatID(req.ChatID); err != nil {
+	if err := validateSendTarget(req.ChatID, req.EphemeralMessageParameters); err != nil {
 		return nil, err
 	}
 	return withRetry(c, ctx, req.ChatID, func() (*tg.Message, error) {
@@ -876,6 +876,8 @@ func calculateBackoff(cfg Config, attempt int, err error) time.Duration {
 
 func extractChatID(chatID tg.ChatID) string {
 	switch v := chatID.(type) {
+	case nil:
+		return "" // no chat (an ephemeral reply to a callback query): only the global limit applies
 	case int64:
 		return strconv.FormatInt(v, 10)
 	case int:

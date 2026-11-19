@@ -68,6 +68,10 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 		"covers", scenario.Covers())
 
 	r.runtime.cleanupCarry = nil // counts of a failed CleanupStep attempt belong to that scenario only
+	// An ephemeral message id may be reused after the message is deleted or expires, so an ephemeral message that an
+	// earlier scenario left (a failed delete, or a scenario that passed without deleting it) is dropped here and not
+	// deleted by a later scenario (B-65 65a).
+	r.runtime.ephemeralMessages = nil
 
 	// A panicking step skips the code after the loop; the deferred call still cleans up before the panic leaves Run
 	// (B-30). Deferred calls run while a panic unwinds, so the panic and its stack trace are not changed.
@@ -142,15 +146,17 @@ func (r *Runner) Run(ctx context.Context, scenario Scenario) *ScenarioResult {
 	return result
 }
 
-// cleanupAfterStop deletes what a stopped scenario left tracked (messages, sticker sets, member tags), on a context
-// that outlives the scenario's (each call bounded by deleteTracked), and records it as the step "cleanup after stop".
+// cleanupAfterStop deletes what a stopped scenario left tracked (messages, sticker sets, member tags, ephemeral
+// messages), on a context that outlives the scenario's (each call bounded by deleteTracked), and records it as the
+// step "cleanup after stop".
 // One attempt per item, with no 429 wait. A failed item is named in the step and the scenario fails. An item whose
 // error is permanent (a non-retryable *tg.APIError) is then dropped from tracking, so it does not fail every later
 // scenario of the run; a transient failure (circuit breaker, network, 429, 500–504, rate-limit wait) stays tracked for a
-// later cleanup (B-30, B-55). Nothing tracked: no call, no step.
+// later cleanup (B-30, B-55), except an ephemeral message: Run drops it when the next scenario starts (its id may
+// be reused). Nothing tracked: no call, no step.
 func (r *Runner) cleanupAfterStop(parent context.Context, result *ScenarioResult) {
 	rt := r.runtime
-	if len(rt.CreatedMessages)+len(rt.CreatedStickerSets)+len(rt.taggedMembers) == 0 {
+	if len(rt.CreatedMessages)+len(rt.CreatedStickerSets)+len(rt.taggedMembers)+len(rt.ephemeralMessages) == 0 {
 		return
 	}
 
@@ -199,6 +205,12 @@ func (r *Runner) runStepWithRetry(ctx context.Context, step Step) (*StepResult, 
 			return stepResult, err // Not a 429, fail immediately
 		}
 
+		// The budget is used up (runStep counted this attempt's sends): do not send again; the stop cleanup
+		// deletes what was sent (B-65 65a).
+		if r.messageCount >= r.maxMessages {
+			return stepResult, err
+		}
+
 		// 429 — wait and retry
 		retryAfter := apiErr.RetryAfter
 		if retryAfter == 0 {
@@ -236,6 +248,8 @@ func (r *Runner) runStep(ctx context.Context, step Step) (*StepResult, error) {
 	}
 
 	stepResult.Duration = time.Since(start)
+	// The budget counts every message the step reports, also when the step then fails: it was sent (B-65 65a).
+	r.messageCount += len(stepResult.MessageIDs) + len(stepResult.EphemeralMessageIDs)
 
 	if err != nil {
 		stepResult.Success = false
@@ -245,7 +259,6 @@ func (r *Runner) runStep(ctx context.Context, step Step) (*StepResult, error) {
 	}
 
 	stepResult.Success = true
-	r.messageCount += len(stepResult.MessageIDs)
 
 	r.logger.Info("step completed",
 		"step", step.Name(),

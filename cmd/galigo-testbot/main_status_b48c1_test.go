@@ -14,12 +14,12 @@ import (
 )
 
 // B-48c1: every scenario group that `--run all` runs is also counted by `--status`. main.go builds the lists
-// by hand in four places (the "all" case of runSuiteCommand and of handleRun, showCoverageStatus, handleStatus), so a
+// by hand in three places (the "all" case of suiteScenarios, used by --run and /run; showCoverageStatus; handleStatus), so a
 // new group added to "all" and not to the two status lists is never counted. The test reads main.go's syntax tree:
 // the set of groups in each "all" case must be a subset of the set in each status function.
 //
 // A group counts only when its call is an argument of the one supported shape,
-// `scenarios := append(suites.AllXScenarios(), suites.AllYScenarios()...)` (`=` in the "all" cases) or
+// `scenarios := append(suites.AllXScenarios(), suites.AllYScenarios()...)` (`=` in the "all" case) or
 // `scenarios = append(scenarios, suites.AllXScenarios()...)`. Any other write to `scenarios`, and any
 // suites.All*Scenarios call outside that shape (a discarded result, a loop), fails the test; in an "all" case every
 // statement must have that shape, so a group reached through a helper fails too. A new shape needs this test changed.
@@ -134,7 +134,7 @@ func TestB48C1_StatusListsCoverAll(t *testing.T) {
 		require.NotEmpty(t, got, "%s: the \"all\" case", fd.Name.Name)
 		return got
 	}
-	for _, run := range []string{"runSuiteCommand", "handleRun"} {
+	for _, run := range []string{"suiteScenarios"} {
 		require.Contains(t, funcs, run)
 		all := allCase(funcs[run])
 		assert.True(t, all["AllSuggestedPostScenarios"], "%s: S71 runs in all", run)

@@ -122,19 +122,20 @@ func showCoverageStatus(logger *slog.Logger) {
 	}
 }
 
-func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
-	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
-	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
-	runner := engine.NewRunner(rt, engine.RunnerConfig{
-		BaseDelay:     cfg.SendInterval,
-		Jitter:        cfg.JitterInterval,
-		MaxMessages:   cfg.MaxMessagesPerRun,
-		RetryOn429:    cfg.RetryOn429,
-		Max429Retries: cfg.Max429Retries,
-	}, logger)
+// availableSuites is the suite list the CLI prints for an unknown --run name.
+const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all"
 
+// isInteractiveSuite reports whether a suite name (any case) is interactive or callback, which each caller runs
+// itself (B-49).
+func isInteractiveSuite(suite string) bool {
+	s := strings.ToLower(suite)
+	return s == "interactive" || s == "callback"
+}
+
+// suiteScenarios returns the scenarios of a suite name (any case) for --run and the bot's /run (B-49). It is false
+// for an unknown name and for interactive and callback (isInteractiveSuite).
+func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	var scenarios []engine.Scenario
-
 	switch strings.ToLower(suite) {
 	case "smoke":
 		scenarios = []engine.Scenario{suites.S0_Smoke()}
@@ -213,13 +214,6 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 	// Extended: Checklists
 	case "checklists":
 		scenarios = suites.AllChecklistScenarios()
-	// Interactive (opt-in, excluded from "all")
-	case "interactive":
-		runInteractiveSuite(cfg, senderClient, logger)
-		return
-	case "callback":
-		runInteractiveSuite(cfg, senderClient, logger)
-		return
 	// Webhook management (opt-in, excluded from "all")
 	case "webhook":
 		scenarios = suites.AllWebhookScenarios()
@@ -300,8 +294,31 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 		scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
+		return nil, false
+	}
+	return scenarios, true
+}
+
+func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
+	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
+	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
+	runner := engine.NewRunner(rt, engine.RunnerConfig{
+		BaseDelay:     cfg.SendInterval,
+		Jitter:        cfg.JitterInterval,
+		MaxMessages:   cfg.MaxMessagesPerRun,
+		RetryOn429:    cfg.RetryOn429,
+		Max429Retries: cfg.Max429Retries,
+	}, logger)
+
+	// Interactive (opt-in, excluded from "all")
+	if isInteractiveSuite(suite) {
+		runInteractiveSuite(cfg, senderClient, logger)
+		return
+	}
+	scenarios, ok := suiteScenarios(suite)
+	if !ok {
 		logger.Error("unknown suite", "suite", suite)
-		fmt.Println("Available suites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all")
+		fmt.Println("Available suites: " + availableSuites)
 		os.Exit(1)
 	}
 
@@ -537,71 +554,8 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	}, logger)
 
 	var scenarios []engine.Scenario
-
-	switch strings.ToLower(suite) {
-	case "smoke":
-		scenarios = []engine.Scenario{suites.S0_Smoke()}
-	case "identity":
-		scenarios = []engine.Scenario{suites.S1_Identity()}
-	case "messages":
-		scenarios = []engine.Scenario{suites.S2_MessageLifecycle()}
-	case "forward":
-		scenarios = []engine.Scenario{suites.S4_ForwardCopy()}
-	case "actions":
-		scenarios = []engine.Scenario{suites.S5_ChatAction()}
-	case "formatted", "formatting", "parse-mode":
-		scenarios = []engine.Scenario{suites.S3_FormattedMessages()}
-	case "link-preview":
-		scenarios = []engine.Scenario{suites.S37_LinkPreview()}
-	case "core":
-		scenarios = suites.AllPhaseAScenarios()
-	// Phase B: Media
-	case "media":
-		scenarios = suites.AllPhaseBScenarios()
-	case "media-uploads":
-		scenarios = []engine.Scenario{suites.S6_MediaUploads()}
-	case "media-groups":
-		scenarios = []engine.Scenario{suites.S7_MediaGroups()}
-	case "edit-media":
-		scenarios = []engine.Scenario{suites.S8_EditMedia()}
-	case "get-file":
-		scenarios = []engine.Scenario{suites.S9_GetFile()}
-	case "edit-message-media":
-		scenarios = []engine.Scenario{suites.S11_EditMessageMedia()}
-	case "multipart-parsemode":
-		scenarios = []engine.Scenario{suites.S36_MultipartParseMode()}
-	case "media-file-id":
-		scenarios = []engine.Scenario{suites.S55_MediaGroupByFileID(), suites.S56_EditMessageMediaByFileID()}
-	case "live-photos":
-		scenarios = suites.AllLivePhotoScenarios()
-	// Phase C: Keyboards
-	case "keyboards":
-		scenarios = suites.AllPhaseCScenarios()
-	case "inline-keyboard":
-		scenarios = []engine.Scenario{suites.S10_InlineKeyboard()}
-	// Extended: Stickers
-	case "stickers":
-		scenarios = suites.AllStickerScenarios()
-	case "sticker-lifecycle":
-		scenarios = []engine.Scenario{suites.S20_StickerLifecycle()}
-	case "stars":
-		scenarios = suites.AllStarsScenarios()
-	case "star-balance":
-		scenarios = []engine.Scenario{suites.S21_Stars()}
-	case "paid-media":
-		scenarios = []engine.Scenario{suites.S70_PaidMedia()}
-	case "suggested-posts":
-		scenarios = suites.AllSuggestedPostScenarios()
-	case "ephemeral":
-		scenarios = suites.AllEphemeralScenarios()
-	case "invoice":
-		scenarios = []engine.Scenario{suites.S22_Invoice()}
-	case "gifts":
-		scenarios = suites.AllGiftScenarios()
-	case "checklists":
-		scenarios = suites.AllChecklistScenarios()
 	// Interactive (opt-in, requires user interaction)
-	case "interactive", "callback":
+	if isInteractiveSuite(suite) {
 		scenarios = suites.AllInteractiveScenarios()
 		// Wire callback channel for interactive scenarios
 		callbackChan := make(chan *tg.CallbackQuery, 10)
@@ -616,101 +570,12 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 				}
 			}
 		}()
-	// Webhook management (opt-in)
-	case "webhook":
-		scenarios = suites.AllWebhookScenarios()
-	case "webhook-lifecycle":
-		scenarios = []engine.Scenario{suites.S13_WebhookLifecycle()}
-	case "get-updates":
-		scenarios = []engine.Scenario{suites.S14_GetUpdates()}
-	// Tier 2
-	case "chat-admin":
-		scenarios = suites.AllChatAdminScenarios()
-	case "chat-info":
-		scenarios = []engine.Scenario{suites.S15_ChatInfo()}
-	case "chat-settings":
-		scenarios = []engine.Scenario{suites.S16_ChatSettings()}
-	case "pin-messages":
-		scenarios = []engine.Scenario{suites.S17_PinMessages()}
-	case "polls":
-		scenarios = []engine.Scenario{suites.S18_Polls()}
-	case "forum-stickers":
-		scenarios = []engine.Scenario{suites.S19_ForumStickers()}
-	// Extras (S25-S32)
-	case "extras":
-		scenarios = suites.AllExtrasScenarios()
-	case "geo":
-		scenarios = []engine.Scenario{suites.S25_GeoLocation()}
-	case "venue":
-		scenarios = []engine.Scenario{suites.S26_GeoVenue()}
-	case "contact-dice":
-		scenarios = []engine.Scenario{suites.S27_ContactAndDice()}
-	case "bulk":
-		scenarios = []engine.Scenario{suites.S28_BulkOps()}
-	case "reactions":
-		scenarios = []engine.Scenario{suites.S29_Reactions()}
-	case "user-info":
-		scenarios = []engine.Scenario{suites.S30_UserInfo()}
-	case "chat-photo":
-		scenarios = []engine.Scenario{suites.S31_ChatPhotoLifecycle()}
-	case "chat-permissions":
-		scenarios = []engine.Scenario{suites.S32_ChatPermissionsLifecycle()}
-	// Bot Identity (S33-S35)
-	case "bot-config":
-		scenarios = suites.AllBotConfigScenarios()
-	case "bot-commands":
-		scenarios = []engine.Scenario{suites.S33_BotCommands()}
-	case "bot-profile":
-		scenarios = []engine.Scenario{suites.S34_BotProfile()}
-	case "bot-admin-defaults":
-		scenarios = []engine.Scenario{suites.S35_BotAdminDefaults()}
-	// Bot API 9.4 (S38-S42)
-	case "api94", "api-94", "9.4":
-		scenarios = suites.AllAPI94Scenarios()
-	case "styled-buttons":
-		scenarios = []engine.Scenario{suites.S38_StyledButtons()}
-	case "profile-audios":
-		scenarios = []engine.Scenario{suites.S39_ProfileAudios()}
-	case "chat-info-94":
-		scenarios = []engine.Scenario{suites.S40_ChatInfo94()}
-	case "video-qualities":
-		scenarios = []engine.Scenario{suites.S42_VideoQualities()}
-	// Bot API 9.5 (S44-S46)
-	case "api95", "api-95", "9.5":
-		scenarios = suites.AllAPI95Scenarios()
-	// Bot API 9.6 (S47-S50)
-	case "api96", "api-96", "9.6":
-		scenarios = suites.AllAPI96Scenarios()
-	// Bot API 10.0 (S51-S54, S57-S65)
-	case "api100", "api-100", "10.0":
-		scenarios = suites.AllAPI100Scenarios()
-	// Bot API 10.1 (S66, S67)
-	case "api101", "api-101", "10.1":
-		scenarios = suites.AllAPI101Scenarios()
-	// Bot API 10.2 (S68, S69)
-	case "api102", "api-102", "10.2":
-		scenarios = suites.AllAPI102Scenarios()
-	case "all":
-		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
-		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
-		scenarios = append(scenarios, suites.AllChatAdminScenarios()...)
-		scenarios = append(scenarios, suites.AllStickerScenarios()...)
-		scenarios = append(scenarios, suites.AllStarsScenarios()...)
-		scenarios = append(scenarios, suites.AllGiftScenarios()...)
-		scenarios = append(scenarios, suites.AllExtrasScenarios()...)
-		scenarios = append(scenarios, suites.AllBotConfigScenarios()...)
-		scenarios = append(scenarios, suites.AllAPI94Scenarios()...)
-		scenarios = append(scenarios, suites.AllAPI95Scenarios()...)
-		scenarios = append(scenarios, suites.AllAPI96Scenarios()...)
-		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
-		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
-		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
-		scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
-		scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
-		// Checklists require Telegram Premium — opt-in via --run checklists
-	default:
-		sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
-		return
+	} else {
+		var ok bool
+		if scenarios, ok = suiteScenarios(suite); !ok {
+			sendMessage(ctx, adapter, chatID, "Unknown suite: "+suite)
+			return
+		}
 	}
 
 	sendMessage(ctx, adapter, chatID, fmt.Sprintf("Running %d scenario(s)...", len(scenarios)))

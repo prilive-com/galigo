@@ -415,6 +415,7 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 		f := newB65aFake()
 		_, err := (&SendEphemeralStep{Method: "sendVoice"}).Execute(context.Background(), b65aRuntime(f, b65aAdmin))
 		require.Error(t, err)
+		assert.ErrorContains(t, err, `unknown method "sendVoice"`)
 		assert.Empty(t, f.sent)
 	})
 }

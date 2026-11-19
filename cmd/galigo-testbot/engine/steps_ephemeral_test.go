@@ -333,6 +333,9 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 			wantEph: []ephemeralMessage{{b30Chat, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "zero_receiver", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b30Chat}, &tg.User{})}, wantErr: true, wantSend: true,
 			wantEph: []ephemeralMessage{{b30Chat, b65aAdmin, 9}}, wantEphID: []int{9}},
+		// A negative receiver is not a user: the delete would be refused locally, so the admin is used (O-C1-04).
+		row{name: "negative_receiver", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b30Chat}, &tg.User{ID: -5})}, wantErr: true, wantSend: true,
+			wantEph: []ephemeralMessage{{b30Chat, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "other_chat", resp: &b65aResp{msg: ephMsg(&tg.Chat{ID: b65aChat2}, &tg.User{ID: b65aAdmin})}, wantSend: true,
 			wantEph: []ephemeralMessage{{b65aChat2, b65aAdmin, 9}}, wantEphID: []int{9}},
 		row{name: "zero_chat", resp: &b65aResp{msg: ephMsg(&tg.Chat{}, &tg.User{ID: b65aAdmin})}, wantSend: true,
@@ -408,6 +411,7 @@ func TestB65A_SendEphemeralStep(t *testing.T) {
 				if err != nil {
 					noReceiver(t, err.Error(), admin, b65aOther)
 				}
+				noReceiver(t, fmt.Sprint(res.Evidence), admin, b65aOther) // A-C1-02
 			})
 		}
 	}
@@ -464,6 +468,9 @@ func TestB65A_EphemeralReplyStep(t *testing.T) {
 		{name: "taken_ephemeral_zero_chat", resp: b65aResp{msg: eph(&tg.Chat{}, &tg.User{ID: b65aOther})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_no_receiver", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, nil)}, wantErr: true, wantEphID: []int{8}, noDelete: true},
 		{name: "taken_ephemeral_zero_receiver", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, &tg.User{})}, wantErr: true, wantEphID: []int{8}, noDelete: true},
+		// A negative receiver is not a user, so the message cannot be deleted (O-C1-04).
+		{name: "taken_ephemeral_negative_receiver", resp: b65aResp{msg: eph(&tg.Chat{ID: b65aChat2}, &tg.User{ID: -5})}, wantErr: true,
+			wantEphID: []int{8}, noDelete: true},
 	}
 	for _, w := range b65aWidths { // the receiver copied from the reply into the recorded target (E-0178, register A1-08)
 		rows = append(rows, row{name: "taken_ephemeral_" + strconv.FormatInt(w, 10),
@@ -497,6 +504,7 @@ func TestB65A_EphemeralReplyStep(t *testing.T) {
 				assert.Contains(t, err.Error(), "cannot be deleted")
 			}
 			noReceiver(t, err.Error(), b65aOther)
+			noReceiver(t, fmt.Sprint(res.Evidence), b65aOther) // A-C1-02
 		})
 	}
 	// Through the runner: an incomplete target is counted once and never deleted (O3-03).

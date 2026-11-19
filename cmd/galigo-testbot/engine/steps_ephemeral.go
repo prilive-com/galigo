@@ -62,9 +62,10 @@ func (s *SendEphemeralStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 	if msg.EphemeralMessageID == 0 {
 		return res, fmt.Errorf("%s: no ephemeral_message_id in the reply", s.Method)
 	}
-	// Delete it for the receiver the server names (the admin, unless the server is wrong).
+	// Delete it for the receiver the server names (the admin, unless the server is wrong); a receiver that is not a
+	// positive user id cannot be deleted for, so the admin is used.
 	receiver := rt.AdminUserID
-	if msg.ReceiverUser != nil && msg.ReceiverUser.ID != 0 {
+	if msg.ReceiverUser != nil && msg.ReceiverUser.ID > 0 {
 		receiver = msg.ReceiverUser.ID
 	}
 	rt.recordEphemeral(chatID, receiver, msg.EphemeralMessageID)
@@ -118,7 +119,7 @@ func (s *EphemeralReplyStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 			rt.TrackMessage(chatID, msg.MessageID)
 		case msg.EphemeralMessageID != 0:
 			res.EphemeralMessageIDs = []int{msg.EphemeralMessageID}
-			if chatID == 0 || receiver == 0 {
+			if chatID == 0 || receiver <= 0 { // a receiver must be a positive user id
 				return res, fmt.Errorf("%w; ephemeral message %d cannot be deleted: the reply names no chat or receiver",
 					err, msg.EphemeralMessageID)
 			}

@@ -18,7 +18,7 @@ func S73_EphemeralMessages() engine.Scenario {
 	return &engine.BaseScenario{
 		ScenarioName: "S73-EphemeralMessages",
 		ScenarioDescription: "ephemeral_message_parameters: a reply without chat_id (10.4), sendMessage (JSON) and " +
-			"sendPhoto (form) to the admin, deleteEphemeralMessage (10.3)",
+			"sendPhoto (form) to the admin (10.3), deleteEphemeralMessage",
 		CoveredMethods:  []string{"sendMessage", "sendPhoto", "deleteEphemeralMessage"},
 		ScenarioTimeout: 60 * time.Second,
 		ScenarioSteps: []engine.Step{

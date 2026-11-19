@@ -304,6 +304,8 @@ func TestB65A_Wire(t *testing.T) {
 		// A chat the caller gives is sent as given, also with callback-only parameters (register O1-06).
 		row{"reply_with_chat", testutil.TestChatID, &tg.EphemeralMessageParameters{CallbackQueryID: b65aCallback}, `{"callback_query_id":"cq-65a"}`},
 		row{"string_chat", "@b65a_chan", &tg.EphemeralMessageParameters{ReceiverUserID: 7}, b65aReceiverJSON(7)},
+		// A plain Go int chat id is a valid chat class too (validateChatID; register O-C1-01).
+		row{"int_chat", int(-100123), &tg.EphemeralMessageParameters{ReceiverUserID: 7}, b65aReceiverJSON(7)},
 	)
 	for _, c := range b65aCalls() {
 		for _, up := range c.paths {
@@ -333,8 +335,12 @@ func TestB65A_Wire(t *testing.T) {
 						// The exact value: the form text, and on the JSON path the raw JSON (a number stays a number,
 						// a string a string; register O1-06).
 						wantText, wantRaw := "@b65a_chan", `"@b65a_chan"`
-						if id, isInt := r.chat.(int64); isInt {
+						switch id := r.chat.(type) {
+						case int64:
 							wantText = strconv.FormatInt(id, 10)
+							wantRaw = wantText
+						case int:
+							wantText = strconv.Itoa(id)
 							wantRaw = wantText
 						}
 						assert.Equal(t, wantText, chat)
@@ -413,6 +419,8 @@ func TestB65A_ChatRule(t *testing.T) {
 		// A negative receiver is still a receiver: a nil chat is refused (register O2-05).
 		{"nil_chat_negative_receiver", nil, &tg.EphemeralMessageParameters{ReceiverUserID: -1, CallbackQueryID: b65aCallback}, "galigo: chat_id is required"},
 		{"nil_chat_empty", nil, &tg.EphemeralMessageParameters{}, ""},
+		// An invalid parameter is refused before the chat check, also with a chat that check refuses (A-C1-01).
+		{"int64_0_empty", int64(0), &tg.EphemeralMessageParameters{}, ""},
 		{"nil_chat_no_param", nil, nil, "galigo: chat_id is required"},
 	}
 	for _, p := range []struct {

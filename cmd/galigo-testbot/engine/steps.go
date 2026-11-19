@@ -336,7 +336,7 @@ func (s *SendChatActionStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 	}, nil
 }
 
-// CleanupStep deletes all tracked messages and sticker sets and clears recorded member tags.
+// CleanupStep deletes all tracked messages, sticker sets and ephemeral messages and clears recorded member tags.
 type CleanupStep struct{}
 
 func (s *CleanupStep) Name() string { return "cleanup" }

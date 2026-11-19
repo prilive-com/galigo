@@ -131,8 +131,8 @@ var b49Routes = []struct {
 	}},
 }
 
-// b49SuiteList is the expected text after "Available suites: " (the baseline 6d9160e at B-49), kept apart from
-// availableSuites so a changed list is seen.
+// b49SuiteList is the expected text after "Available suites: ", copied from availableSuites at 6d9160e (B-49) and
+// kept apart from it so a changed list is seen; docs/testing.md step 5 updates both.
 const b49SuiteList = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all"
 
 func b49Names(ss []engine.Scenario) []string {
@@ -159,8 +159,24 @@ func TestB49_SuiteRoutes(t *testing.T) {
 			assert.Equal(t, want, b49Names(got), in)
 		}
 	}
-	all, _ := suiteScenarios("all")
-	assert.Len(t, all, 68)
+	// The selector lower-cases with strings.ToLower, like the baseline switch tag, so Unicode upper case maps too:
+	// U+0130 to "i" and the Kelvin sign U+212A to "k" (register A-C1-01).
+	for in, label := range map[string]string{"\u0130dentity": "identity", "SMO\u212aE": "smoke"} {
+		got, ok := suiteScenarios(in)
+		assert.True(t, ok, in)
+		assert.Equal(t, b49Names(b49Routes[b49RouteIndex(t, label)].want()), b49Names(got), in)
+	}
+}
+
+func b49RouteIndex(t *testing.T, label string) int {
+	t.Helper()
+	for i, r := range b49Routes {
+		if r.label == label {
+			return i
+		}
+	}
+	t.Fatalf("no route %q", label)
+	return -1
 }
 
 // T-refuse: names suiteScenarios does not select, including the two each caller runs itself.
@@ -299,19 +315,19 @@ func b49Inputs() []b49Input {
 	return rows
 }
 
-type b49Bot struct {
-	dir string
-}
-
 // b49RunBot runs handleRun against the mock server with a message budget of 0, so every scenario stops before its
-// first step: the only requests are the bot's own messages.
-func b49RunBot(t *testing.T, suite string) (b49Bot, []string) {
+// first step: the only requests are the bot's own messages. It returns the report folder and the message texts. The
+// server and the client are closed when it returns, so the rows do not keep listeners and connections open (register
+// REGISTER-change.md O-C1-02; the t.Cleanup closes run again and do nothing).
+func b49RunBot(t *testing.T, suite string) (string, []string) {
 	t.Helper()
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, _ *http.Request) {
 		testutil.ReplyMessage(w, 1)
 	})
+	defer server.Close()
 	client := testutil.NewTestClient(t, server.BaseURL())
+	defer func() { _ = client.Close() }()
 	adapter := engine.NewSenderAdapter(client)
 	cfg := &config.Config{Admins: []int64{1}, StorageDir: t.TempDir(), MaxMessagesPerRun: 0}
 	updates := make(chan tg.Update)
@@ -326,34 +342,34 @@ func b49RunBot(t *testing.T, suite string) (b49Bot, []string) {
 		require.NoError(t, json.Unmarshal(c.Body, &body))
 		texts = append(texts, body.Text)
 	}
-	return b49Bot{dir: cfg.StorageDir}, texts
+	return cfg.StorageDir, texts
 }
 
 // T-bot: the bot's /run refuses an empty and an unknown name with one message and no report, and for every accepted
 // label (and interactive) runs exactly the selected scenarios. The refusals include near misses of both conditions:
 // spaces, a second word, a suffix (the bot joins the words after /run with one space).
 func TestB49_BotRun(t *testing.T) {
-	bot, texts := b49RunBot(t, "")
+	dir, texts := b49RunBot(t, "")
 	require.Len(t, texts, 1)
 	assert.True(t, strings.HasPrefix(texts[0], "Usage: /run <suite>\n"), texts[0])
-	_, err := os.Stat(filepath.Join(bot.dir, "reports"))
+	_, err := os.Stat(filepath.Join(dir, "reports"))
 	assert.True(t, os.IsNotExist(err))
 
 	for _, in := range []string{"nosuch", "NoSuch", " smoke", "smoke ", "smoke x",
 		" interactive", "interactive ", "interactive x", "callback x", "interactive2"} {
-		bot, texts := b49RunBot(t, in)
+		dir, texts := b49RunBot(t, in)
 		assert.Equal(t, []string{"Unknown suite: " + in}, texts, in)
-		_, err := os.Stat(filepath.Join(bot.dir, "reports"))
+		_, err := os.Stat(filepath.Join(dir, "reports"))
 		assert.True(t, os.IsNotExist(err), in)
 	}
 
 	for _, r := range b49Inputs() {
 		want := b49Names(r.want())
-		bot, texts := b49RunBot(t, r.in)
+		dir, texts := b49RunBot(t, r.in)
 		require.Len(t, texts, 2, r.in)
 		assert.Equal(t, "Running "+strconv.Itoa(len(want))+" scenario(s)...", texts[0], r.in)
 		assert.True(t, strings.HasPrefix(texts[1], "Test Run: "), r.in)
-		assert.Equal(t, want, b49ReportNames(t, bot.dir), r.in)
+		assert.Equal(t, want, b49ReportNames(t, dir), r.in)
 	}
 }
 
@@ -364,18 +380,20 @@ func TestB49_CLIRun(t *testing.T) {
 	// inherited B49_CLI_SUITE alone must not turn the parent test into a child (register O-T3-01).
 	if a := flag.Args(); len(a) == 1 && a[0] == "b49-cli-child" {
 		suite, ok := os.LookupEnv("B49_CLI_SUITE")
-		if !ok {
-			fmt.Fprintln(os.Stderr, "b49: child without B49_CLI_SUITE")
+		dir := os.Getenv("B49_CLI_DIR")
+		if !ok || !filepath.IsAbs(dir) {
+			fmt.Fprintln(os.Stderr, "b49: child needs B49_CLI_SUITE and an absolute B49_CLI_DIR")
 			os.Exit(3)
 		}
-		// The child calls runSuiteCommand only: never main, flag parsing or config.Load (they read .env). The nil
+		// The child calls runSuiteCommand only: never main (it reads .env with config.LoadDotEnv) or config.Load (it
+		// reads the environment), so the child's config holds only the fake values below. The nil
 		// client makes a call through the sender panic. The resolver below refuses DNS lookups as a backup only (a
 		// hosts-file entry is read first): wrong versions that could reach runInteractiveSuite's own poller are kept
 		// out of this test by the mutation tool's checked network rule (TEST-PLAN §3).
 		net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(context.Context, string, string) (net.Conn, error) {
 			return nil, errors.New("b49: no network in the CLI child")
 		}}
-		cfg := &config.Config{Admins: []int64{1}, StorageDir: os.Getenv("B49_CLI_DIR"), MaxMessagesPerRun: 0}
+		cfg := &config.Config{Admins: []int64{1}, StorageDir: dir, MaxMessagesPerRun: 0}
 		runSuiteCommand(cfg, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)), suite, false)
 		os.Exit(0)
 	}
@@ -387,6 +405,7 @@ func TestB49_CLIRun(t *testing.T) {
 		defer cancel()
 		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestB49_CLIRun$", "--", "b49-cli-child")
 		cmd.Env = append(os.Environ(), "B49_CLI_SUITE="+suite, "B49_CLI_DIR="+dir)
+		cmd.Dir = dir // the child's working folder is the temp folder too (register O-C1-06)
 		var stdout, stderr strings.Builder
 		cmd.Stdout, cmd.Stderr = &stdout, &stderr
 		err = cmd.Run()

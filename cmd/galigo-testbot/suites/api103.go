@@ -9,29 +9,26 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// s74Text is a plain RichText.
-func s74Text(s string) tg.RichText { return tg.RichText{Plain: s} }
-
 // s74Blocks are the 10.3 blocks S74 sends without media: a row of four buttons (callback, URL, copy_text, disabled),
 // a paragraph with a button node, a compact table and an expandable quotation. engine.VerifyRichAPI103Step checks
 // the reply against them.
 func s74Blocks() []tg.InputRichBlock {
 	cell := func(s string) tg.RichBlockTableCell {
-		t := s74Text(s)
+		t := s68Text(s)
 		return tg.RichBlockTableCell{Text: &t, Align: "left", VAlign: "top"}
 	}
 	return []tg.InputRichBlock{
 		tg.InputRichBlockButtons{Align: "center", Buttons: []tg.RichMessageButton{
-			{Text: s74Text("callback"), Style: tg.ButtonStylePrimary, CallbackData: "s74"},
-			{Text: s74Text("url"), URL: "https://t.me/"},
-			{Text: s74Text("copy"), CopyText: &tg.CopyTextButton{Text: "galigo"}},
-			{Text: s74Text("off"), Disabled: &tg.DisabledButton{}},
+			{Text: s68Text("callback"), Style: tg.ButtonStylePrimary, CallbackData: "s74"},
+			{Text: s68Text("url"), URL: "https://t.me/"},
+			{Text: s68Text("copy"), CopyText: &tg.CopyTextButton{Text: "galigo"}},
+			{Text: s68Text("off"), Disabled: &tg.DisabledButton{}},
 		}},
-		tg.InputRichBlockParagraph{Text: tg.RichText{Parts: []tg.RichText{s74Text("galigo 10.3 "),
+		tg.InputRichBlockParagraph{Text: tg.RichText{Parts: []tg.RichText{s68Text("galigo 10.3 "),
 			{Node: tg.RichTextButton{Type: "button",
-				Button: tg.RichMessageButton{Text: s74Text("node"), CallbackData: "s74-node"}}}}}},
+				Button: tg.RichMessageButton{Text: s68Text("node"), CallbackData: "s74-node"}}}}}},
 		tg.InputRichBlockTable{Cells: [][]tg.RichBlockTableCell{{cell("a"), cell("b")}}, IsCompact: true},
-		tg.InputRichBlockExpandableBlockQuotation{Text: s74Text("galigo 10.3 expandable"), Credit: &tg.RichText{Plain: "galigo"}},
+		tg.InputRichBlockExpandableBlockQuotation{Text: s68Text("galigo 10.3 expandable"), Credit: &tg.RichText{Plain: "galigo"}},
 	}
 }
 

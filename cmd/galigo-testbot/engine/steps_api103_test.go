@@ -184,6 +184,7 @@ func TestB65C_SendRichDocumentBlockStep(t *testing.T) {
 	f := &fake101d{msg: reply}
 	rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 	rt.LastMessage = api101dReply(api101dRich(api101dPara(), b65cDoc("BQAC-fake-doc"), b65cDoc("BQAC-fake-doc2")), "")
+	rt.LastMessage.Chat = &tg.Chat{ID: testutil.TestChatID - 1} // the step sends to rt.ChatID, not to the last message's chat (C1-01)
 	res, err := step.Execute(context.Background(), rt)
 	require.NoError(t, err)
 	assert.Equal(t, "sendRichMessage (document block)", res.StepName)
@@ -252,6 +253,7 @@ func TestB65C_SendRichDocumentBlockStepErrors(t *testing.T) {
 	}{
 		{"reply without rich message", api101dReply(nil, "t"), "sendRichMessage: the reply has no rich_message"},
 		{"other blocks", api101dReply(api101dRich(api101dPara()), ""), "sendRichMessage: blocks [paragraph], want [document]"},
+		{"reply with text", api101dReply(api101dRich(b65cDoc("BQAC-fake-doc")), "t"), `sendRichMessage: the reply has text "t"`},
 	}
 	for _, r := range tracked {
 		t.Run(r.name, func(t *testing.T) {

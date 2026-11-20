@@ -77,8 +77,8 @@ func (s *VerifyRichAPI103Step) Execute(_ context.Context, rt *Runtime) (*StepRes
 }
 
 // SendRichDocumentBlockStep sends to rt.ChatID a rich message with one document block, made from the file_id of the
-// first document block in the rich message of rt.LastMessage, with the caption "document block". It checks that the
-// reply has the block types WantBlocks.
+// first document block in the rich message of rt.LastMessage, with the caption "document block". The send and the
+// checks of the reply are SendRichMessageStep's.
 type SendRichDocumentBlockStep struct {
 	WantBlocks []string
 }
@@ -104,22 +104,7 @@ func (s *SendRichDocumentBlockStep) Execute(ctx context.Context, rt *Runtime) (*
 		Document: sender.NewInputMediaDocument(sender.FromFileID(id)),
 		Caption:  &tg.RichBlockCaption{Text: tg.RichText{Plain: "document block"}},
 	}}}
-	msg, err := rt.Sender.SendRichMessage(ctx, rt.ChatID, rm)
-	if err != nil {
-		return res, err
-	}
-	if msg == nil {
-		return res, errors.New("sendRichMessage: no message in the reply")
-	}
-	rt.TrackMessage(rt.ChatID, msg.MessageID)
-	rt.LastMessage = msg
-	res.MessageIDs = []int{msg.MessageID}
-	if msg.RichMessage == nil {
-		return res, errors.New("sendRichMessage: the reply has no rich_message")
-	}
-	if got := richBlockTypes(msg.RichMessage); !slices.Equal(got, s.WantBlocks) {
-		return res, fmt.Errorf("sendRichMessage: blocks %v, want %v", got, s.WantBlocks)
-	}
-	res.Evidence = map[string]any{"message_id": msg.MessageID, "blocks": s.WantBlocks}
-	return res, nil
+	res, err := (&SendRichMessageStep{RichMessage: rm, WantBlocks: s.WantBlocks}).Execute(ctx, rt)
+	res.StepName = s.Name()
+	return res, err
 }

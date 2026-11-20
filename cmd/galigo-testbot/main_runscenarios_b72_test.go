@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 
@@ -50,6 +51,9 @@ func (s *b72FakeScenario) Steps() []engine.Step {
 	return s.BaseScenario.Steps()
 }
 
+// errB72Signal is the cause of the rows' cancel (not context.Canceled).
+var errB72Signal = errors.New("b72: interrupt signal received")
+
 // TestB72_RunScenarios: the run context is checked before each scenario starts, the report is finalized, and an
 // interrupted run's report is marked failed after Finalize (PLAN §4, AC2). Each scenario has exactly one step (a
 // scenario with no step passes on a cancelled context). Rows: a context cancelled before the first scenario; cancelled
@@ -58,7 +62,7 @@ func (s *b72FakeScenario) Steps() []engine.Step {
 // returned context error while the run context is live (E-0108: that is not an interrupt; the next scenario runs);
 // the last step of the last scenario cancels (no further scenario to stop, but the run was interrupted: failed); the
 // last scenario's step cancels and reports a skip (a step that turns the cancel into a skip or a success must not
-// make the run pass, change review C1-01); no scenario and a cancelled context; all pass. Admissions (calls to Steps)
+// make the run pass, change review A-C1-01); no scenario and a cancelled context; all pass. Admissions (calls to Steps)
 // show which scenarios the runner started; the summary totals and the end time show that Finalize ran.
 func TestB72_RunScenarios(t *testing.T) {
 	type want struct {
@@ -108,7 +112,10 @@ func TestB72_RunScenarios(t *testing.T) {
 			[]want{{"B72-0", true}, {"B72-1", true}}, []int{1, 1}, []int{1, 1}, -1, true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			// The cancel carries a cause other than context.Canceled, as a real signal does on Go 1.26+
+			// (signal.NotifyContext), so a marking keyed on the cause instead of ctx.Err() fails (change review C2-02).
+			ctx, cancelCause := context.WithCancelCause(context.Background())
+			cancel := func() { cancelCause(errB72Signal) }
 			defer cancel()
 			fixtures := c.fixtures(cancel)
 			admitted := make([]int, len(fixtures))

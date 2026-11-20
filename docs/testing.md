@@ -908,7 +908,8 @@ Ctrl-C (SIGINT) and SIGTERM during `--run` (also `--run interactive`):
 - During a scenario's step or its pace: the scenario stops, and the runner tries once to delete what it tracked (a failed delete is named in the report, and the item may stay in the chat). No further scenario starts. The report is saved as failed, and the exit code is 1. This is also true when the step reports the cancelled call as a skip.
 - After the handler is registered and before the first scenario: an empty report is saved as failed, and the exit code is 1.
 - Between two scenarios, before the next one is admitted: no further scenario starts, the report is saved as failed, and the exit code is 1. What earlier passed scenarios still track stays, with no report line. A signal just after a scenario is admitted fails that scenario, and its cleanup after stop deletes those items (ephemeral messages excepted).
-- After the last scenario's last step and its pace: no work is left to stop, but the report is saved as failed, and the exit code is 1.
+- After the last scenario's last step and its pace, until the report is finalized: no work is left to stop, but the report is saved as failed, and the exit code is 1.
+- During the report save or the summary: the report and the exit code do not change.
 - A further signal, after the earlier signal handling is restored (this happens asynchronously): it ends the testbot when that handling ends the process, so the cleanup and the report can be cut short.
 - If SIGINT was ignored when the testbot started, the first SIGINT still stops the run as above; a later SIGINT is ignored again.
 - SIGHUP (a closed terminal) still ends `--run` with no cleanup.

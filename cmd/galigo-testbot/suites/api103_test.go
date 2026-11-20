@@ -234,7 +234,8 @@ func b65dRun(t *testing.T, f *fake75, logger *slog.Logger) (*engine.ScenarioResu
 	t.Helper()
 	rt := engine.NewRuntime(f, b65dGroup, b65dAdmin)
 	runner := engine.NewRunner(rt, engine.RunnerConfig{MaxMessages: 10}, logger)
-	return runner.Run(context.Background(), S75_ReplyMarkupAPI103()), runner
+	res := runner.Run(context.Background(), S75_ReplyMarkupAPI103())
+	return res, runner
 }
 
 // T-run (i) and (iii): the echo is ok; the planned cleanup deletes the reply's message.

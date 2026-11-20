@@ -52,8 +52,8 @@ func (s *VerifyRichAPI103Step) Execute(_ context.Context, rt *Runtime) (*StepRes
 		return res, fmt.Errorf("verify rich message: block 1 is %T, want tg.RichBlockParagraph", blocks[1])
 	}
 	if !slices.ContainsFunc(p.Text.Parts, func(part tg.RichText) bool {
-		n, ok := part.Node.(tg.RichTextButton)
-		return ok && n.Button.CallbackData != ""
+		n, isButton := part.Node.(tg.RichTextButton)
+		return isButton && n.Button.CallbackData != ""
 	}) {
 		return res, errors.New("verify rich message: block 1 has no button node with callback data")
 	}

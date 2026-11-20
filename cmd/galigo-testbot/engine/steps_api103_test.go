@@ -217,8 +217,9 @@ func TestB65C_SendRichDocumentBlockStepErrors(t *testing.T) {
 			f := &fake101d{msg: api101dReply(api101dRich(b65cDoc("BQAC-fake-doc")), "")}
 			rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 			rt.LastMessage = r.last
-			_, err := step.Execute(context.Background(), rt)
+			res, err := step.Execute(context.Background(), rt)
 			assert.EqualError(t, err, r.want)
+			assert.Equal(t, "sendRichMessage (document block)", res.StepName) // C3-02: also before any send
 			assert.Empty(t, f.calls)
 			assert.Empty(t, rt.CreatedMessages)
 		})

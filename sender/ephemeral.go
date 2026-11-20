@@ -90,7 +90,7 @@ func (c *Client) EditEphemeralMessageText(ctx context.Context, req EditEphemeral
 	return c.callJSON(ctx, "editEphemeralMessageText", req, nil, extractChatID(req.ChatID))
 }
 
-// EditEphemeralMessageMedia edits the media of an ephemeral message (Bot API 10.2). It is sent as
+// EditEphemeralMessageMedia edits the media of an ephemeral message (Bot API 10.2; an upload 10.3). It is sent as
 // multipart/form-data. It is not retried.
 func (c *Client) EditEphemeralMessageMedia(ctx context.Context, req EditEphemeralMessageMediaRequest) error {
 	if err := validateEphemeralTarget(req.ChatID, req.ReceiverUserID, req.EphemeralMessageID); err != nil {
@@ -99,7 +99,8 @@ func (c *Client) EditEphemeralMessageMedia(ctx context.Context, req EditEphemera
 	return c.callJSON(ctx, "editEphemeralMessageMedia", req, nil, extractChatID(req.ChatID))
 }
 
-// EditEphemeralMessageCaption edits the caption of an ephemeral message (Bot API 10.2). It is not retried.
+// EditEphemeralMessageCaption edits the caption of an ephemeral message (Bot API 10.2; show_caption_above_media 10.3).
+// It is not retried.
 func (c *Client) EditEphemeralMessageCaption(ctx context.Context, req EditEphemeralMessageCaptionRequest) error {
 	if err := validateEphemeralTarget(req.ChatID, req.ReceiverUserID, req.EphemeralMessageID); err != nil {
 		return err

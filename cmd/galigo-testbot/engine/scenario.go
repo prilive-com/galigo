@@ -393,7 +393,7 @@ type SenderClient interface {
 
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
 
-	// Ephemeral messages (Bot API 10.3/10.4)
+	// Ephemeral messages (Bot API 10.2–10.4)
 	SendEphemeralReply(ctx context.Context, callbackQueryID, text string) (*tg.Message, error)
 	DeleteEphemeralMessage(ctx context.Context, req sender.DeleteEphemeralMessageRequest) error
 	EditEphemeralMessageText(ctx context.Context, req sender.EditEphemeralMessageTextRequest) error

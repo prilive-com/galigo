@@ -396,6 +396,10 @@ type SenderClient interface {
 	// Ephemeral messages (Bot API 10.3/10.4)
 	SendEphemeralReply(ctx context.Context, callbackQueryID, text string) (*tg.Message, error)
 	DeleteEphemeralMessage(ctx context.Context, req sender.DeleteEphemeralMessageRequest) error
+	EditEphemeralMessageText(ctx context.Context, req sender.EditEphemeralMessageTextRequest) error
+	EditEphemeralMessageCaption(ctx context.Context, req sender.EditEphemeralMessageCaptionRequest) error
+	EditEphemeralMessageMedia(ctx context.Context, req sender.EditEphemeralMessageMediaRequest) error
+	EditEphemeralMessageReplyMarkup(ctx context.Context, req sender.EditEphemeralMessageReplyMarkupRequest) error
 
 	// Reactions and administrators (10.0)
 	DeleteMessageReaction(ctx context.Context, req sender.DeleteMessageReactionRequest) error

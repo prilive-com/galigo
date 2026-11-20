@@ -833,6 +833,26 @@ func (a *SenderAdapter) DeleteEphemeralMessage(ctx context.Context, req sender.D
 	return a.client.DeleteEphemeralMessage(ctx, req)
 }
 
+// EditEphemeralMessageText edits the text or rich content of an ephemeral message (Bot API 10.2; rich_message 10.3).
+func (a *SenderAdapter) EditEphemeralMessageText(ctx context.Context, req sender.EditEphemeralMessageTextRequest) error {
+	return a.client.EditEphemeralMessageText(ctx, req)
+}
+
+// EditEphemeralMessageCaption edits the caption of an ephemeral message (Bot API 10.2; show_caption_above_media 10.3).
+func (a *SenderAdapter) EditEphemeralMessageCaption(ctx context.Context, req sender.EditEphemeralMessageCaptionRequest) error {
+	return a.client.EditEphemeralMessageCaption(ctx, req)
+}
+
+// EditEphemeralMessageMedia edits the media of an ephemeral message (Bot API 10.2; an upload 10.3).
+func (a *SenderAdapter) EditEphemeralMessageMedia(ctx context.Context, req sender.EditEphemeralMessageMediaRequest) error {
+	return a.client.EditEphemeralMessageMedia(ctx, req)
+}
+
+// EditEphemeralMessageReplyMarkup edits the inline keyboard of an ephemeral message (Bot API 10.2).
+func (a *SenderAdapter) EditEphemeralMessageReplyMarkup(ctx context.Context, req sender.EditEphemeralMessageReplyMarkupRequest) error {
+	return a.client.EditEphemeralMessageReplyMarkup(ctx, req)
+}
+
 // SavePreparedKeyboardButton stores a keyboard button for a user (9.6).
 func (a *SenderAdapter) SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error) {
 	return a.client.SavePreparedKeyboardButton(ctx, sender.SavePreparedKeyboardButtonRequest{UserID: userID, Button: button})

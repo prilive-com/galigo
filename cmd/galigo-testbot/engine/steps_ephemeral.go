@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
+	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -133,5 +134,53 @@ func (s *EphemeralReplyStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 			"got: %w", err)
 	}
 	res.Evidence = map[string]any{"error_code": apiErr.Code, "description": apiErr.Description}
+	return res, nil
+}
+
+// EditEphemeralStep edits the newest ephemeral message the scenario recorded (Bot API 10.3 changes). Method is
+// "editEphemeralMessageText" (a rich message with one uploaded photo: the form path), "editEphemeralMessageReplyMarkup"
+// (one callback button), "editEphemeralMessageCaption" (show_caption_above_media) or "editEphemeralMessageMedia" (a
+// photo upload). The server answers True, so the step checks only that the edit was accepted. An edit sends no new
+// message: it adds nothing to the message budget, and the record stays for the cleanup.
+type EditEphemeralStep struct {
+	Method string
+}
+
+func (s *EditEphemeralStep) Name() string { return s.Method + " (10.3)" }
+
+func (s *EditEphemeralStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: s.Method}
+	if len(rt.ephemeralMessages) == 0 {
+		return res, fmt.Errorf("%s: no ephemeral message to edit", s.Method)
+	}
+	m := rt.ephemeralMessages[len(rt.ephemeralMessages)-1]
+	photo := func() sender.InputMedia {
+		return sender.NewInputMediaPhoto(sender.FromBytes(fixtures.PhotoBytes(), "galigo-ephemeral-edit.jpg"))
+	}
+	var err error
+	switch s.Method {
+	case "editEphemeralMessageText":
+		err = rt.Sender.EditEphemeralMessageText(ctx, sender.EditEphemeralMessageTextRequest{
+			ChatID: m.chatID, ReceiverUserID: m.receiverUserID, EphemeralMessageID: m.messageID,
+			RichMessage: &tg.InputRichMessage{Markdown: "galigo ephemeral **rich** edit\n\n![](tg://photo?id=e)",
+				Media: []tg.InputRichMessageMedia{{ID: "e", Media: photo()}}}})
+	case "editEphemeralMessageReplyMarkup":
+		err = rt.Sender.EditEphemeralMessageReplyMarkup(ctx, sender.EditEphemeralMessageReplyMarkupRequest{
+			ChatID: m.chatID, ReceiverUserID: m.receiverUserID, EphemeralMessageID: m.messageID,
+			ReplyMarkup: &tg.InlineKeyboardMarkup{InlineKeyboard: [][]tg.InlineKeyboardButton{{{Text: "galigo", CallbackData: "b65b"}}}}})
+	case "editEphemeralMessageCaption":
+		err = rt.Sender.EditEphemeralMessageCaption(ctx, sender.EditEphemeralMessageCaptionRequest{
+			ChatID: m.chatID, ReceiverUserID: m.receiverUserID, EphemeralMessageID: m.messageID,
+			Caption: "galigo ephemeral caption", ShowCaptionAboveMedia: true})
+	case "editEphemeralMessageMedia":
+		err = rt.Sender.EditEphemeralMessageMedia(ctx, sender.EditEphemeralMessageMediaRequest{
+			ChatID: m.chatID, ReceiverUserID: m.receiverUserID, EphemeralMessageID: m.messageID, Media: photo()})
+	default:
+		return res, fmt.Errorf("unknown method %q", s.Method)
+	}
+	if err != nil {
+		return res, fmt.Errorf("%s: %w", s.Method, err)
+	}
+	res.Evidence = map[string]any{"ephemeral_message_id": m.messageID}
 	return res, nil
 }

@@ -6,21 +6,22 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// EditEphemeralMessageTextRequest represents an editEphemeralMessageText request (Bot API 10.2).
+// EditEphemeralMessageTextRequest represents an editEphemeralMessageText request (Bot API 10.2; rich_message 10.3).
+// Set Text or RichMessage: the server needs one of them.
 type EditEphemeralMessageTextRequest struct {
 	ChatID             tg.ChatID                `json:"chat_id"`
 	ReceiverUserID     int64                    `json:"receiver_user_id"`
 	EphemeralMessageID int                      `json:"ephemeral_message_id"`
-	Text               string                   `json:"text"`
+	Text               string                   `json:"text,omitempty"`
 	ParseMode          tg.ParseMode             `json:"parse_mode,omitempty"`
 	Entities           []tg.MessageEntity       `json:"entities,omitempty"`
+	RichMessage        *tg.InputRichMessage     `json:"rich_message,omitempty"`
 	LinkPreviewOptions *tg.LinkPreviewOptions   `json:"link_preview_options,omitempty"`
 	ReplyMarkup        *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
-// EditEphemeralMessageMediaRequest represents an editEphemeralMessageMedia request (Bot API 10.2).
-// A Media with an uploaded file (InputFile with a Reader or Source) is sent as a file part. A file_id or URL works
-// with Bot API 10.2; an upload needs a 10.3 server.
+// EditEphemeralMessageMediaRequest represents an editEphemeralMessageMedia request (Bot API 10.2). A Media with an
+// uploaded file (InputFile with a Reader or Source) is sent as a file part (Bot API 10.3).
 type EditEphemeralMessageMediaRequest struct {
 	ChatID             tg.ChatID                `json:"chat_id"`
 	ReceiverUserID     int64                    `json:"receiver_user_id"`
@@ -29,15 +30,17 @@ type EditEphemeralMessageMediaRequest struct {
 	ReplyMarkup        *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
-// EditEphemeralMessageCaptionRequest represents an editEphemeralMessageCaption request (Bot API 10.2).
+// EditEphemeralMessageCaptionRequest represents an editEphemeralMessageCaption request (Bot API 10.2;
+// show_caption_above_media 10.3).
 type EditEphemeralMessageCaptionRequest struct {
-	ChatID             tg.ChatID                `json:"chat_id"`
-	ReceiverUserID     int64                    `json:"receiver_user_id"`
-	EphemeralMessageID int                      `json:"ephemeral_message_id"`
-	Caption            string                   `json:"caption,omitempty"`
-	ParseMode          tg.ParseMode             `json:"parse_mode,omitempty"`
-	CaptionEntities    []tg.MessageEntity       `json:"caption_entities,omitempty"`
-	ReplyMarkup        *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ChatID                tg.ChatID                `json:"chat_id"`
+	ReceiverUserID        int64                    `json:"receiver_user_id"`
+	EphemeralMessageID    int                      `json:"ephemeral_message_id"`
+	Caption               string                   `json:"caption,omitempty"`
+	ParseMode             tg.ParseMode             `json:"parse_mode,omitempty"`
+	CaptionEntities       []tg.MessageEntity       `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool                     `json:"show_caption_above_media,omitempty"`
+	ReplyMarkup           *tg.InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
 // EditEphemeralMessageReplyMarkupRequest represents an editEphemeralMessageReplyMarkup request (Bot API 10.2).
@@ -70,14 +73,19 @@ func validateEphemeralTarget(chatID tg.ChatID, receiverUserID int64, ephemeralMe
 	return nil
 }
 
-// EditEphemeralMessageText edits the text of an ephemeral message (Bot API 10.2); see
-// tg.Message.EphemeralMessageID. It is not retried.
+// EditEphemeralMessageText edits the text or rich content of an ephemeral message (Bot API 10.2; rich_message 10.3);
+// see tg.Message.EphemeralMessageID. An upload in RichMessage.Media is sent as a file part. It is not retried.
 func (c *Client) EditEphemeralMessageText(ctx context.Context, req EditEphemeralMessageTextRequest) error {
 	if err := validateEphemeralTarget(req.ChatID, req.ReceiverUserID, req.EphemeralMessageID); err != nil {
 		return err
 	}
 	if err := req.LinkPreviewOptions.Validate(); err != nil {
 		return err
+	}
+	if req.RichMessage != nil {
+		if err := validateInputRichMessage(*req.RichMessage); err != nil {
+			return err
+		}
 	}
 	return c.callJSON(ctx, "editEphemeralMessageText", req, nil, extractChatID(req.ChatID))
 }

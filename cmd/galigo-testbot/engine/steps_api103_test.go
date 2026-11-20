@@ -230,8 +230,9 @@ func TestB65C_SendRichDocumentBlockStepErrors(t *testing.T) {
 		rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 		last := withDoc()
 		rt.LastMessage = last
-		_, err := step.Execute(context.Background(), rt)
+		res, err := step.Execute(context.Background(), rt)
 		assert.ErrorIs(t, err, boom)
+		assert.Equal(t, "sendRichMessage (document block)", res.StepName) // C2-02: the name also on a failed send
 		assert.Len(t, f.calls, 1)
 		assert.Empty(t, rt.CreatedMessages)
 		assert.Same(t, last, rt.LastMessage)
@@ -241,8 +242,9 @@ func TestB65C_SendRichDocumentBlockStepErrors(t *testing.T) {
 		f := &fake101d{}
 		rt := NewRuntime(f, testutil.TestChatID, testutil.TestUserID)
 		rt.LastMessage = withDoc()
-		_, err := step.Execute(context.Background(), rt)
+		res, err := step.Execute(context.Background(), rt)
 		assert.EqualError(t, err, "sendRichMessage: no message in the reply")
+		assert.Equal(t, "sendRichMessage (document block)", res.StepName)
 		assert.Empty(t, rt.CreatedMessages)
 	})
 
@@ -262,6 +264,7 @@ func TestB65C_SendRichDocumentBlockStepErrors(t *testing.T) {
 			rt.LastMessage = withDoc()
 			res, err := step.Execute(context.Background(), rt)
 			assert.EqualError(t, err, r.want)
+			assert.Equal(t, "sendRichMessage (document block)", res.StepName)
 			assert.Equal(t, []int{api101dMsgID}, res.MessageIDs)
 			assert.Equal(t, []CreatedMessage{{ChatID: testutil.TestChatID, MessageID: api101dMsgID}}, rt.CreatedMessages,
 				"the sent message is tracked, so the cleanup deletes it")

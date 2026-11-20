@@ -99,6 +99,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 	scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
 
@@ -123,7 +124,7 @@ func showCoverageStatus(logger *slog.Logger) {
 }
 
 // availableSuites is the suite list the CLI prints for an unknown --run name.
-const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, live-photos, all"
+const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, live-photos, all"
 
 // isInteractiveSuite reports whether a suite name (any case) is interactive or callback, which each caller runs
 // itself (B-49).
@@ -275,6 +276,9 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	// Bot API 10.2 (S68, S69)
 	case "api102", "api-102", "10.2":
 		scenarios = suites.AllAPI102Scenarios()
+	// Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in "ephemeral", S73)
+	case "api103", "api-103", "10.3":
+		scenarios = suites.AllAPI103Scenarios()
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -290,6 +294,7 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 		scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 		scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+		scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 		scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 		scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
@@ -636,6 +641,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllAPI100Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI101Scenarios()...)
 	scenarios = append(scenarios, suites.AllAPI102Scenarios()...)
+	scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 	scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
 
@@ -720,6 +726,9 @@ Bot API 10.1 (S66, S67):
 
 Bot API 10.2 (S68, S69):
   api102 - All 10.2 tests (rich message blocks and media)
+
+Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in ephemeral, S73):
+  api103 - Buttons, button nodes, compact tables, expandable quotations, document blocks
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

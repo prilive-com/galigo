@@ -70,6 +70,15 @@ type SwitchInlineQueryChosenChat struct {
 	AllowChannelChats bool   `json:"allow_channel_chats,omitempty"`
 }
 
+// CopyTextButton describes a button that copies the specified text to the clipboard (Bot API 7.11).
+type CopyTextButton struct {
+	Text string `json:"text"`
+}
+
+// DisabledButton marks a button as disabled: it does nothing when pressed (Bot API 10.3). It currently holds no
+// information; a non-nil *DisabledButton encodes as {}.
+type DisabledButton struct{}
+
 // Button constructors
 
 // Btn creates a callback button (most common type).

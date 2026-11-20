@@ -14,10 +14,15 @@ import (
 // ==================== Bot API 10.1 steps (rich messages) ====================
 
 // richBlockTypes returns the "type" of each block of a rich message, in order (every RichBlock kind, and
-// RichBlockUnknown, has a Type field).
+// RichBlockUnknown, has a Type field). A RichBlockUnknown gives "unknown:" and its type, so a block of a known kind
+// that did not decode cannot match a WantBlocks list.
 func richBlockTypes(m *tg.RichMessage) []string {
 	out := make([]string, 0, len(m.Blocks))
 	for _, b := range m.Blocks {
+		if u, ok := b.(tg.RichBlockUnknown); ok {
+			out = append(out, "unknown:"+u.Type)
+			continue
+		}
 		out = append(out, reflect.ValueOf(b).FieldByName("Type").String())
 	}
 	return out

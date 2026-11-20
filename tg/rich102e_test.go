@@ -36,7 +36,7 @@ func cap102e(text, credit string) *tg.RichBlockCaption {
 	return c
 }
 
-// rich102eKinds: the five media blocks, built from a media value and a caption.
+// rich102eKinds: the five media blocks of 10.2 and the document block of 10.3, built from a media value and a caption.
 var rich102eKinds = []struct {
 	goType, constant, key string
 	make                  func(m tg.InputRichMedia, c *tg.RichBlockCaption) tg.InputRichBlock
@@ -56,6 +56,9 @@ var rich102eKinds = []struct {
 	{"InputRichBlockVoiceNote", "voice_note", "voice_note", func(m tg.InputRichMedia, c *tg.RichBlockCaption) tg.InputRichBlock {
 		return tg.InputRichBlockVoiceNote{VoiceNote: m, Caption: c}
 	}},
+	{"InputRichBlockDocument", "document", "document", func(m tg.InputRichMedia, c *tg.RichBlockCaption) tg.InputRichBlock {
+		return tg.InputRichBlockDocument{Document: m, Caption: c}
+	}},
 }
 
 // Compile-time: each media block is an InputRichBlock, and the fake is an InputRichMedia.
@@ -65,12 +68,13 @@ var (
 	_ tg.InputRichBlock = tg.InputRichBlockPhoto{}
 	_ tg.InputRichBlock = tg.InputRichBlockVideo{}
 	_ tg.InputRichBlock = tg.InputRichBlockVoiceNote{}
+	_ tg.InputRichBlock = tg.InputRichBlockDocument{}
 	_ tg.InputRichMedia = fake102e{}
 )
 
-// T-kind-e: five kinds, distinct names and constants; "type" first and once, for the value and its pointer.
+// T-kind-e: six kinds, distinct names and constants; "type" first and once, for the value and its pointer.
 func TestAPI102E_Kinds(t *testing.T) {
-	require.Len(t, rich102eKinds, 5)
+	require.Len(t, rich102eKinds, 6)
 	names, consts := map[string]bool{}, map[string]bool{}
 	for _, k := range rich102eKinds {
 		t.Run(k.constant, func(t *testing.T) {
@@ -188,13 +192,14 @@ func TestAPI102E_MessageMedia(t *testing.T) {
 	}
 }
 
-// rich102eShape: every field of the five blocks and InputRichMessageMedia {Go name, Go type, json tag}.
+// rich102eShape: every field of the six blocks and InputRichMessageMedia {Go name, Go type, json tag}.
 var rich102eShape = map[string][]rich101dField{
 	"InputRichBlockAnimation": {{"Animation", "tg.InputRichMedia", "animation"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockAudio":     {{"Audio", "tg.InputRichMedia", "audio"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockPhoto":     {{"Photo", "tg.InputRichMedia", "photo"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockVideo":     {{"Video", "tg.InputRichMedia", "video"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockVoiceNote": {{"VoiceNote", "tg.InputRichMedia", "voice_note"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
+	"InputRichBlockDocument":  {{"Document", "tg.InputRichMedia", "document"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichMessageMedia":   {{"ID", "string", "id"}, {"Media", "tg.InputRichMedia", "media"}},
 }
 
@@ -204,8 +209,8 @@ func TestAPI102E_Shapes(t *testing.T) {
 	for _, k := range rich102eKinds {
 		values[k.goType] = k.make(nil, nil)
 	}
-	require.Len(t, rich102eShape, 6)
-	require.Len(t, values, 6)
+	require.Len(t, rich102eShape, 7)
+	require.Len(t, values, 7)
 	for name, want := range rich102eShape {
 		t.Run(name, func(t *testing.T) {
 			v, ok := values[name]
@@ -325,9 +330,9 @@ func TestAPI102E_FieldWalk(t *testing.T) {
 			}
 		})
 	}
-	// The walk itself: 5 blocks × (media type, media, caption text, caption credit) + the item's id, media type, media.
+	// The walk itself: 6 blocks × (media type, media, caption text, caption credit) + the item's id, media type, media.
 	slices.Sort(leaves)
-	require.Len(t, leaves, 23, "%v", leaves)
+	require.Len(t, leaves, 27, "%v", leaves)
 	assert.Contains(t, leaves, "InputRichMessageMedia.ID")
 	assert.Contains(t, leaves, "InputRichBlockPhoto.Caption.Credit")
 }

@@ -682,6 +682,9 @@ go run ./cmd/galigo-testbot --run api101                 # All 10.1 tests
 # Bot API 10.2 scenarios (S68, S69)
 go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 
+# Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in ephemeral, S73)
+go run ./cmd/galigo-testbot --run api103                 # Buttons, button nodes, compact tables, expandable quotations, document blocks
+
 # Suggested posts (S71, S72; Bot API 9.2)
 go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters, approve and decline reach the server
 
@@ -839,7 +842,13 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | Scenario | Methods | Description |
 |----------|---------|-------------|
 | S68-RichBlocks | sendRichMessage, sendRichMessageDraft | Rich message made of blocks (`InputRichMessage.Blocks`): heading, paragraph, preformatted, divider, mathematical expression, anchor, list, block quotation, pull quotation, table, details, map and footer, with blocks nested in a list item, a quotation and details; the block kinds of the reply are checked; cleaned up, then a draft with a thinking block (private chats only, so in a group the step is skipped). Collage and slideshow are sent by S69: the server refuses them with text blocks only (`RICH_MESSAGE_BLOCK_UNEXPECTED`) |
-| S69-RichMedia | sendRichMessage, editMessageText | Rich message from markdown whose `tg://` links name the media list (`InputRichMessage.Media`), with one upload of each kind (photo, video, audio, animation, voice note; multipart): the reply has a paragraph and the five media blocks; then the five media blocks (`InputRichBlockPhoto` … `InputRichBlockVoiceNote`, each with a caption), a collage and a slideshow of two photo blocks, by the file_ids of that reply; then that message is edited to markdown with a new photo upload; cleaned up. The server takes `tg://photo`, `tg://video` (also an animation) and `tg://audio` (also a voice note) links, and refuses `tg://animation`, `tg://voice_note`, `tg://voice`; S69's animation is the MP4 fixture (the GIF fixture was refused in the live trial). Not live-proved: a draft with media (private chats only), uploads in inline results and in media blocks (galigo refuses them locally: mock tests) |
+| S69-RichMedia | sendRichMessage, editMessageText | Rich message from markdown whose `tg://` links name the media list (`InputRichMessage.Media`), with one upload of each kind (photo, video, audio, animation, voice note; multipart): the reply has a paragraph and the five media blocks; then the five media blocks (`InputRichBlockPhoto` … `InputRichBlockVoiceNote`, each with a caption), a collage and a slideshow of two photo blocks, by the file_ids of that reply; then that message is edited to markdown with a new photo upload; cleaned up. The server takes `tg://photo`, `tg://video` (also an animation) and `tg://audio` (also a voice note) links, and refuses `tg://animation`, `tg://voice_note`, `tg://voice` (in the 10.2 trial; 10.3 also takes `tg://document`: S74); S69's animation is the MP4 fixture (the GIF fixture was refused in the live trial). Not live-proved: a draft with media (private chats only), uploads in inline results and in media blocks (galigo refuses them locally: mock tests) |
+
+#### Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in `ephemeral`, S73)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S74-RichAPI103 | sendRichMessage | Rich message of blocks with the 10.3 kinds: a `buttons` row aligned center (a callback button with style `primary`, a URL button, a `copy_text` button, a disabled button), a paragraph with a button node, a compact table and an expandable block quotation; the reply's block kinds and the decoded values are checked (`VerifyRichAPI103Step`); then a markdown rich message with a `tg://document` link and a document upload in the media list (the reply has a paragraph and a document block), then a `document` block by the file_id of that reply; cleaned up. A block that decodes as unknown fails the step (it is named `unknown:<type>`). Not live-proved: the `web_app`, `login_url` and switch-inline buttons (mock tests and the slice's probes) |
 
 #### Suggested posts (S71, S72)
 
@@ -964,6 +973,9 @@ cmd/galigo-testbot/
 │   ├── steps_api95.go         # Bot API 9.5 steps (date_time entity, member tags, message streaming)
 │   ├── steps_api96.go         # Bot API 9.6 steps (polls, quizzes, poll option replies, prepared buttons)
 │   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
+│   ├── steps_api101.go        # Bot API 10.1 rich message steps (SendRichMessageStep, EditMessageRichStep, SendRichMessageDraftStep)
+│   ├── steps_api102.go        # Bot API 10.2 rich media blocks step (SendRichMediaBlocksStep)
+│   ├── steps_api103.go        # Bot API 10.3 rich message steps (VerifyRichAPI103Step, SendRichDocumentBlockStep; S74)
 │   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
 │   ├── steps_suggested_post.go # Suggested post steps: parameters (sendMessage, sendPhoto; S71), approve and decline (S72)
 │   ├── steps_ephemeral.go # Ephemeral message steps: send to the admin (sendMessage, sendPhoto), edit (the four edit methods), reply without chat_id (S73)
@@ -989,6 +1001,7 @@ cmd/galigo-testbot/
 │   ├── api100.go      # Bot API 10.0 (S51-S54, S57-S65: reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
 │   ├── api102.go      # Bot API 10.2 (S68: rich message blocks, S69: rich message media)
+│   ├── api103.go      # Bot API 10.3 rich messages (S74: buttons, button nodes, compact tables, expandable quotations, document blocks)
 │   ├── suggested_post.go # Suggested posts, Bot API 9.2 (S71, S72)
 │   ├── ephemeral.go   # Ephemeral messages, Bot API 10.3/10.4 (S73)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)

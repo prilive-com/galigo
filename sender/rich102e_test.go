@@ -299,6 +299,7 @@ func TestAPI102E_SendMediaUploads(t *testing.T) {
 				{ID: "e", Media: sender.NewInputMediaAnimation(sender.FromURL("https://x/g.mp4"))},
 				{ID: "f", Media: nilMedia},
 				{ID: "b", Media: sender.NewInputMediaVoiceNote(sender.FromBytes([]byte("vo"), "v.ogg"))},
+				{ID: "d", Media: sender.NewInputMediaDocument(sender.FromBytes([]byte("doc"), "d.txt"))}, // Bot API 10.3 (B-65 65c)
 				{ID: "h"}, // no media at all: left as it is (null)
 			}
 			before := make([]tg.InputRichMessageMedia, len(media))
@@ -318,6 +319,7 @@ func TestAPI102E_SendMediaUploads(t *testing.T) {
 				`{"id":"e","media":{"media":"https://x/g.mp4","type":"animation"}},` +
 				`{"id":"f","media":null},` +
 				`{"id":"b","media":{"media":"attach://file3","type":"voice_note"}},` +
+				`{"id":"d","media":{"media":"attach://file4","type":"document"}},` +
 				`{"id":"h","media":null}]}`}
 			for k, v := range api102eArgs[c.name] {
 				want[k] = v
@@ -328,6 +330,7 @@ func TestAPI102E_SendMediaUploads(t *testing.T) {
 				"file1": {FileName: "a.mp3", Data: []byte("aud")},
 				"file2": {FileName: "p.jpg", Data: []byte("ph")},
 				"file3": {FileName: "v.ogg", Data: []byte("vo")},
+				"file4": {FileName: "d.txt", Data: []byte("doc")},
 			}, files)
 			// The caller's slice, every item (a value or the pointed-to media) and the live photo's photo are not
 			// changed, field by field; the images are taken before the call.
@@ -481,7 +484,7 @@ func TestAPI102E_SendMediaNoUpload(t *testing.T) {
 // T-rm-4 (AC6): an upload anywhere but the media list is refused before any request, and its reader is not opened.
 func TestAPI102E_UploadElsewhereRefused(t *testing.T) {
 	for _, c := range api102dCallers {
-		for _, k := range []string{"animation", "audio", "photo", "video", "voice_note", "in-collage", "beside-list-upload"} {
+		for _, k := range []string{"animation", "audio", "photo", "video", "voice_note", "document", "in-collage", "beside-list-upload"} {
 			t.Run(c.name+"/"+k, func(t *testing.T) {
 				var cnt api102eCounter
 				var b tg.InputRichBlock // each block holds an upload of its own kind
@@ -497,6 +500,8 @@ func TestAPI102E_UploadElsewhereRefused(t *testing.T) {
 					b = tg.InputRichBlockVideo{Video: &v}
 				case "voice_note":
 					b = tg.InputRichBlockVoiceNote{VoiceNote: sender.NewInputMediaVoiceNote(cnt.reader("x"))}
+				case "document": // Bot API 10.3 (B-65 65c)
+					b = tg.InputRichBlockDocument{Document: sender.NewInputMediaDocument(cnt.source("x"))}
 				case "in-collage":
 					b = tg.InputRichBlockCollage{Blocks: []tg.InputRichBlock{
 						tg.InputRichBlockAnimation{Animation: sender.NewInputMediaAnimation(cnt.reader("x"))}}}

@@ -29,7 +29,8 @@ func rtp102d(s string) *tg.RichText { r := rt102d(s); return &r }
 func ip102d(n int) *int { return &n }
 
 // rich102dKinds is the table of the 16 block types of 10.2d and their "type" constants (T-kind). This table
-// was checked against the spec text: the same 16 classes, the same constants.
+// was checked against the spec text: the same 16 classes, the same constants. The two text blocks of Bot API 10.3
+// follow them (18 in all).
 var rich102dKinds = []struct {
 	goType   string
 	block    tg.InputRichBlock
@@ -51,12 +52,15 @@ var rich102dKinds = []struct {
 	{"InputRichBlockDetails", tg.InputRichBlockDetails{}, "details"},
 	{"InputRichBlockMap", tg.InputRichBlockMap{}, "map"},
 	{"InputRichBlockThinking", tg.InputRichBlockThinking{}, "thinking"},
+	// Bot API 10.3 (B-65 65c)
+	{"InputRichBlockExpandableBlockQuotation", tg.InputRichBlockExpandableBlockQuotation{}, "expandable_blockquote"},
+	{"InputRichBlockButtons", tg.InputRichBlockButtons{}, "buttons"},
 }
 
-// T-kind: each of the 16 types (as a value and as a pointer) encodes a JSON object whose first key is "type" with its
+// T-kind: each of the 18 types (as a value and as a pointer) encodes a JSON object whose first key is "type" with its
 // constant, and "type" appears once.
 func TestAPI102D_Kinds(t *testing.T) {
-	require.Len(t, rich102dKinds, 16)
+	require.Len(t, rich102dKinds, 18)
 	names, consts := map[string]bool{}, map[string]bool{}
 	for _, k := range rich102dKinds {
 		t.Run(k.constant, func(t *testing.T) {
@@ -80,7 +84,7 @@ func TestAPI102D_Kinds(t *testing.T) {
 	}
 }
 
-// T-marker: the interface has exactly one method, unexported; values and pointers of the 16 types implement it.
+// T-marker: the interface has exactly one method, unexported; values and pointers of the 18 types implement it.
 func TestAPI102D_Marker(t *testing.T) {
 	it := reflect.TypeOf((*tg.InputRichBlock)(nil)).Elem()
 	require.Equal(t, 1, it.NumMethod())
@@ -312,7 +316,7 @@ func TestAPI102D_OptionalInts(t *testing.T) {
 	}
 }
 
-// rich102dShape is every field of the 17 new types: name, Go type, JSON tag (T-shape). The tags
+// rich102dShape is every field of the 17 types of 10.2d and the two 10.3 text blocks (19): name, Go type, JSON tag (T-shape). The tags
 // were checked against the spec text: required fields have no omitempty, optional fields have it.
 var rich102dShape = map[string][]rich101dField{
 	"InputRichBlockParagraph":              {{"Text", "tg.RichText", "text"}},
@@ -328,25 +332,27 @@ var rich102dShape = map[string][]rich101dField{
 	"InputRichBlockCollage":                {{"Blocks", "[]tg.InputRichBlock", "blocks"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockSlideshow":              {{"Blocks", "[]tg.InputRichBlock", "blocks"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
 	"InputRichBlockTable": {{"Cells", "[][]tg.RichBlockTableCell", "cells"}, {"IsBordered", "bool", "is_bordered,omitempty"},
-		{"IsStriped", "bool", "is_striped,omitempty"}, {"Caption", "*tg.RichText", "caption,omitempty"}},
+		{"IsStriped", "bool", "is_striped,omitempty"}, {"IsCompact", "bool", "is_compact,omitempty"}, {"Caption", "*tg.RichText", "caption,omitempty"}},
 	"InputRichBlockDetails": {{"Summary", "tg.RichText", "summary"}, {"Blocks", "[]tg.InputRichBlock", "blocks"},
 		{"IsOpen", "bool", "is_open,omitempty"}},
 	"InputRichBlockMap": {{"Location", "tg.Location", "location"}, {"Zoom", "*int", "zoom,omitempty"}, {"Width", "*int", "width,omitempty"},
 		{"Height", "*int", "height,omitempty"}, {"Caption", "*tg.RichBlockCaption", "caption,omitempty"}},
-	"InputRichBlockThinking": {{"Text", "tg.RichText", "text"}},
+	"InputRichBlockThinking":                 {{"Text", "tg.RichText", "text"}},
+	"InputRichBlockExpandableBlockQuotation": {{"Text", "tg.RichText", "text"}, {"Credit", "*tg.RichText", "credit,omitempty"}},
+	"InputRichBlockButtons":                  {{"Buttons", "[]tg.RichMessageButton", "buttons"}, {"Align", "string", "align,omitempty"}},
 	"InputRichBlockListItem": {{"Blocks", "[]tg.InputRichBlock", "blocks"}, {"HasCheckbox", "bool", "has_checkbox,omitempty"},
 		{"IsChecked", "bool", "is_checked,omitempty"}, {"Value", "*int", "value,omitempty"}, {"Type", "string", "type,omitempty"}},
 }
 
-// T-shape: the fields of the 17 types, in order, with their exact count; none embedded; MarshalJSON is the only
-// exported method of the 16 blocks, on the value and on the pointer (none on the list item).
+// T-shape: the fields of the 19 types, in order, with their exact count; none embedded; MarshalJSON is the only
+// exported method of the 18 blocks, on the value and on the pointer (none on the list item).
 func TestAPI102D_Shapes(t *testing.T) {
 	values := map[string]any{"InputRichBlockListItem": tg.InputRichBlockListItem{}}
 	for _, k := range rich102dKinds {
 		values[k.goType] = k.block
 	}
-	require.Len(t, rich102dShape, 17)
-	require.Len(t, values, 17)
+	require.Len(t, rich102dShape, 19)
+	require.Len(t, values, 19)
 	for name, want := range rich102dShape {
 		t.Run(name, func(t *testing.T) {
 			v, ok := values[name]

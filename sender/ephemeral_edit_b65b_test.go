@@ -249,13 +249,16 @@ func TestB65B_EditTextRichUploadNoRetry(t *testing.T) {
 // T-rich-block-upload (B-61 for this method): an upload in a rich media block, also a nested one, is refused before
 // any request, and its reader is not opened (TestAPI102E_UploadElsewhereRefused for the 10.2 callers).
 func TestB65B_EditTextRichBlockUpload(t *testing.T) {
-	for _, k := range []string{"block", "in-collage"} {
+	for _, k := range []string{"block", "in-collage", "document"} {
 		t.Run(k, func(t *testing.T) {
 			var cnt api102eCounter
 			var b tg.InputRichBlock = tg.InputRichBlockPhoto{Photo: sender.NewInputMediaPhoto(cnt.source("x"))}
-			if k == "in-collage" {
+			switch k {
+			case "in-collage":
 				b = tg.InputRichBlockCollage{Blocks: []tg.InputRichBlock{
 					tg.InputRichBlockAnimation{Animation: sender.NewInputMediaAnimation(cnt.reader("x"))}}}
+			case "document": // Bot API 10.3 (B-65 65c)
+				b = tg.InputRichBlockDocument{Document: sender.NewInputMediaDocument(cnt.reader("x"))}
 			}
 			server := testutil.NewMockServer(t)
 			api102cOK(server, "editEphemeralMessageText")

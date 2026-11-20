@@ -324,6 +324,10 @@ func TestB72_CLIInterrupt(t *testing.T) {
 //
 // Package: no non-test file imports os, os/signal, syscall, log, runtime or context under another name or as a
 // dot import (the rules above match those names).
+//
+// Limits (the change review's diff read covers them, TEST-PLAN §2): a caller that hangs or blocks forever; a process
+// end that names no listed function (a library exit such as flag.CommandLine.Parse with ExitOnError, a runtime panic);
+// a scenario run directly by the caller (runner.Run) on a derived context; report.Save before runScenarios.
 func TestB72_InterruptSeam(t *testing.T) {
 	fset := token.NewFileSet()
 	paths, err := filepath.Glob("*.go")

@@ -19,7 +19,7 @@ type ChatAdministratorRights struct {
 	CanManageTopics         *bool `json:"can_manage_topics,omitempty"`
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
 	CanManageTags           *bool `json:"can_manage_tags,omitempty"` // 9.5
-	CanSendWelcomeMessages  bool  `json:"can_send_welcome_messages"` // 10.3: send welcome messages to new members
+	CanSendWelcomeMessages  bool  `json:"can_send_welcome_messages"` // 10.3: manage welcome messages (a bot sends them directly)
 }
 
 // FullAdminRights returns administrator rights with all permissions enabled.

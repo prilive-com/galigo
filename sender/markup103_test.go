@@ -90,13 +90,17 @@ func TestB65D_WireRights(t *testing.T) {
 			})
 		})
 	}
-	t.Run("full admin rights", func(t *testing.T) {
-		_, args, _, raw, err := b48c1WireCall(t, "promoteChatMember", b65dReplyTrue, func(ctx context.Context, c *sender.Client) error {
+	t.Run("full admin rights", func(t *testing.T) { // the whole body (C1-06): every right of FullAdminRights
+		want := map[string]string{"chat_id": wireChatID, "user_id": "456", "is_anonymous": "false"}
+		for _, k := range []string{"can_manage_chat", "can_delete_messages", "can_manage_video_chats", "can_restrict_members",
+			"can_promote_members", "can_change_info", "can_invite_users", "can_post_messages", "can_edit_messages",
+			"can_pin_messages", "can_post_stories", "can_edit_stories", "can_delete_stories", "can_manage_topics",
+			"can_manage_direct_messages", "can_manage_tags", "can_send_welcome_messages"} {
+			want[k] = "true"
+		}
+		b65dBody(t, "promoteChatMember", want, func(ctx context.Context, c *sender.Client) error {
 			return c.PromoteChatMemberWithRights(ctx, testutil.TestChatID, 456, tg.FullAdminRights())
 		})
-		require.NoError(t, err)
-		assert.Equal(t, "true", args["can_send_welcome_messages"])
-		assert.Equal(t, "true", string(raw["can_send_welcome_messages"]))
 	})
 }
 

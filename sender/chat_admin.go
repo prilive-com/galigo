@@ -33,7 +33,7 @@ type PromoteChatMemberRequest struct {
 	// Bot API 9.2; for channels only.
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
 
-	// Bot API 10.3: send welcome messages to new members.
+	// Bot API 10.3: manage the chat's welcome messages (a bot sends them directly).
 	CanSendWelcomeMessages *bool `json:"can_send_welcome_messages,omitempty"`
 }
 
@@ -261,7 +261,7 @@ func WithCanManageTags(can bool) PromoteOption {
 	}
 }
 
-// WithCanSendWelcomeMessages grants ability to send welcome messages to new members.
+// WithCanSendWelcomeMessages grants the right to manage the chat's welcome messages (a bot sends them directly).
 // Added in Bot API 10.3.
 func WithCanSendWelcomeMessages(can bool) PromoteOption {
 	return func(r *PromoteChatMemberRequest) {

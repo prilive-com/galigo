@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"regexp"
 	"testing"
@@ -326,6 +327,63 @@ func TestB65D_S75RunNoLeak(t *testing.T) {
 
 			assert.NotContains(t, logs.String(), "B65D-SECRET")
 			assert.NotContains(t, string(saved), "B65D-SECRET")
+		})
+	}
+}
+
+// b65dEchoServer is a mock Bot API for S75 on the real adapter (C1-01): sendMessage replies with a message whose
+// reply_markup is the request's own reply_markup, changed by change; deleteMessage replies true.
+func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTelegramServer {
+	t.Helper()
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			testutil.ReplyBadRequest(w, "bad body")
+			return
+		}
+		markup, _ := req["reply_markup"].(map[string]any)
+		if change != nil {
+			change(markup)
+		}
+		testutil.ReplyOK(w, map[string]any{"message_id": 42, "date": 1,
+			"chat": map[string]any{"id": req["chat_id"], "type": "supergroup"}, "reply_markup": markup})
+	})
+	server.On("/bot"+testutil.TestToken+"/deleteMessage", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+	return server
+}
+
+// T-run on the real adapter (C1-01): S75 through engine.SenderAdapter and sender.Client against a mock HTTP server.
+// The exact sendMessage body carries the whole 10.3 markup; the echo passes, and a reply without force_reply fails.
+func TestB65D_S75RealAdapter(t *testing.T) {
+	const wantSend = `{"chat_id":-1009876543210,"text":"galigo 10.3 reply markup","reply_markup":{"inline_keyboard":` +
+		`[[{"text":"callback","callback_data":"s75"},{"text":"off","disabled":{}}]],"force_reply":true}}`
+	for _, tc := range []struct {
+		name   string
+		change func(map[string]any)
+		want   string // the echo step's whole error; "" = success
+	}{
+		{"echo", nil, ""},
+		{"force_reply dropped", func(m map[string]any) { delete(m, "force_reply") },
+			"sendMessage (reply markup): the reply markup differs: force_reply sent true, received false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := b65dEchoServer(t, tc.change)
+			rt := engine.NewRuntime(engine.NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), b65dGroup, b65dAdmin)
+			res := engine.NewRunner(rt, engine.RunnerConfig{MaxMessages: 10}, slog.New(slog.DiscardHandler)).
+				Run(context.Background(), S75_ReplyMarkupAPI103())
+			require.Equal(t, 2, server.CaptureCount())
+			server.CaptureAt(0).AssertPath(t, "/bot"+testutil.TestToken+"/sendMessage")
+			assert.JSONEq(t, wantSend, server.CaptureAt(0).BodyString())
+			server.CaptureAt(1).AssertPath(t, "/bot"+testutil.TestToken+"/deleteMessage")
+			assert.JSONEq(t, `{"chat_id":-1009876543210,"message_id":42}`, server.CaptureAt(1).BodyString())
+			require.Len(t, res.Steps, 2)
+			assert.Equal(t, tc.want == "", res.Success, "%+v", res)
+			assert.Equal(t, tc.want, res.Steps[0].Error)
+			assert.Equal(t, []int{42}, res.Steps[0].MessageIDs)
+			assert.Equal(t, map[string]any{"deleted_count": 1}, res.Steps[1].Evidence)
 		})
 	}
 }

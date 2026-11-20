@@ -219,3 +219,32 @@ func TestB65D_StepSendError(t *testing.T) {
 	assert.Empty(t, res.MessageIDs)
 	assert.Nil(t, res.Evidence)
 }
+
+// T-step-fallback (C1-01/C1-02): a nil row against an empty row is a difference reflect.DeepEqual sees and no compared
+// field shows; the error is the whole fallback text and holds no text of the equal sibling row (a canary).
+func TestB65D_StepFallback(t *testing.T) {
+	const canary = "B65D-SECRET-FALLBACK"
+	markup := func(last []tg.InlineKeyboardButton) tg.InlineKeyboardMarkup {
+		return tg.InlineKeyboardMarkup{InlineKeyboard: [][]tg.InlineKeyboardButton{{{Text: canary, CallbackData: canary}}, last}}
+	}
+	for _, tc := range []struct {
+		name       string
+		sent, recv []tg.InlineKeyboardButton
+	}{
+		{"empty sent, nil received", []tg.InlineKeyboardButton{}, nil},
+		{"nil sent, empty received", nil, []tg.InlineKeyboardButton{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &fakeMarkup{reply: func() *tg.InlineKeyboardMarkup { m := markup(tc.recv); return &m }}
+			rt := NewRuntime(f, b65dGroup, b65dAdmin)
+			step := &SendReplyMarkupEchoStep{Text: b65dText, Markup: markup(tc.sent)}
+			res, err := step.Execute(context.Background(), rt)
+			require.Error(t, err)
+			assert.Equal(t, b65dP+"a difference outside the compared fields", err.Error())
+			assert.NotContains(t, err.Error(), canary)
+			assert.NotContains(t, fmt.Sprintf("%v", res.Evidence), canary)
+			assert.Equal(t, []CreatedMessage{{ChatID: b65dGroup, MessageID: b65dMsgID}}, rt.CreatedMessages)
+			assert.Equal(t, map[string]any{"message_id": b65dMsgID, "rows": 2, "force_reply": false}, res.Evidence)
+		})
+	}
+}

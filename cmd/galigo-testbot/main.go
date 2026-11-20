@@ -354,15 +354,13 @@ func interruptContext() (context.Context, context.CancelFunc) {
 }
 
 // runScenarios runs the scenarios in order, adds each result to report and finalizes it. ctx is checked before each
-// scenario starts: once it is cancelled (an interrupt, B-72) no further scenario starts, and the report is marked
-// failed even if every scenario that ran passed. The scenario that was running when ctx was cancelled stops early, and
-// the runner's after-stop cleanup runs.
+// scenario starts: once it is cancelled (an interrupt, B-72) no further scenario starts. The scenario that was running
+// when ctx was cancelled stops early, and the runner's after-stop cleanup runs. A run whose ctx is cancelled is marked
+// failed, even if every scenario that ran passed or skipped (a step may turn the cancel into a skip).
 func runScenarios(ctx context.Context, runner *engine.Runner, scenarios []engine.Scenario, report *evidence.Report, logger *slog.Logger) {
-	interrupted := false
 	for i, scenario := range scenarios {
 		if ctx.Err() != nil {
 			logger.Warn("run interrupted, remaining scenarios not run", "cause", context.Cause(ctx), "not_run", len(scenarios)-i)
-			interrupted = true
 			break
 		}
 		logger.Info("running scenario", "name", scenario.Name())
@@ -375,8 +373,8 @@ func runScenarios(ctx context.Context, runner *engine.Runner, scenarios []engine
 	}
 
 	report.Finalize()
-	if interrupted {
-		report.Success = false // the run stopped early
+	if ctx.Err() != nil {
+		report.Success = false // the run was interrupted
 	}
 }
 

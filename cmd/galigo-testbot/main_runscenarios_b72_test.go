@@ -56,8 +56,10 @@ func (s *b72FakeScenario) Steps() []engine.Step {
 // after the first scenario was admitted, before its step; a scenario that passes while its step cancels the context
 // (the step must see its own context cancelled: the scenario runs on the run context); a scenario failing with a
 // returned context error while the run context is live (E-0108: that is not an interrupt; the next scenario runs);
-// the last step of the last scenario cancels (AC2's boundary: not interrupted, passed); all pass. Admissions (calls to
-// Steps) show which scenarios the runner started; the summary totals and the end time show that Finalize ran.
+// the last step of the last scenario cancels (no further scenario to stop, but the run was interrupted: failed); the
+// last scenario's step cancels and reports a skip (a step that turns the cancel into a skip or a success must not
+// make the run pass, change review C1-01); no scenario and a cancelled context; all pass. Admissions (calls to Steps)
+// show which scenarios the runner started; the summary totals and the end time show that Finalize ran.
 func TestB72_RunScenarios(t *testing.T) {
 	type want struct {
 		name string
@@ -94,7 +96,13 @@ func TestB72_RunScenarios(t *testing.T) {
 			[]want{{"B72-0", false}, {"B72-1", true}}, []int{1, 1}, []int{1, 1}, -1, false},
 		{"last step of the last scenario cancels", false,
 			func(cancel func()) []fix { return []fix{{}, {step: b72Step{do: cancel}}} },
-			[]want{{"B72-0", true}, {"B72-1", true}}, []int{1, 1}, []int{1, 1}, 1, true},
+			[]want{{"B72-0", true}, {"B72-1", true}}, []int{1, 1}, []int{1, 1}, 1, false},
+		{"last scenario cancels and skips", false,
+			func(cancel func()) []fix { return []fix{{step: b72Step{do: cancel, err: engine.Skip("b72 skip")}}} },
+			[]want{{"B72-0", true}}, []int{1}, []int{1}, 0, false},
+		{"no scenario cancelled", true,
+			func(func()) []fix { return nil },
+			[]want{}, []int{}, []int{}, -1, false},
 		{"all pass", false,
 			func(func()) []fix { return []fix{{}, {}} },
 			[]want{{"B72-0", true}, {"B72-1", true}}, []int{1, 1}, []int{1, 1}, -1, true},

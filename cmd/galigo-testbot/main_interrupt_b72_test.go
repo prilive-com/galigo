@@ -317,7 +317,8 @@ func TestB72_CLIInterrupt(t *testing.T) {
 //     interruptContext, os, signal, ... always mean the package's own (E-0172: a local shadow); neither names
 //     syscall (syscall.Exit is an early exit);
 //   - os is named only as os.Exit (so no os.FindProcess(os.Getpid()).Kill());
-//   - the package-level functions each calls are exactly the baseline's (a new helper could end the process).
+//   - the package-level functions and values each refers to (called, as a value, or instantiated) are exactly the
+//     baseline's (a new helper or a func variable could end the process).
 //
 // Package: no non-test file imports os, os/signal, syscall, log, runtime or context under another name or as a
 // dot import (the rules above match those names).
@@ -328,6 +329,7 @@ func TestB72_InterruptSeam(t *testing.T) {
 	funcs := map[string]*ast.FuncDecl{}
 	global := map[string]bool{} // top-level names of the package and import names of its non-test files
 	var renamed []string        // imports of os, os/signal, syscall, log, runtime or context under another name
+	values := map[string]bool{} // package-level vars and consts
 	for _, p := range paths {
 		if strings.HasSuffix(p, "_test.go") {
 			continue
@@ -360,6 +362,7 @@ func TestB72_InterruptSeam(t *testing.T) {
 					case *ast.ValueSpec:
 						for _, nm := range y.Names {
 							global[nm.Name] = true
+							values[nm.Name] = true
 						}
 					case *ast.TypeSpec:
 						global[y.Name.Name] = true
@@ -437,10 +440,10 @@ func TestB72_InterruptSeam(t *testing.T) {
 	for _, c := range []struct {
 		fn    string
 		start bool
-		calls map[string]bool // the package-level functions it calls
+		calls map[string]bool // the package-level functions and values it refers to
 	}{
 		{"runSuiteCommand", false, map[string]bool{"isInteractiveSuite": true, "runInteractiveSuite": true,
-			"suiteScenarios": true, "interruptContext": true, "runScenarios": true}},
+			"suiteScenarios": true, "interruptContext": true, "runScenarios": true, "availableSuites": true}},
 		{"runInteractiveSuite", true, map[string]bool{"interruptContext": true, "runScenarios": true}},
 	} {
 		t.Run(c.fn, func(t *testing.T) {
@@ -471,7 +474,6 @@ func TestB72_InterruptSeam(t *testing.T) {
 				}
 			}
 			osExit := map[*ast.Ident]bool{}
-			pkgCalls := map[string]bool{}
 			ast.Inspect(fd.Body, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.FuncType: // parameters and results of a func literal (not struct fields or interface methods)
@@ -487,10 +489,6 @@ func TestB72_InterruptSeam(t *testing.T) {
 				case *ast.SelectorExpr:
 					if id, ok := x.X.(*ast.Ident); ok && id.Name == "os" && x.Sel.Name == "Exit" {
 						osExit[id] = true
-					}
-				case *ast.CallExpr:
-					if id, ok := ast.Unparen(x.Fun).(*ast.Ident); ok && funcs[id.Name] != nil {
-						pkgCalls[id.Name] = true
 					}
 				case *ast.AssignStmt:
 					if x.Tok == token.DEFINE {
@@ -522,7 +520,28 @@ func TestB72_InterruptSeam(t *testing.T) {
 				}
 				return true
 			})
-			assert.Equal(t, c.calls, pkgCalls, "%s calls exactly the baseline's package-level functions", c.fn)
+			// Package-level functions and values the body refers to, in any form (a field or method name after a dot,
+			// and a composite literal's key, are not references).
+			notRef := map[*ast.Ident]bool{}
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				switch x := n.(type) {
+				case *ast.SelectorExpr:
+					notRef[x.Sel] = true
+				case *ast.KeyValueExpr:
+					if id, ok := x.Key.(*ast.Ident); ok {
+						notRef[id] = true
+					}
+				}
+				return true
+			})
+			pkgRefs := map[string]bool{}
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				if id, ok := n.(*ast.Ident); ok && !notRef[id] && (funcs[id.Name] != nil || values[id.Name]) {
+					pkgRefs[id.Name] = true
+				}
+				return true
+			})
+			assert.Equal(t, c.calls, pkgRefs, "%s refers to exactly the baseline's package-level functions and values", c.fn)
 
 			defs, runs, starts := 0, 0, 0
 			var runCall *ast.CallExpr

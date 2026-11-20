@@ -1,6 +1,7 @@
 package tg
 
-// Bot API 10.2 rich messages, send side: the media of InputRichMessage.Media and of the media blocks.
+// Bot API 10.2 rich messages, send side: the media of InputRichMessage.Media and of the media blocks (10.3: the
+// document block).
 
 // InputRichMedia is the media of an InputRichMessageMedia or of a media block (Bot API 10.2): an InputMediaAnimation,
 // InputMediaAudio, InputMediaDocument, InputMediaPhoto, InputMediaVideo or InputMediaVoiceNote. Use a
@@ -14,7 +15,8 @@ type InputRichMedia interface {
 }
 
 // InputRichMessageMedia is a media element of a rich message to send (Bot API 10.2). The HTML or Markdown text refers
-// to it with a tg://photo?id=, tg://video?id= or tg://audio?id= link that names its ID.
+// to it with a tg://photo?id=, tg://video?id=, tg://audio?id= or tg://document?id= (Bot API 10.3) link that names its
+// ID.
 type InputRichMessageMedia struct {
 	ID    string         `json:"id"`
 	Media InputRichMedia `json:"media"`
@@ -51,6 +53,14 @@ type InputRichBlockVoiceNote struct {
 	Caption   *RichBlockCaption `json:"caption,omitempty"`
 }
 
+// InputRichBlockDocument is a block with a general file (Bot API 10.3). Document is an InputMediaDocument (use
+// sender.NewInputMediaDocument with a file_id or an HTTP URL; an upload is refused); the caption of the media itself
+// is ignored, use Caption.
+type InputRichBlockDocument struct {
+	Document InputRichMedia    `json:"document"`
+	Caption  *RichBlockCaption `json:"caption,omitempty"`
+}
+
 // MarshalJSON encodes the block with "type":"animation".
 func (b InputRichBlockAnimation) MarshalJSON() ([]byte, error) {
 	type t InputRichBlockAnimation
@@ -75,6 +85,12 @@ func (b InputRichBlockVideo) MarshalJSON() ([]byte, error) {
 	return marshalInputRichBlock("video", t(b))
 }
 
+// MarshalJSON encodes the block with "type":"document".
+func (b InputRichBlockDocument) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockDocument
+	return marshalInputRichBlock("document", t(b))
+}
+
 // MarshalJSON encodes the block with "type":"voice_note".
 func (b InputRichBlockVoiceNote) MarshalJSON() ([]byte, error) {
 	type t InputRichBlockVoiceNote
@@ -86,3 +102,6 @@ func (InputRichBlockAudio) inputRichBlock()     {}
 func (InputRichBlockPhoto) inputRichBlock()     {}
 func (InputRichBlockVideo) inputRichBlock()     {}
 func (InputRichBlockVoiceNote) inputRichBlock() {}
+
+// Bot API 10.3 block.
+func (InputRichBlockDocument) inputRichBlock() {}

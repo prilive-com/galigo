@@ -284,13 +284,13 @@ func TestAPI101C_MessageWithoutRich(t *testing.T) {
 // T-rm-5
 func TestAPI101C_Update(t *testing.T) {
 	in := `{"update_id":5,"message":{"message_id":9,"date":1,"chat":{"id":1,"type":"private"},"rich_message":{"blocks":[` +
-		`{"type":"expandable_blockquote","blocks":[]},{"type":"heading","text":"a","size":"big"},5]}}}`
+		`{"type":"future_block","blocks":[]},{"type":"heading","text":"a","size":"big"},5]}}}`
 	var u tg.Update
 	require.NoError(t, json.Unmarshal([]byte(in), &u))
 	require.NotNil(t, u.Message)
 	require.NotNil(t, u.Message.RichMessage)
 	assert.Equal(t, tg.RichBlocks{
-		tg.RichBlockUnknown{Type: "expandable_blockquote", Raw: json.RawMessage(`{"type":"expandable_blockquote","blocks":[]}`)},
+		tg.RichBlockUnknown{Type: "future_block", Raw: json.RawMessage(`{"type":"future_block","blocks":[]}`)},
 		tg.RichBlockUnknown{Type: "heading", Raw: json.RawMessage(`{"type":"heading","text":"a","size":"big"}`)},
 		tg.RichBlockUnknown{Raw: json.RawMessage(`5`)},
 	}, u.Message.RichMessage.Blocks)
@@ -375,7 +375,7 @@ func TestAPI101C_RichTextDirect(t *testing.T) {
 func TestAPI101C_RichTextNodeFallback(t *testing.T) {
 	cases := []struct{ in, typ string }{
 		{`{"type":"date_time","text":"x","unix_time":"soon","date_time_format":"f"}`, "date_time"},
-		{`{"type":"button","text":"b","button":{}}`, "button"},
+		{`{"type":"future_text","text":"b","button":{}}`, "future_text"},
 		{`{"type":5}`, ""},
 		{`{}`, ""},
 		{`{"text":"x"}`, ""},
@@ -630,10 +630,10 @@ func TestAPI101C_RichBlocksForms(t *testing.T) {
 	t.Run("mixed", func(t *testing.T) {
 		assert.Equal(t, tg.RichBlocks{
 			tg.RichBlockDivider{Type: "divider"},
-			tg.RichBlockUnknown{Type: "document", Raw: json.RawMessage(`{"type":"document"}`)},
+			tg.RichBlockUnknown{Type: "future_block", Raw: json.RawMessage(`{"type":"future_block"}`)},
 			tg.RichBlockUnknown{Raw: json.RawMessage(`5`)},
 			tg.RichBlockUnknown{Type: "heading", Raw: json.RawMessage(`{"type":"heading","size":"x"}`)},
-		}, decode(t, `[{"type":"divider"},{"type":"document"},5,{"type":"heading","size":"x"}]`))
+		}, decode(t, `[{"type":"divider"},{"type":"future_block"},5,{"type":"heading","size":"x"}]`))
 	})
 	t.Run("as-given type", func(t *testing.T) {
 		assert.Equal(t, tg.RichBlocks{
@@ -652,10 +652,10 @@ func TestAPI101C_RichBlocksForms(t *testing.T) {
 
 // T-rb-3
 func TestAPI101C_NestedHolders(t *testing.T) {
-	const blocks = `[{"type":"paragraph","text":"n"},{"type":"document"}]`
+	const blocks = `[{"type":"paragraph","text":"n"},{"type":"future_block"}]`
 	want := tg.RichBlocks{
 		tg.RichBlockParagraph{Type: "paragraph", Text: rich101cText("n")},
-		tg.RichBlockUnknown{Type: "document", Raw: json.RawMessage(`{"type":"document"}`)},
+		tg.RichBlockUnknown{Type: "future_block", Raw: json.RawMessage(`{"type":"future_block"}`)},
 	}
 	var rm tg.RichMessage
 	require.NoError(t, json.Unmarshal([]byte(`{"blocks":`+blocks+`}`), &rm))
@@ -777,7 +777,7 @@ func FuzzRichText(f *testing.F) {
 // FuzzRichBlocks: TEST-PLAN section 4.
 func FuzzRichBlocks(f *testing.F) {
 	for _, s := range []string{`[]`, `null`, `"x"`, `{"type":"paragraph","text":"a"}`,
-		`[{"type":"divider"},{"type":"document"},5,{"type":"heading","size":"x"}]`,
+		`[{"type":"divider"},{"type":"future_block"},5,{"type":"heading","size":"x"}]`,
 		`[{"type":" paragraph","text":"a"},{"type":"DIVIDER"}]`, `{invalid`, `[`} {
 		f.Add([]byte(s))
 	}
@@ -821,13 +821,14 @@ func init() {
 		tg.RichTextCode{}, tg.RichTextCustomEmoji{}, tg.RichTextMathematicalExpression{}, tg.RichTextURL{},
 		tg.RichTextEmailAddress{}, tg.RichTextPhoneNumber{}, tg.RichTextBankCardNumber{}, tg.RichTextMention{},
 		tg.RichTextHashtag{}, tg.RichTextCashtag{}, tg.RichTextBotCommand{}, tg.RichTextAnchor{}, tg.RichTextAnchorLink{},
-		tg.RichTextReference{}, tg.RichTextReferenceLink{},
-		tg.RichBlockCaption{}, tg.RichBlockTableCell{}, tg.RichBlockListItem{},
+		tg.RichTextReference{}, tg.RichTextReferenceLink{}, tg.RichTextButton{},
+		tg.RichBlockCaption{}, tg.RichBlockTableCell{}, tg.RichBlockListItem{}, tg.RichMessageButton{},
 		tg.RichBlockParagraph{}, tg.RichBlockSectionHeading{}, tg.RichBlockPreformatted{}, tg.RichBlockFooter{},
 		tg.RichBlockDivider{}, tg.RichBlockMathematicalExpression{}, tg.RichBlockAnchor{}, tg.RichBlockList{},
 		tg.RichBlockBlockQuotation{}, tg.RichBlockPullQuotation{}, tg.RichBlockCollage{}, tg.RichBlockSlideshow{},
 		tg.RichBlockTable{}, tg.RichBlockDetails{}, tg.RichBlockMap{}, tg.RichBlockAnimation{}, tg.RichBlockAudio{},
 		tg.RichBlockPhoto{}, tg.RichBlockVideo{}, tg.RichBlockVoiceNote{}, tg.RichBlockThinking{},
+		tg.RichBlockExpandableBlockQuotation{}, tg.RichBlockButtons{}, tg.RichBlockDocument{},
 		tg.RichMessage{},
 	} {
 		rt := reflect.TypeOf(v)
@@ -852,19 +853,20 @@ func rich101cTypeString(t reflect.Type) string {
 
 // T-shape
 func TestAPI101C_Shapes(t *testing.T) {
-	require.Len(t, rich101cShapes, 145)
+	require.Len(t, rich101cShapes, 168)
 	byType := map[string][]rich101cShape{}
 	for _, s := range rich101cShapes {
 		byType[s.typ] = append(byType[s.typ], s)
 	}
-	require.Len(t, byType, 50)
-	require.Len(t, rich101cTypes, 50)
+	require.Len(t, byType, 55)
+	require.Len(t, rich101cTypes, 55)
 	for name, rows := range byType {
 		rt, ok := rich101cTypes[name]
 		require.True(t, ok, name)
 		var got []rich101cShape
 		for i := range rt.NumField() {
 			f := rt.Field(i)
+			require.False(t, f.Anonymous, "%s.%s", name, f.Name)
 			if f.IsExported() {
 				got = append(got, rich101cShape{name, f.Name, rich101cTypeString(f.Type), f.Tag.Get("json")})
 			}
@@ -906,7 +908,8 @@ func TestAPI101C_Sealed(t *testing.T) {
 	var nText, nBlock int
 	for name, rt := range rich101cTypes {
 		switch {
-		case name == "RichBlockCaption" || name == "RichBlockTableCell" || name == "RichBlockListItem" || name == "RichMessage":
+		case name == "RichBlockCaption" || name == "RichBlockTableCell" || name == "RichBlockListItem" || name == "RichMessage" ||
+			name == "RichMessageButton":
 			assert.False(t, rt.Implements(textNode), name)
 			assert.False(t, rt.Implements(block), name)
 		case len(name) > 8 && name[:8] == "RichText":
@@ -919,8 +922,8 @@ func TestAPI101C_Sealed(t *testing.T) {
 			nBlock++
 		}
 	}
-	assert.Equal(t, 25, nText)
-	assert.Equal(t, 21, nBlock)
+	assert.Equal(t, 26, nText)
+	assert.Equal(t, 24, nBlock)
 	assert.True(t, reflect.TypeOf(tg.RichTextUnknown{}).Implements(textNode))
 	assert.True(t, reflect.TypeOf(tg.RichBlockUnknown{}).Implements(block))
 	for _, v := range []any{tg.RichText{}, tg.RichBlocks{}} {
@@ -982,7 +985,8 @@ func TestAPI101C_RawIsCopied(t *testing.T) {
 	})
 }
 
-// rich101cShapes is the field table of FIELDS-101c.md (generated from the Bot API 10.1 spec), one row per field.
+// rich101cShapes is the field table of FIELDS-101c.md (generated from the Bot API 10.1 spec), one row per field, and
+// the rows of the Bot API 10.3 read types (B-65 65c, from the 10.3 spec tables).
 var rich101cShapes = []rich101cShape{
 	{"RichTextBold", "Type", "string", `type`},
 	{"RichTextBold", "Text", "RichText", `text`},
@@ -1096,6 +1100,7 @@ var rich101cShapes = []rich101cShape{
 	{"RichBlockTable", "Cells", "[][]RichBlockTableCell", `cells`},
 	{"RichBlockTable", "IsBordered", "bool", `is_bordered,omitempty`},
 	{"RichBlockTable", "IsStriped", "bool", `is_striped,omitempty`},
+	{"RichBlockTable", "IsCompact", "bool", `is_compact,omitempty`},
 	{"RichBlockTable", "Caption", "*RichText", `caption,omitempty`},
 	{"RichBlockDetails", "Type", "string", `type`},
 	{"RichBlockDetails", "Summary", "RichText", `summary`},
@@ -1129,4 +1134,27 @@ var rich101cShapes = []rich101cShape{
 	{"RichBlockThinking", "Text", "RichText", `text`},
 	{"RichMessage", "Blocks", "RichBlocks", `blocks`},
 	{"RichMessage", "IsRTL", "bool", `is_rtl,omitempty`},
+	// Bot API 10.3
+	{"RichTextButton", "Type", "string", `type`},
+	{"RichTextButton", "Button", "RichMessageButton", `button`},
+	{"RichMessageButton", "Text", "RichText", `text`},
+	{"RichMessageButton", "Style", "string", `style,omitempty`},
+	{"RichMessageButton", "URL", "string", `url,omitempty`},
+	{"RichMessageButton", "CallbackData", "string", `callback_data,omitempty`},
+	{"RichMessageButton", "WebApp", "*WebAppInfo", `web_app,omitempty`},
+	{"RichMessageButton", "LoginURL", "*LoginURL", `login_url,omitempty`},
+	{"RichMessageButton", "SwitchInlineQuery", "*string", `switch_inline_query,omitempty`},
+	{"RichMessageButton", "SwitchInlineQueryCurrentChat", "*string", `switch_inline_query_current_chat,omitempty`},
+	{"RichMessageButton", "SwitchInlineQueryChosenChat", "*SwitchInlineQueryChosenChat", `switch_inline_query_chosen_chat,omitempty`},
+	{"RichMessageButton", "CopyText", "*CopyTextButton", `copy_text,omitempty`},
+	{"RichMessageButton", "Disabled", "*DisabledButton", `disabled,omitempty`},
+	{"RichBlockExpandableBlockQuotation", "Type", "string", `type`},
+	{"RichBlockExpandableBlockQuotation", "Text", "RichText", `text`},
+	{"RichBlockExpandableBlockQuotation", "Credit", "*RichText", `credit,omitempty`},
+	{"RichBlockButtons", "Type", "string", `type`},
+	{"RichBlockButtons", "Buttons", "[]RichMessageButton", `buttons`},
+	{"RichBlockButtons", "Align", "string", `align,omitempty`},
+	{"RichBlockDocument", "Type", "string", `type`},
+	{"RichBlockDocument", "Document", "Document", `document`},
+	{"RichBlockDocument", "Caption", "*RichBlockCaption", `caption,omitempty`},
 }

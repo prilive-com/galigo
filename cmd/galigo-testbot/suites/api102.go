@@ -74,7 +74,8 @@ func s69Media() []tg.InputRichMessageMedia {
 }
 
 // s69Markdown links the media of s69Media. The server takes tg://photo, tg://video (also an animation) and
-// tg://audio (also a voice note) links; tg://animation, tg://voice_note and tg://voice links are refused.
+// tg://audio (also a voice note) links; tg://animation, tg://voice_note and tg://voice links are refused (in the 10.2
+// trial; 10.3 also takes tg://document: S74).
 const s69Markdown = "galigo 10.2 media\n\n![](tg://photo?id=p)\n\n![](tg://video?id=v)\n\n![](tg://audio?id=a)\n\n" +
 	"![](tg://video?id=g)\n\n![](tg://audio?id=n)"
 

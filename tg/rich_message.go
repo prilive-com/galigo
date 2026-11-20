@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 )
 
-// Bot API 10.1 rich messages, read side: Message.RichMessage and the RichText and RichBlock types.
-// Kinds added in later Bot API versions decode as RichTextUnknown or RichBlockUnknown and keep their raw JSON.
+// Bot API 10.1–10.3 rich messages, read side: Message.RichMessage and the RichText and RichBlock types.
+// Kinds this version of galigo does not model (added later) decode as RichTextUnknown or RichBlockUnknown and keep
+// their raw JSON.
 
 // RichText is rich formatted text (Bot API 10.1): a JSON string for plain text, a JSON array of RichText, or one of
 // the RichText* kinds. Exactly one form is set when decoded: Plain for a string (also the zero value), Parts for an
@@ -174,6 +175,8 @@ func unmarshalRichTextNode(data []byte) RichTextNode {
 		return decodeRichTextNode[RichTextCashtag](data, probe.Type)
 	case "bot_command":
 		return decodeRichTextNode[RichTextBotCommand](data, probe.Type)
+	case "button":
+		return decodeRichTextNode[RichTextButton](data, probe.Type)
 	case "anchor":
 		return decodeRichTextNode[RichTextAnchor](data, probe.Type)
 	case "anchor_link":
@@ -215,6 +218,8 @@ func unmarshalRichBlock(data json.RawMessage) RichBlock {
 		return decodeRichBlock[RichBlockList](data, probe.Type)
 	case "blockquote":
 		return decodeRichBlock[RichBlockBlockQuotation](data, probe.Type)
+	case "expandable_blockquote":
+		return decodeRichBlock[RichBlockExpandableBlockQuotation](data, probe.Type)
 	case "pullquote":
 		return decodeRichBlock[RichBlockPullQuotation](data, probe.Type)
 	case "collage":
@@ -227,10 +232,14 @@ func unmarshalRichBlock(data json.RawMessage) RichBlock {
 		return decodeRichBlock[RichBlockDetails](data, probe.Type)
 	case "map":
 		return decodeRichBlock[RichBlockMap](data, probe.Type)
+	case "buttons":
+		return decodeRichBlock[RichBlockButtons](data, probe.Type)
 	case "animation":
 		return decodeRichBlock[RichBlockAnimation](data, probe.Type)
 	case "audio":
 		return decodeRichBlock[RichBlockAudio](data, probe.Type)
+	case "document":
+		return decodeRichBlock[RichBlockDocument](data, probe.Type)
 	case "photo":
 		return decodeRichBlock[RichBlockPhoto](data, probe.Type)
 	case "video":
@@ -420,6 +429,12 @@ type RichTextBotCommand struct {
 	BotCommand string   `json:"bot_command"`
 }
 
+// RichTextButton is a button inside the text (Bot API 10.3).
+type RichTextButton struct {
+	Type   string            `json:"type"`
+	Button RichMessageButton `json:"button"`
+}
+
 // RichTextAnchor is an anchor (Bot API 10.1).
 type RichTextAnchor struct {
 	Type string `json:"type"`
@@ -471,6 +486,27 @@ type RichBlockListItem struct {
 	IsChecked   bool       `json:"is_checked,omitempty"`
 	Value       int        `json:"value,omitempty"`
 	Type        string     `json:"type,omitempty"`
+}
+
+// RichMessageButton is a button in a rich message (Bot API 10.3), read in RichTextButton and RichBlockButtons and sent
+// in InputRichBlockButtons. Exactly one field other than Text and Style names the kind of the button. The server keeps
+// one when several are set; for a button with none it answered 400 "... Text buttons are not allowed in the inline
+// keyboard" (an observed reply, not a spec rule). galigo checks none of this locally. SwitchInlineQuery and
+// SwitchInlineQueryCurrentChat are pointers: the query may be empty, so a pointer to "" is that kind with an empty
+// query, and nil is not that kind. Style is "danger", "success", "primary" or "link" ("link" only for a callback
+// button); Text may hold only plain text, RichTextCustomEmoji and RichTextDateTime.
+type RichMessageButton struct {
+	Text                         RichText                     `json:"text"`
+	Style                        string                       `json:"style,omitempty"`
+	URL                          string                       `json:"url,omitempty"`
+	CallbackData                 string                       `json:"callback_data,omitempty"`
+	WebApp                       *WebAppInfo                  `json:"web_app,omitempty"`
+	LoginURL                     *LoginURL                    `json:"login_url,omitempty"`
+	SwitchInlineQuery            *string                      `json:"switch_inline_query,omitempty"`
+	SwitchInlineQueryCurrentChat *string                      `json:"switch_inline_query_current_chat,omitempty"`
+	SwitchInlineQueryChosenChat  *SwitchInlineQueryChosenChat `json:"switch_inline_query_chosen_chat,omitempty"`
+	CopyText                     *CopyTextButton              `json:"copy_text,omitempty"`
+	Disabled                     *DisabledButton              `json:"disabled,omitempty"`
 }
 
 // RichBlockParagraph is a text paragraph, corresponding to the HTML tag <p> (Bot API 10.1).
@@ -529,6 +565,13 @@ type RichBlockBlockQuotation struct {
 	Credit *RichText  `json:"credit,omitempty"`
 }
 
+// RichBlockExpandableBlockQuotation is a block quotation that is shown collapsed and can be expanded (Bot API 10.3).
+type RichBlockExpandableBlockQuotation struct {
+	Type   string    `json:"type"`
+	Text   RichText  `json:"text"`
+	Credit *RichText `json:"credit,omitempty"`
+}
+
 // RichBlockPullQuotation is a quotation with centered text, loosely corresponding to the HTML tag <aside> (Bot API 10.1).
 type RichBlockPullQuotation struct {
 	Type   string    `json:"type"`
@@ -556,6 +599,7 @@ type RichBlockTable struct {
 	Cells      [][]RichBlockTableCell `json:"cells"`
 	IsBordered bool                   `json:"is_bordered,omitempty"`
 	IsStriped  bool                   `json:"is_striped,omitempty"`
+	IsCompact  bool                   `json:"is_compact,omitempty"` // 10.3
 	Caption    *RichText              `json:"caption,omitempty"`
 }
 
@@ -577,6 +621,14 @@ type RichBlockMap struct {
 	Caption  *RichBlockCaption `json:"caption,omitempty"`
 }
 
+// RichBlockButtons is a block with a row of buttons, corresponding to the custom HTML tag <tg-button-row> (Bot API
+// 10.3). Align is "left", "center" or "right".
+type RichBlockButtons struct {
+	Type    string              `json:"type"`
+	Buttons []RichMessageButton `json:"buttons"`
+	Align   string              `json:"align,omitempty"`
+}
+
 // RichBlockAnimation is a block with an animation, corresponding to the HTML tag <video> (Bot API 10.1).
 type RichBlockAnimation struct {
 	Type       string            `json:"type"`
@@ -590,6 +642,13 @@ type RichBlockAudio struct {
 	Type    string            `json:"type"`
 	Audio   Audio             `json:"audio"`
 	Caption *RichBlockCaption `json:"caption,omitempty"`
+}
+
+// RichBlockDocument is a block with a general file (Bot API 10.3).
+type RichBlockDocument struct {
+	Type     string            `json:"type"`
+	Document Document          `json:"document"`
+	Caption  *RichBlockCaption `json:"caption,omitempty"`
 }
 
 // RichBlockPhoto is a block with a photo, corresponding to the HTML tag <img> (Bot API 10.1).
@@ -653,6 +712,9 @@ func (RichTextAnchorLink) richTextNode()             {}
 func (RichTextReference) richTextNode()              {}
 func (RichTextReferenceLink) richTextNode()          {}
 
+// Bot API 10.3 node.
+func (RichTextButton) richTextNode() {}
+
 func (RichBlockParagraph) richBlock()              {}
 func (RichBlockSectionHeading) richBlock()         {}
 func (RichBlockPreformatted) richBlock()           {}
@@ -675,14 +737,20 @@ func (RichBlockVideo) richBlock()                  {}
 func (RichBlockVoiceNote) richBlock()              {}
 func (RichBlockThinking) richBlock()               {}
 
+// Bot API 10.3 blocks.
+func (RichBlockExpandableBlockQuotation) richBlock() {}
+func (RichBlockButtons) richBlock()                  {}
+func (RichBlockDocument) richBlock()                 {}
+
 // ================== Send side (Bot API 10.1) ==================
 
 // InputRichMessage describes a rich message to send (Bot API 10.1). Use exactly one of three forms: HTML, Markdown,
 // or Blocks (Bot API 10.2; the InputRichBlock* types; an empty slice counts as not used). SendRichMessage,
-// SendRichMessageDraft and EditMessageText refuse a value that uses none or more than one form (the server picks one
-// silently when several are set); InputRichMessageContent in an inline result is sent unchecked. Media (Bot API 10.2)
-// lists the media that HTML or Markdown names with tg://photo?id=, tg://video?id= (also an animation) or
-// tg://audio?id= (also a voice note) links; it is not a form. sender.Client sends an upload in Media as multipart.
+// SendRichMessageDraft, EditMessageText and EditEphemeralMessageText refuse a value that uses none or more than one
+// form (the server picks one silently when several are set); InputRichMessageContent in an inline result is sent
+// unchecked. Media (Bot API 10.2) lists the media that HTML or Markdown names with tg://photo?id=, tg://video?id= (also
+// an animation), tg://audio?id= (also a voice note) or tg://document?id= (Bot API 10.3) links; it is not a form.
+// sender.Client sends an upload in Media as multipart.
 type InputRichMessage struct {
 	HTML                string                  `json:"html,omitempty"`
 	Markdown            string                  `json:"markdown,omitempty"`

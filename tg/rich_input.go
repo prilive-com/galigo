@@ -7,7 +7,8 @@ import (
 	"reflect"
 )
 
-// Bot API 10.2 rich messages, send side: the blocks of InputRichMessage.Blocks.
+// Bot API 10.2 rich messages, send side: the blocks of InputRichMessage.Blocks (10.3: buttons, expandable quotation,
+// compact table).
 
 // InputRichBlock is a block of a rich message to send (Bot API 10.2): one of the InputRichBlock* types. Each type
 // writes its own "type" value when encoded; the caller does not set it.
@@ -141,6 +142,13 @@ type InputRichBlockBlockQuotation struct {
 	Credit *RichText        `json:"credit,omitempty"`
 }
 
+// InputRichBlockExpandableBlockQuotation is a block quotation that is shown collapsed and can be expanded (Bot API
+// 10.3).
+type InputRichBlockExpandableBlockQuotation struct {
+	Text   RichText  `json:"text"`
+	Credit *RichText `json:"credit,omitempty"`
+}
+
 // InputRichBlockPullQuotation is a quotation with centered text, loosely corresponding to the HTML tag <aside> (Bot
 // API 10.2).
 type InputRichBlockPullQuotation struct {
@@ -165,6 +173,7 @@ type InputRichBlockTable struct {
 	Cells      [][]RichBlockTableCell `json:"cells"`
 	IsBordered bool                   `json:"is_bordered,omitempty"`
 	IsStriped  bool                   `json:"is_striped,omitempty"`
+	IsCompact  bool                   `json:"is_compact,omitempty"` // 10.3
 	Caption    *RichText              `json:"caption,omitempty"`
 }
 
@@ -184,6 +193,13 @@ type InputRichBlockMap struct {
 	Width    *int              `json:"width,omitempty"`
 	Height   *int              `json:"height,omitempty"`
 	Caption  *RichBlockCaption `json:"caption,omitempty"`
+}
+
+// InputRichBlockButtons is a block with a row of 1-8 buttons, corresponding to the custom HTML tag <tg-button-row>
+// (Bot API 10.3). Align is "left", "center" or "right"; it is not sent when empty.
+type InputRichBlockButtons struct {
+	Buttons []RichMessageButton `json:"buttons"`
+	Align   string              `json:"align,omitempty"`
 }
 
 // InputRichBlockThinking is a block with a "Thinking…" placeholder, corresponding to the custom HTML tag
@@ -252,6 +268,12 @@ func (b InputRichBlockBlockQuotation) MarshalJSON() ([]byte, error) {
 	return marshalInputRichBlock("blockquote", t(b))
 }
 
+// MarshalJSON encodes the block with "type":"expandable_blockquote".
+func (b InputRichBlockExpandableBlockQuotation) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockExpandableBlockQuotation
+	return marshalInputRichBlock("expandable_blockquote", t(b))
+}
+
 // MarshalJSON encodes the block with "type":"pullquote".
 func (b InputRichBlockPullQuotation) MarshalJSON() ([]byte, error) {
 	type t InputRichBlockPullQuotation
@@ -297,6 +319,12 @@ func (b InputRichBlockMap) MarshalJSON() ([]byte, error) {
 	return marshalInputRichBlock("map", t(b))
 }
 
+// MarshalJSON encodes the block with "type":"buttons".
+func (b InputRichBlockButtons) MarshalJSON() ([]byte, error) {
+	type t InputRichBlockButtons
+	return marshalInputRichBlock("buttons", t(b))
+}
+
 // MarshalJSON encodes the block with "type":"thinking".
 func (b InputRichBlockThinking) MarshalJSON() ([]byte, error) {
 	type t InputRichBlockThinking
@@ -319,6 +347,10 @@ func (InputRichBlockTable) inputRichBlock()                  {}
 func (InputRichBlockDetails) inputRichBlock()                {}
 func (InputRichBlockMap) inputRichBlock()                    {}
 func (InputRichBlockThinking) inputRichBlock()               {}
+
+// Bot API 10.3 blocks.
+func (InputRichBlockExpandableBlockQuotation) inputRichBlock() {}
+func (InputRichBlockButtons) inputRichBlock()                  {}
 
 func (b InputRichBlockList) inputRichBlockChildren() [][]InputRichBlock {
 	return listItemBlocks(b.Items)

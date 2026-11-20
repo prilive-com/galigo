@@ -526,6 +526,6 @@ type SendMessageDraftRequest struct {
 	// Update.StoppedMessageGeneration when the user presses it. KeepOnStop keeps the draft in the chat when the button
 	// is pressed; the draft still disappears after a short time or when the bot sends a message, so send it as a new
 	// message to keep it.
-	CanStop    bool `json:"-"`
-	KeepOnStop bool `json:"-"`
+	CanStop    bool `json:"can_stop,omitempty"`
+	KeepOnStop bool `json:"keep_on_stop,omitempty"`
 }

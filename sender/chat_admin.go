@@ -98,6 +98,7 @@ func (c *Client) PromoteChatMemberWithRights(ctx context.Context, chatID tg.Chat
 		CanManageTags:       rights.CanManageTags,
 
 		CanManageDirectMessages: rights.CanManageDirectMessages,
+		CanSendWelcomeMessages:  &rights.CanSendWelcomeMessages,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -129,6 +130,7 @@ func (c *Client) DemoteChatMember(ctx context.Context, chatID tg.ChatID, userID 
 		CanManageTags:       &f,
 
 		CanManageDirectMessages: &f,
+		CanSendWelcomeMessages:  &f,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -262,5 +264,7 @@ func WithCanManageTags(can bool) PromoteOption {
 // WithCanSendWelcomeMessages grants ability to send welcome messages to new members.
 // Added in Bot API 10.3.
 func WithCanSendWelcomeMessages(can bool) PromoteOption {
-	return func(r *PromoteChatMemberRequest) {}
+	return func(r *PromoteChatMemberRequest) {
+		r.CanSendWelcomeMessages = &can
+	}
 }

@@ -68,9 +68,9 @@ func S75_ReplyMarkupAPI103() engine.Scenario {
 			&engine.SendReplyMarkupEchoStep{Text: "galigo 10.3 reply markup", Markup: tg.InlineKeyboardMarkup{
 				InlineKeyboard: [][]tg.InlineKeyboardButton{{
 					tg.Btn("callback", "s75"),
-					{Text: "off"},
+					{Text: "off", Disabled: &tg.DisabledButton{}},
 				}},
-				ForceReply: false,
+				ForceReply: true,
 			}},
 			&engine.CleanupStep{},
 		},
@@ -80,5 +80,5 @@ func S75_ReplyMarkupAPI103() engine.Scenario {
 // AllAPI103Scenarios returns the Bot API 10.3 scenarios: S74 (rich messages) and S75 (reply markup). The 10.3
 // ephemeral changes are in AllEphemeralScenarios, S73.
 func AllAPI103Scenarios() []engine.Scenario {
-	return []engine.Scenario{S74_RichAPI103()}
+	return []engine.Scenario{S74_RichAPI103(), S75_ReplyMarkupAPI103()}
 }

@@ -51,8 +51,8 @@ type SendRichMessageDraftRequest struct {
 	DraftID         int                 `json:"draft_id"`
 	RichMessage     tg.InputRichMessage `json:"rich_message"`
 	// CanStop and KeepOnStop (Bot API 10.3): as on SendMessageDraftRequest.
-	CanStop    bool `json:"-"`
-	KeepOnStop bool `json:"-"`
+	CanStop    bool `json:"can_stop,omitempty"`
+	KeepOnStop bool `json:"keep_on_stop,omitempty"`
 }
 
 // SendRichMessageDraft streams a partial rich message to a user (Bot API 10.1). ChatID must be an integer (private

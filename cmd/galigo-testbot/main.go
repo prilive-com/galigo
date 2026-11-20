@@ -276,7 +276,7 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	// Bot API 10.2 (S68, S69)
 	case "api102", "api-102", "10.2":
 		scenarios = suites.AllAPI102Scenarios()
-	// Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in "ephemeral", S73)
+	// Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in "ephemeral", S73)
 	case "api103", "api-103", "10.3":
 		scenarios = suites.AllAPI103Scenarios()
 	case "all":
@@ -727,8 +727,8 @@ Bot API 10.1 (S66, S67):
 Bot API 10.2 (S68, S69):
   api102 - All 10.2 tests (rich message blocks and media)
 
-Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in ephemeral, S73):
-  api103 - Buttons, button nodes, compact tables, expandable quotations, document blocks
+Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73):
+  api103 - Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

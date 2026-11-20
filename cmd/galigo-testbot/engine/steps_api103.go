@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/prilive-com/galigo/sender"
@@ -132,7 +133,12 @@ func (s *SendReplyMarkupEchoStep) Execute(ctx context.Context, rt *Runtime) (*St
 	res.MessageIDs = []int{msg.MessageID}
 	res.Evidence = map[string]any{"message_id": msg.MessageID, "rows": len(s.Markup.InlineKeyboard),
 		"force_reply": s.Markup.ForceReply}
-	// stub: no compare
+	switch {
+	case msg.ReplyMarkup == nil:
+		return res, errors.New("sendMessage (reply markup): the reply has no reply markup")
+	case !reflect.DeepEqual(s.Markup, *msg.ReplyMarkup):
+		return res, fmt.Errorf("sendMessage (reply markup): the reply markup differs: %s", markupDiff(s.Markup, *msg.ReplyMarkup))
+	}
 	return res, nil
 }
 
@@ -140,5 +146,35 @@ func (s *SendReplyMarkupEchoStep) Execute(ctx context.Context, rt *Runtime) (*St
 // position and Go field name of a differing button field, whether a pointer field is set, and the length of a
 // differing string.
 func markupDiff(want, got tg.InlineKeyboardMarkup) string {
-	return "" // stub
+	if want.ForceReply != got.ForceReply {
+		return fmt.Sprintf("force_reply sent %t, received %t", want.ForceReply, got.ForceReply)
+	}
+	if len(want.InlineKeyboard) != len(got.InlineKeyboard) {
+		return fmt.Sprintf("%d rows sent, %d received", len(want.InlineKeyboard), len(got.InlineKeyboard))
+	}
+	for r := range want.InlineKeyboard {
+		w, g := want.InlineKeyboard[r], got.InlineKeyboard[r]
+		if len(w) != len(g) {
+			return fmt.Sprintf("row %d: %d buttons sent, %d received", r, len(w), len(g))
+		}
+		for b := range w {
+			wv, gv := reflect.ValueOf(w[b]), reflect.ValueOf(g[b])
+			for i := range wv.NumField() {
+				wf, gf := wv.Field(i), gv.Field(i)
+				if reflect.DeepEqual(wf.Interface(), gf.Interface()) {
+					continue
+				}
+				name := wv.Type().Field(i).Name
+				switch wf.Kind() {
+				case reflect.String:
+					return fmt.Sprintf("row %d button %d: %s differs (sent %d bytes, received %d bytes)", r, b, name, wf.Len(), gf.Len())
+				case reflect.Pointer:
+					return fmt.Sprintf("row %d button %d: %s differs (sent set=%t, received set=%t)", r, b, name, !wf.IsNil(), !gf.IsNil())
+				default:
+					return fmt.Sprintf("row %d button %d: %s differs", r, b, name)
+				}
+			}
+		}
+	}
+	return "a difference outside the compared fields"
 }

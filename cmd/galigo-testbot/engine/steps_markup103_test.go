@@ -156,6 +156,13 @@ func b65dMismatches() []b65dMismatch {
 		}, want: b65dP + "2 rows sent, 3 received"},
 		{name: "k row 1 url", change: func(m *tg.InlineKeyboardMarkup) { m.InlineKeyboard[1][0].URL = "https://u.example/" },
 			want: b65dP + "row 1 button 0: URL differs (sent 0 bytes, received 18 bytes)"},
+		// C3-01: four differences; the error names the first in row, button and field order.
+		{name: "l several differences", change: func(m *tg.InlineKeyboardMarkup) {
+			m.InlineKeyboard[0][0].Style = tg.ButtonStylePrimary
+			m.InlineKeyboard[0][0].CallbackData = "z"
+			m.InlineKeyboard[0][1].Text = "z"
+			m.InlineKeyboard[1][0].URL = "https://u.example/"
+		}, want: b65dP + "row 0 button 0: Style differs (sent 0 bytes, received 7 bytes)"},
 	}
 }
 

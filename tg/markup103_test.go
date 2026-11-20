@@ -107,18 +107,18 @@ func TestB65D_DecodeMember(t *testing.T) {
 }
 
 // T-dec-stop: the update decodes into the whole value and re-encodes to the same keys; the zero value keeps its two
-// required keys.
+// required keys. The chat is private, as for a real draft (C3-03); the id is fake.
 func TestB65D_DecodeStopped(t *testing.T) {
-	chat := &tg.Chat{ID: -1009876543210, Type: "supergroup"}
+	chat := &tg.Chat{ID: 987654321, Type: "private"}
 	for _, tc := range []struct {
 		name, js, again string
 		want            tg.MessageGenerationStopped
 	}{
-		{"thread", `{"update_id":1,"stopped_message_generation":{"chat":{"id":-1009876543210,"type":"supergroup"},"message_thread_id":7,"draft_id":9}}`,
-			`{"chat":{"id":-1009876543210,"type":"supergroup"},"message_thread_id":7,"draft_id":9}`,
+		{"thread", `{"update_id":1,"stopped_message_generation":{"chat":{"id":987654321,"type":"private"},"message_thread_id":7,"draft_id":9}}`,
+			`{"chat":{"id":987654321,"type":"private"},"message_thread_id":7,"draft_id":9}`,
 			tg.MessageGenerationStopped{Chat: chat, MessageThreadID: 7, DraftID: 9}},
-		{"no thread", `{"update_id":1,"stopped_message_generation":{"chat":{"id":-1009876543210,"type":"supergroup"},"draft_id":9}}`,
-			`{"chat":{"id":-1009876543210,"type":"supergroup"},"draft_id":9}`,
+		{"no thread", `{"update_id":1,"stopped_message_generation":{"chat":{"id":987654321,"type":"private"},"draft_id":9}}`,
+			`{"chat":{"id":987654321,"type":"private"},"draft_id":9}`,
 			tg.MessageGenerationStopped{Chat: chat, DraftID: 9}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -332,7 +332,8 @@ func TestB65D_S75RunNoLeak(t *testing.T) {
 }
 
 // b65dEchoServer is a mock Bot API for S75 on the real adapter (C1-01): sendMessage replies with a message whose
-// reply_markup is the request's own reply_markup, changed by change; deleteMessage replies true.
+// reply_markup is the request's own reply_markup, changed by change; a markup that change leaves empty is left out
+// of the reply (C3-02); deleteMessage replies true.
 func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTelegramServer {
 	t.Helper()
 	server := testutil.NewMockServer(t)
@@ -346,8 +347,11 @@ func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTel
 		if change != nil {
 			change(markup)
 		}
-		testutil.ReplyOK(w, map[string]any{"message_id": 42, "date": 1,
-			"chat": map[string]any{"id": req["chat_id"], "type": "supergroup"}, "reply_markup": markup})
+		reply := map[string]any{"message_id": 42, "date": 1, "chat": map[string]any{"id": req["chat_id"], "type": "supergroup"}}
+		if len(markup) > 0 {
+			reply["reply_markup"] = markup
+		}
+		testutil.ReplyOK(w, reply)
 	})
 	server.On("/bot"+testutil.TestToken+"/deleteMessage", func(w http.ResponseWriter, _ *http.Request) {
 		testutil.ReplyOK(w, true)
@@ -357,7 +361,7 @@ func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTel
 
 // T-run on the real adapter (C1-01): S75 through engine.SenderAdapter and sender.Client against a mock HTTP server.
 // The exact sendMessage body carries the whole 10.3 markup; the echo passes, and a reply without force_reply or
-// without a button's disabled fails (C2-04), with the message still deleted.
+// without a button's disabled (C2-04), or without reply_markup (C3-02), fails, with the message still deleted.
 func TestB65D_S75RealAdapter(t *testing.T) {
 	const wantSend = `{"chat_id":-1009876543210,"text":"galigo 10.3 reply markup","reply_markup":{"inline_keyboard":` +
 		`[[{"text":"callback","callback_data":"s75"},{"text":"off","disabled":{}}]],"force_reply":true}}`
@@ -372,6 +376,7 @@ func TestB65D_S75RealAdapter(t *testing.T) {
 		{"disabled dropped", func(m map[string]any) {
 			delete(m["inline_keyboard"].([]any)[0].([]any)[1].(map[string]any), "disabled")
 		}, "sendMessage (reply markup): the reply markup differs: row 0 button 1: Disabled differs (sent set=true, received set=false)"},
+		{"reply markup omitted", func(m map[string]any) { clear(m) }, "sendMessage (reply markup): the reply has no reply markup"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := b65dEchoServer(t, tc.change)

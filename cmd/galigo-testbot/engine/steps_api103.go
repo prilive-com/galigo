@@ -123,8 +123,7 @@ func (s *SendReplyMarkupEchoStep) Name() string { return "sendMessage (reply mar
 
 func (s *SendReplyMarkupEchoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	res := &StepResult{StepName: s.Name(), Method: "sendMessage"}
-	markup := s.Markup
-	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithReplyMarkup(&markup))
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithReplyMarkup(&s.Markup))
 	if err != nil {
 		return res, err
 	}

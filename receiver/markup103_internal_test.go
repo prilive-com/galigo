@@ -19,7 +19,7 @@ import (
 // PollingClient, read from its updates channel. Ids are fake.
 
 const (
-	b65dStopBody = `{"update_id":1,"stopped_message_generation":{"chat":{"id":-1009876543210,"type":"supergroup"},` +
+	b65dStopBody = `{"update_id":1,"stopped_message_generation":{"chat":{"id":987654321,"type":"private"},` + // C3-03: a draft's chat
 		`"message_thread_id":7,"draft_id":9}}`
 	b65dJoinedBody = `{"update_id":2,"message":{"message_id":42,"date":1,"chat":{"id":-1009876543210,"type":"supergroup"},` +
 		`"community_chat_joined":{"community":{"id":4503599627370495,"name":"c"}}}}`
@@ -27,7 +27,7 @@ const (
 
 func b65dWantStop() tg.Update {
 	return tg.Update{UpdateID: 1, StoppedMessageGeneration: &tg.MessageGenerationStopped{
-		Chat: &tg.Chat{ID: -1009876543210, Type: "supergroup"}, MessageThreadID: 7, DraftID: 9}}
+		Chat: &tg.Chat{ID: 987654321, Type: "private"}, MessageThreadID: 7, DraftID: 9}}
 }
 
 func b65dWantJoined() tg.Update {

@@ -30,6 +30,16 @@ type Update struct {
 	// MessageSig.
 	GuestMessage *Message                `json:"guest_message,omitempty"`
 	Subscription *BotSubscriptionUpdated `json:"subscription,omitempty"` // 10.2
+	// StoppedMessageGeneration (Bot API 10.3): a user stopped the generation of a message draft sent with can_stop.
+	StoppedMessageGeneration *MessageGenerationStopped `json:"-"`
+}
+
+// MessageGenerationStopped is an update: a user pressed the stop button of a message draft sent with can_stop.
+// Added in Bot API 10.3.
+type MessageGenerationStopped struct {
+	Chat            *Chat `json:"-"` // the chat in which the message is generated
+	MessageThreadID int   `json:"-"` // the message thread, if any
+	DraftID         int   `json:"-"` // the draft that was stopped
 }
 
 // CallbackQuery represents an incoming callback query from an inline keyboard.

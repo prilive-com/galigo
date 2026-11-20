@@ -62,6 +62,7 @@ type ChatMemberAdministrator struct {
 	CanManageTopics         *bool  `json:"can_manage_topics,omitempty"`
 	CanManageDirectMessages *bool  `json:"can_manage_direct_messages,omitempty"`
 	CanManageTags           *bool  `json:"can_manage_tags,omitempty"` // 9.5
+	CanSendWelcomeMessages  bool   `json:"-"`                         // 10.3
 	CustomTitle             string `json:"custom_title,omitempty"`
 }
 

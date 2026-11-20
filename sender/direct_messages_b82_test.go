@@ -149,10 +149,10 @@ func TestB82_PromoteWire(t *testing.T) {
 	demoteBody := map[string]string{"chat_id": wireChatID, "user_id": "456"}
 	for _, k := range []string{"can_manage_chat", "can_delete_messages", "can_manage_video_chats", "can_restrict_members",
 		"can_promote_members", "can_change_info", "can_invite_users", "can_post_messages", "can_edit_messages",
-		"can_pin_messages", "can_manage_tags", "can_manage_direct_messages"} {
+		"can_pin_messages", "can_manage_tags", "can_manage_direct_messages", "can_send_welcome_messages"} {
 		demoteBody[k] = "false"
 	}
-	// the 13 other options with their keys (the combined-option leaves below)
+	// the 14 other options with their keys (the combined-option leaves below)
 	others := []struct {
 		opt func(bool) sender.PromoteOption
 		key string
@@ -163,7 +163,7 @@ func TestB82_PromoteWire(t *testing.T) {
 		{sender.WithCanChangeInfo, "can_change_info"}, {sender.WithCanInviteUsers, "can_invite_users"},
 		{sender.WithCanPostMessages, "can_post_messages"}, {sender.WithCanEditMessages, "can_edit_messages"},
 		{sender.WithCanPinMessages, "can_pin_messages"}, {sender.WithCanManageTopics, "can_manage_topics"},
-		{sender.WithCanManageTags, "can_manage_tags"},
+		{sender.WithCanManageTags, "can_manage_tags"}, {sender.WithCanSendWelcomeMessages, "can_send_welcome_messages"}, // B-65 65d
 	}
 	// rightsNilOthers sets every right of tg.ChatAdministratorRights except the new one by reflection: the i-th other
 	// right gets val(i, isPointer); a pointer right points to that value, or stays nil when val returns nil (a plain bool
@@ -213,7 +213,7 @@ func TestB82_PromoteWire(t *testing.T) {
 		name string
 		call func(ctx context.Context, c *sender.Client) error
 		want string            // "true", "false" or "" (absent)
-		only bool              // the body holds only chat_id, user_id and this right (options only: WithRights always sends the 8 plain bools of tg.ChatAdministratorRights)
+		only bool              // the body holds only chat_id, user_id and this right (options only: WithRights always sends the 9 plain bools of tg.ChatAdministratorRights; B-65 65d: 8 -> 9)
 		body map[string]string // the whole body, when set
 	}{
 		{"option true", func(ctx context.Context, c *sender.Client) error {
@@ -286,7 +286,7 @@ func TestB82_PromoteWire(t *testing.T) {
 		})
 	}
 
-	// The combined-option leaves: PromoteChatMember with the 13 other options and WithCanManageDirectMessages, the new
+	// The combined-option leaves: PromoteChatMember with the 14 other options (B-65 65d: 13 -> 14) and WithCanManageDirectMessages, the new
 	// option last or first, its value true or false. Each leaf runs the passes "others all true", "others all false"
 	// and one pass per other option with only that one true, so no other value is tied to the new value, to the order
 	// or to another option; every pass compares the whole body, as arguments and as raw JSON. So an
@@ -339,16 +339,16 @@ func TestB82_PromoteWire(t *testing.T) {
 	}
 
 	// The nil-right leaf: WithRights with the new right
-	// nil and the 16 other rights (8 plain bools, 8 pointers) in these passes: all true; all false; exactly one true
-	// (16); exactly one false (16); every pointer right nil with the plain rights all true, and all false (the second is
+	// nil and the 17 other rights (9 plain bools, 8 pointers) in these passes: all true; all false; exactly one true
+	// (17); exactly one false (17); every pointer right nil with the plain rights all true, and all false (the second is
 	// tg.ChatAdministratorRights{}); exactly one pointer right nil, the others true (8). Every pass compares the whole
-	// body, as arguments and as raw JSON. So a fallback for a nil new right fails when it fires in one of these 44
-	// passes. Not run: the other true/false combinations of the 16 rights, nil patterns other than all pointer rights
+	// body, as arguments and as raw JSON. So a fallback for a nil new right fails when it fires in one of these 46
+	// passes. Not run: the other true/false combinations of the 17 rights, nil patterns other than all pointer rights
 	// nil or one pointer right nil with the others true, and their crosses (for example one pointer right nil and
 	// another false); a fallback that fires only there passes.
 	t.Run("rights nil others each", func(t *testing.T) {
 		// in this leaf, not in the parent: a failure here must not stop the other leaves (mutant MC-new-right-in-tg)
-		require.Len(t, otherRightKeys, 16, "the other rights of tg.ChatAdministratorRights")
+		require.Len(t, otherRightKeys, 17, "the other rights of tg.ChatAdministratorRights") // B-65 65d: 16 -> 17
 		type nilPass struct {
 			name string
 			val  func(i int, isPointer bool) *bool
@@ -382,7 +382,7 @@ func TestB82_PromoteWire(t *testing.T) {
 				}})
 			}
 		}
-		require.Len(t, passes, 44)
+		require.Len(t, passes, 46) // B-65 65d: 44 -> 46 (a plain bool right: only and all-but)
 		for _, p := range passes {
 			rights, want, _, _ := rightsNilOthers(t, p.val)
 			mediaType, args, _, raw, err := b48c1WireCall(t, "promoteChatMember", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, true) },

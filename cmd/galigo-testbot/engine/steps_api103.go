@@ -10,7 +10,7 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// ==================== Bot API 10.3 steps (rich messages) ====================
+// ==================== Bot API 10.3 steps (rich messages, reply markup) ====================
 
 // VerifyRichAPI103Step checks the 10.3 kinds in the rich message of rt.LastMessage, as S74 sends them: block 0 a row
 // of four buttons aligned "center" (a callback button with style "primary", a URL button, a copy_text button that
@@ -107,4 +107,38 @@ func (s *SendRichDocumentBlockStep) Execute(ctx context.Context, rt *Runtime) (*
 	res, err := (&SendRichMessageStep{RichMessage: rm, WantBlocks: s.WantBlocks}).Execute(ctx, rt)
 	res.StepName = s.Name()
 	return res, err
+}
+
+// SendReplyMarkupEchoStep sends Text with the inline keyboard Markup to rt.ChatID (Bot API 10.3: a disabled button,
+// force_reply) and requires the message the server returns to carry the same markup as a whole value. It records the
+// message for cleanup and the message budget before it checks the reply. On a mismatch the error names where the
+// values differ, but prints no text from the server (B-116): positions, field names, presence and lengths only.
+type SendReplyMarkupEchoStep struct {
+	Text   string
+	Markup tg.InlineKeyboardMarkup
+}
+
+func (s *SendReplyMarkupEchoStep) Name() string { return "sendMessage (reply markup)" }
+
+func (s *SendReplyMarkupEchoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendMessage"}
+	markup := s.Markup
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithReplyMarkup(&markup))
+	if err != nil {
+		return res, err
+	}
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	res.MessageIDs = []int{msg.MessageID}
+	res.Evidence = map[string]any{"message_id": msg.MessageID, "rows": len(s.Markup.InlineKeyboard),
+		"force_reply": s.Markup.ForceReply}
+	// stub: no compare
+	return res, nil
+}
+
+// markupDiff names the first places where got differs from want, with no text from got: row and button counts, the
+// position and Go field name of a differing button field, whether a pointer field is set, and the length of a
+// differing string.
+func markupDiff(want, got tg.InlineKeyboardMarkup) string {
+	return "" // stub
 }

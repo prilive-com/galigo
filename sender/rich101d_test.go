@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -485,7 +486,38 @@ func TestAPI101D_RequestShapes(t *testing.T) {
 		{"MessageThreadID", "int", "message_thread_id,omitempty"},
 		{"DraftID", "int", "draft_id"},
 		{"RichMessage", "tg.InputRichMessage", "rich_message"},
+		{"CanStop", "bool", "can_stop,omitempty"},        // B-65 65d
+		{"KeepOnStop", "bool", "keep_on_stop,omitempty"}, // B-65 65d
 	}, api101dFields(sender.SendRichMessageDraftRequest{}))
+	// B-65 65d (X-T3-09): the whole field lists of the two other requests with a new 10.3 field, and no embedded field.
+	assert.Equal(t, []api101dField{
+		{"ChatID", "interface {}", "chat_id"},
+		{"DraftID", "int", "draft_id"},
+		{"Text", "string", "text"},
+		{"MessageThreadID", "int", "message_thread_id,omitempty"},
+		{"ParseMode", "tg.ParseMode", "parse_mode,omitempty"},
+		{"Entities", "[]tg.MessageEntity", "entities,omitempty"},
+		{"CanStop", "bool", "can_stop,omitempty"},
+		{"KeepOnStop", "bool", "keep_on_stop,omitempty"},
+	}, api101dFields(sender.SendMessageDraftRequest{}))
+	promote := []api101dField{{"ChatID", "interface {}", "chat_id"}, {"UserID", "int64", "user_id"}}
+	for _, k := range []string{"IsAnonymous/is_anonymous", "CanManageChat/can_manage_chat", "CanDeleteMessages/can_delete_messages",
+		"CanManageVideoChats/can_manage_video_chats", "CanRestrictMembers/can_restrict_members",
+		"CanPromoteMembers/can_promote_members", "CanChangeInfo/can_change_info", "CanInviteUsers/can_invite_users",
+		"CanPostMessages/can_post_messages", "CanEditMessages/can_edit_messages", "CanPinMessages/can_pin_messages",
+		"CanPostStories/can_post_stories", "CanEditStories/can_edit_stories", "CanDeleteStories/can_delete_stories",
+		"CanManageTopics/can_manage_topics", "CanManageTags/can_manage_tags",
+		"CanManageDirectMessages/can_manage_direct_messages", "CanSendWelcomeMessages/can_send_welcome_messages"} {
+		name, tag, _ := strings.Cut(k, "/")
+		promote = append(promote, api101dField{name, "*bool", tag + ",omitempty"})
+	}
+	assert.Equal(t, promote, api101dFields(sender.PromoteChatMemberRequest{}))
+	for _, v := range []any{sender.SendMessageDraftRequest{}, sender.SendRichMessageDraftRequest{}, sender.PromoteChatMemberRequest{}} {
+		rt := reflect.TypeOf(v)
+		for i := range rt.NumField() {
+			assert.False(t, rt.Field(i).Anonymous, "%s.%s must be a named field, not embedded", rt, rt.Field(i).Name)
+		}
+	}
 }
 
 // T-irc-3

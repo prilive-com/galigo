@@ -522,4 +522,10 @@ type SendMessageDraftRequest struct {
 	MessageThreadID int                `json:"message_thread_id,omitempty"`
 	ParseMode       tg.ParseMode       `json:"parse_mode,omitempty"`
 	Entities        []tg.MessageEntity `json:"entities,omitempty"`
+	// CanStop (Bot API 10.3) shows the user a button to stop further drafts; the bot gets
+	// Update.StoppedMessageGeneration when the user presses it. KeepOnStop keeps the draft in the chat when the button
+	// is pressed; the draft still disappears after a short time or when the bot sends a message, so send it as a new
+	// message to keep it.
+	CanStop    bool `json:"-"`
+	KeepOnStop bool `json:"-"`
 }

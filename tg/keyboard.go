@@ -9,6 +9,9 @@ import (
 // InlineKeyboardMarkup represents an inline keyboard attached to a message.
 type InlineKeyboardMarkup struct {
 	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+	// ForceReply (Bot API 10.3) shows the reply interface to the user, as if they had selected the bot's message and
+	// tapped Reply. An edit of an inline keyboard cannot change it.
+	ForceReply bool `json:"-"`
 }
 
 // InlineKeyboardButton represents a button in an inline keyboard.
@@ -24,6 +27,9 @@ type InlineKeyboardButton struct {
 	SwitchInlineQueryCurrentChat string                       `json:"switch_inline_query_current_chat,omitempty"`
 	SwitchInlineQueryChosenChat  *SwitchInlineQueryChosenChat `json:"switch_inline_query_chosen_chat,omitempty"`
 	Pay                          bool                         `json:"pay,omitempty"`
+	// Disabled (Bot API 10.3) makes the button do nothing. Observed 2026-11-20: with CallbackData also set, the
+	// server keeps the callback and drops Disabled.
+	Disabled *DisabledButton `json:"-"`
 }
 
 // Button style constants for InlineKeyboardButton and KeyboardButton.
@@ -319,6 +325,9 @@ type ReplyKeyboardMarkup struct {
 	OneTimeKeyboard       bool               `json:"one_time_keyboard,omitempty"`
 	InputFieldPlaceholder string             `json:"input_field_placeholder,omitempty"`
 	Selective             bool               `json:"selective,omitempty"`
+	// ForceReply (Bot API 10.3) shows the reply interface to the user, as if they had selected the bot's message and
+	// tapped Reply.
+	ForceReply bool `json:"-"`
 }
 
 // ReplyKeyboardRemove requests removal of the custom keyboard.

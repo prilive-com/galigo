@@ -18,7 +18,8 @@ type ChatAdministratorRights struct {
 	CanDeleteStories        *bool `json:"can_delete_stories,omitempty"`
 	CanManageTopics         *bool `json:"can_manage_topics,omitempty"`
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
-	CanManageTags           *bool `json:"can_manage_tags,omitempty"` // 9.5
+	CanManageTags           *bool `json:"can_manage_tags,omitempty"`           // 9.5
+	CanSendWelcomeMessages  bool  `json:"can_send_welcome_messages,omitempty"` // 10.3: send welcome messages to new members
 }
 
 // FullAdminRights returns administrator rights with all permissions enabled.

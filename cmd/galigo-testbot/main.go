@@ -324,18 +324,9 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 
 	report := evidence.NewReport()
 
-	ctx := context.Background()
-	for _, scenario := range scenarios {
-		logger.Info("running scenario", "name", scenario.Name())
-		result := runner.Run(ctx, scenario)
-		report.AddScenario(result)
-
-		if !result.Success {
-			logger.Error("scenario failed", "name", scenario.Name(), "error", result.Error)
-		}
-	}
-
-	report.Finalize()
+	ctx, stop := interruptContext()
+	defer stop()
+	runScenarios(ctx, runner, scenarios, report, logger)
 
 	// Save report
 	filename, err := report.Save(cfg.StorageDir)
@@ -350,6 +341,42 @@ func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *sl
 
 	if !report.Success {
 		os.Exit(1)
+	}
+}
+
+// interruptContext returns a context that the first SIGINT or SIGTERM cancels (B-72). The first signal also restores
+// the earlier signal handling (asynchronously), so a further signal ends the testbot when that handling ends the
+// process (the default), also during the after-stop cleanup.
+func interruptContext() (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	context.AfterFunc(ctx, stop)
+	return ctx, stop
+}
+
+// runScenarios runs the scenarios in order, adds each result to report and finalizes it. ctx is checked before each
+// scenario starts: once it is cancelled (an interrupt, B-72) no further scenario starts, and the report is marked
+// failed even if every scenario that ran passed. The scenario that was running when ctx was cancelled stops early, and
+// the runner's after-stop cleanup runs.
+func runScenarios(ctx context.Context, runner *engine.Runner, scenarios []engine.Scenario, report *evidence.Report, logger *slog.Logger) {
+	interrupted := false
+	for i, scenario := range scenarios {
+		if ctx.Err() != nil {
+			logger.Warn("run interrupted, remaining scenarios not run", "cause", context.Cause(ctx), "not_run", len(scenarios)-i)
+			interrupted = true
+			break
+		}
+		logger.Info("running scenario", "name", scenario.Name())
+		result := runner.Run(ctx, scenario)
+		report.AddScenario(result)
+
+		if !result.Success {
+			logger.Error("scenario failed", "name", scenario.Name(), "error", result.Error)
+		}
+	}
+
+	report.Finalize()
+	if interrupted {
+		report.Success = false // the run stopped early
 	}
 }
 
@@ -371,7 +398,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 		receiverCfg,
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := interruptContext()
 	defer cancel()
 
 	if err := pollingClient.Start(ctx); err != nil {
@@ -414,17 +441,7 @@ func runInteractiveSuite(cfg *config.Config, senderClient *sender.Client, logger
 
 	report := evidence.NewReport()
 
-	for _, scenario := range scenarios {
-		logger.Info("running scenario", "name", scenario.Name())
-		result := runner.Run(ctx, scenario)
-		report.AddScenario(result)
-
-		if !result.Success {
-			logger.Error("scenario failed", "name", scenario.Name(), "error", result.Error)
-		}
-	}
-
-	report.Finalize()
+	runScenarios(ctx, runner, scenarios, report, logger)
 
 	// Save report
 	filename, err := report.Save(cfg.StorageDir)

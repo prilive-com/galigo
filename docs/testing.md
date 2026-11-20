@@ -903,7 +903,17 @@ When a scenario stops before all its steps succeed (a failed step, a skip, the m
 
 The message budget (`TESTBOT_MAX_MESSAGES_PER_RUN`) counts every message and ephemeral message a step reports, also when the step then fails (some older steps report nothing when they fail, and one step can send more than the budget has left). A step that gets a 429 is not repeated once the budget is used. A scenario that reaches the budget before its `CleanupStep` stops, and the runner deletes what it left tracked.
 
-Limits: Ctrl-C ends `--run` without cleanup; a scenario whose steps all succeed but leaves something tracked keeps it for a later `CleanupStep` (an ephemeral message is dropped without a report when the next scenario starts); restore steps (webhook, chat title, photo, permissions) are not run after an early stop.
+Ctrl-C (SIGINT) and SIGTERM during `--run` (also `--run interactive`):
+
+- During a scenario's step or its pace: the scenario stops, and the runner tries once to delete what it tracked (a failed delete is named in the report, and the item may stay in the chat). No further scenario starts. The report is saved as failed, and the exit code is 1.
+- After the handler is registered and before the first scenario: an empty report is saved as failed, and the exit code is 1.
+- Between two scenarios, before the next one is admitted: no further scenario starts, the report is saved as failed, and the exit code is 1. What earlier passed scenarios still track stays, with no report line. A signal just after a scenario is admitted fails that scenario, and its cleanup after stop deletes those items (ephemeral messages excepted).
+- After the last scenario's last step and its pace: nothing is stopped.
+- A further signal, after the earlier signal handling is restored (this happens asynchronously): it ends the testbot when that handling ends the process, so the cleanup and the report can be cut short.
+- If SIGINT was ignored when the testbot started, a later SIGINT is ignored again.
+- SIGHUP (a closed terminal) still ends `--run` with no cleanup.
+
+Limits: a scenario whose steps all succeed but leaves something tracked keeps it for a later `CleanupStep` (an ephemeral message is dropped without a report when the next scenario starts); restore steps (webhook, chat title, photo, permissions) are not run after an early stop.
 
 ### Evidence Reports
 

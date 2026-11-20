@@ -58,14 +58,14 @@ func TestHandleHelp_Text(t *testing.T) {
 	}
 	assert.Equal(t, []string{"  api102 - All 10.2 tests (rich message blocks and media)"}, api102) // API102D T-tb-4, API102E
 	// B-65 65c T-routes: one api103 line under its heading.
-	assert.Contains(t, lines, "Bot API 10.3 rich messages (S74; the 10.3 ephemeral changes are in ephemeral, S73):")
+	assert.Contains(t, lines, "Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73):")
 	var api103 []string
 	for _, l := range lines {
 		if strings.HasPrefix(l, "  api103 ") {
 			api103 = append(api103, l)
 		}
 	}
-	assert.Equal(t, []string{"  api103 - Buttons, button nodes, compact tables, expandable quotations, document blocks"}, api103)
+	assert.Equal(t, []string{"  api103 - Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup"}, api103)
 
 	// B-48b2 T-help: the stars and paid-media lines.
 	assert.Contains(t, lines, "  stars             - Star balance + transactions, invoice, paid media (S21, S22, S70)")

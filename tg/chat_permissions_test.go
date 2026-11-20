@@ -119,6 +119,7 @@ func TestFullAdminRights(t *testing.T) {
 	assert.True(t, *r.CanManageDirectMessages)
 	assert.NotNil(t, r.CanManageTags)
 	assert.True(t, *r.CanManageTags)
+	assert.True(t, r.CanSendWelcomeMessages) // B-65 65d
 }
 
 func TestModeratorRights(t *testing.T) {
@@ -130,6 +131,7 @@ func TestModeratorRights(t *testing.T) {
 	assert.False(t, r.CanChangeInfo)
 	assert.NotNil(t, r.CanPinMessages)
 	assert.True(t, *r.CanPinMessages)
+	assert.False(t, r.CanSendWelcomeMessages) // B-65 65d
 }
 
 func TestContentManagerRights(t *testing.T) {
@@ -141,4 +143,5 @@ func TestContentManagerRights(t *testing.T) {
 	assert.True(t, *r.CanPostMessages)
 	assert.False(t, r.CanRestrictMembers)
 	assert.False(t, r.CanPromoteMembers)
+	assert.False(t, r.CanSendWelcomeMessages) // B-65 65d
 }

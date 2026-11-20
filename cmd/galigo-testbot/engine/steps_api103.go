@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
-// ==================== Bot API 10.3 steps (rich messages) ====================
+// ==================== Bot API 10.3 steps (rich messages, reply markup) ====================
 
 // VerifyRichAPI103Step checks the 10.3 kinds in the rich message of rt.LastMessage, as S74 sends them: block 0 a row
 // of four buttons aligned "center" (a callback button with style "primary", a URL button, a copy_text button that
@@ -107,4 +108,72 @@ func (s *SendRichDocumentBlockStep) Execute(ctx context.Context, rt *Runtime) (*
 	res, err := (&SendRichMessageStep{RichMessage: rm, WantBlocks: s.WantBlocks}).Execute(ctx, rt)
 	res.StepName = s.Name()
 	return res, err
+}
+
+// SendReplyMarkupEchoStep sends Text with the inline keyboard Markup to rt.ChatID (Bot API 10.3: a disabled button,
+// force_reply) and requires the message the server returns to carry the same markup as a whole value. It records the
+// message for cleanup and the message budget before it checks the reply. On a mismatch the error names where the
+// values differ, but prints no text from the server (B-116): positions, field names, presence and lengths only.
+type SendReplyMarkupEchoStep struct {
+	Text   string
+	Markup tg.InlineKeyboardMarkup
+}
+
+func (s *SendReplyMarkupEchoStep) Name() string { return "sendMessage (reply markup)" }
+
+func (s *SendReplyMarkupEchoStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
+	res := &StepResult{StepName: s.Name(), Method: "sendMessage"}
+	msg, err := rt.Sender.SendMessage(ctx, rt.ChatID, s.Text, WithReplyMarkup(&s.Markup))
+	if err != nil {
+		return res, err
+	}
+	rt.LastMessage = msg
+	rt.TrackMessage(rt.ChatID, msg.MessageID)
+	res.MessageIDs = []int{msg.MessageID}
+	res.Evidence = map[string]any{"message_id": msg.MessageID, "rows": len(s.Markup.InlineKeyboard),
+		"force_reply": s.Markup.ForceReply}
+	switch {
+	case msg.ReplyMarkup == nil:
+		return res, errors.New("sendMessage (reply markup): the reply has no reply markup")
+	case !reflect.DeepEqual(s.Markup, *msg.ReplyMarkup):
+		return res, fmt.Errorf("sendMessage (reply markup): the reply markup differs: %s", markupDiff(s.Markup, *msg.ReplyMarkup))
+	}
+	return res, nil
+}
+
+// markupDiff names the first places where got differs from want, with no text from got: row and button counts, the
+// position and Go field name of a differing button field, whether a pointer field is set, and the length of a
+// differing string.
+func markupDiff(want, got tg.InlineKeyboardMarkup) string {
+	if want.ForceReply != got.ForceReply {
+		return fmt.Sprintf("force_reply sent %t, received %t", want.ForceReply, got.ForceReply)
+	}
+	if len(want.InlineKeyboard) != len(got.InlineKeyboard) {
+		return fmt.Sprintf("%d rows sent, %d received", len(want.InlineKeyboard), len(got.InlineKeyboard))
+	}
+	for r := range want.InlineKeyboard {
+		w, g := want.InlineKeyboard[r], got.InlineKeyboard[r]
+		if len(w) != len(g) {
+			return fmt.Sprintf("row %d: %d buttons sent, %d received", r, len(w), len(g))
+		}
+		for b := range w {
+			wv, gv := reflect.ValueOf(w[b]), reflect.ValueOf(g[b])
+			for i := range wv.NumField() {
+				wf, gf := wv.Field(i), gv.Field(i)
+				if reflect.DeepEqual(wf.Interface(), gf.Interface()) {
+					continue
+				}
+				name := wv.Type().Field(i).Name
+				switch wf.Kind() {
+				case reflect.String:
+					return fmt.Sprintf("row %d button %d: %s differs (sent %d bytes, received %d bytes)", r, b, name, wf.Len(), gf.Len())
+				case reflect.Pointer:
+					return fmt.Sprintf("row %d button %d: %s differs (sent set=%t, received set=%t)", r, b, name, !wf.IsNil(), !gf.IsNil())
+				default:
+					return fmt.Sprintf("row %d button %d: %s differs", r, b, name)
+				}
+			}
+		}
+	}
+	return "a difference outside the compared fields"
 }

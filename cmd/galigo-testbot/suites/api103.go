@@ -56,8 +56,29 @@ func S74_RichAPI103() engine.Scenario {
 	}
 }
 
-// AllAPI103Scenarios returns the Bot API 10.3 rich message scenarios (the 10.3 ephemeral changes are in
-// AllEphemeralScenarios, S73).
+// S75_ReplyMarkupAPI103 sends a message with the Bot API 10.3 reply markup (a callback button, a disabled button
+// and force_reply) and checks that the server returns the same markup.
+func S75_ReplyMarkupAPI103() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S75-ReplyMarkupAPI103",
+		ScenarioDescription: "sendMessage with a disabled button and force_reply on an inline keyboard (Bot API 10.3)",
+		CoveredMethods:      []string{"sendMessage"},
+		ScenarioTimeout:     30 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendReplyMarkupEchoStep{Text: "galigo 10.3 reply markup", Markup: tg.InlineKeyboardMarkup{
+				InlineKeyboard: [][]tg.InlineKeyboardButton{{
+					tg.Btn("callback", "s75"),
+					{Text: "off", Disabled: &tg.DisabledButton{}},
+				}},
+				ForceReply: true,
+			}},
+			&engine.CleanupStep{},
+		},
+	}
+}
+
+// AllAPI103Scenarios returns the Bot API 10.3 scenarios: S74 (rich messages) and S75 (reply markup). The 10.3
+// ephemeral changes are in AllEphemeralScenarios, S73.
 func AllAPI103Scenarios() []engine.Scenario {
-	return []engine.Scenario{S74_RichAPI103()}
+	return []engine.Scenario{S74_RichAPI103(), S75_ReplyMarkupAPI103()}
 }

@@ -3,6 +3,7 @@ package sender_test
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -251,52 +252,65 @@ func TestGetMyShortDescription(t *testing.T) {
 
 // ==================== SetMyDefaultAdministratorRights ====================
 
+// The whole body, as raw JSON: the rights object with can_send_welcome_messages false and true (B-65 65d), and
+// for_channels absent for groups.
 func TestSetMyDefaultAdministratorRights(t *testing.T) {
-	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/setMyDefaultAdministratorRights", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, true)
-	})
-
-	client := testutil.NewTestClient(t, server.BaseURL())
-	err := client.SetMyDefaultAdministratorRights(context.Background(),
-		sender.WithAdminRights(tg.ChatAdministratorRights{
-			CanDeleteMessages: true,
-			CanInviteUsers:    true,
-		}))
-	require.NoError(t, err)
+	for _, welcome := range []bool{false, true} {
+		t.Run(strconv.FormatBool(welcome), func(t *testing.T) {
+			_, _, _, raw, err := b48c1WireCall(t, "setMyDefaultAdministratorRights", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, true) },
+				func(ctx context.Context, c *sender.Client) error {
+					return c.SetMyDefaultAdministratorRights(ctx, sender.WithAdminRights(tg.ChatAdministratorRights{
+						CanDeleteMessages: true, CanInviteUsers: true, CanSendWelcomeMessages: welcome,
+					}))
+				})
+			require.NoError(t, err)
+			assertRawJSON(t, map[string]string{"rights": `{"is_anonymous":false,"can_manage_chat":false,"can_delete_messages":true,` +
+				`"can_manage_video_chats":false,"can_restrict_members":false,"can_promote_members":false,"can_change_info":false,` +
+				`"can_invite_users":true,"can_send_welcome_messages":` + strconv.FormatBool(welcome) + `}`}, raw)
+		})
+	}
 }
 
+// As above for channels: for_channels true.
 func TestSetMyDefaultAdministratorRights_ForChannels(t *testing.T) {
-	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/setMyDefaultAdministratorRights", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, true)
-	})
-
-	client := testutil.NewTestClient(t, server.BaseURL())
-	canPost := true
-	err := client.SetMyDefaultAdministratorRights(context.Background(),
-		sender.WithAdminRightsForChannels(tg.ChatAdministratorRights{
-			CanPostMessages: &canPost,
-		}))
-	require.NoError(t, err)
+	for _, welcome := range []bool{false, true} {
+		t.Run(strconv.FormatBool(welcome), func(t *testing.T) {
+			canPost := true
+			_, _, _, raw, err := b48c1WireCall(t, "setMyDefaultAdministratorRights", func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, true) },
+				func(ctx context.Context, c *sender.Client) error {
+					return c.SetMyDefaultAdministratorRights(ctx, sender.WithAdminRightsForChannels(tg.ChatAdministratorRights{
+						CanPostMessages: &canPost, CanSendWelcomeMessages: welcome,
+					}))
+				})
+			require.NoError(t, err)
+			assertRawJSON(t, map[string]string{"for_channels": "true", "rights": `{"is_anonymous":false,"can_manage_chat":false,` +
+				`"can_delete_messages":false,"can_manage_video_chats":false,"can_restrict_members":false,"can_promote_members":false,` +
+				`"can_change_info":false,"can_invite_users":false,"can_post_messages":true,"can_send_welcome_messages":` +
+				strconv.FormatBool(welcome) + `}`}, raw)
+		})
+	}
 }
 
 // ==================== GetMyDefaultAdministratorRights ====================
 
 func TestGetMyDefaultAdministratorRights(t *testing.T) {
-	server := testutil.NewMockServer(t)
-	server.On("/bot"+testutil.TestToken+"/getMyDefaultAdministratorRights", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, map[string]any{
-			"can_delete_messages": true,
-			"can_invite_users":    true,
-		})
-	})
+	for _, welcome := range []bool{true, false} { // B-65 65d: the new right in both values
+		t.Run(strconv.FormatBool(welcome), func(t *testing.T) {
+			server := testutil.NewMockServer(t)
+			server.On("/bot"+testutil.TestToken+"/getMyDefaultAdministratorRights", func(w http.ResponseWriter, r *http.Request) {
+				testutil.ReplyOK(w, map[string]any{
+					"can_delete_messages":       true,
+					"can_invite_users":          true,
+					"can_send_welcome_messages": welcome,
+				})
+			})
 
-	client := testutil.NewTestClient(t, server.BaseURL())
-	result, err := client.GetMyDefaultAdministratorRights(context.Background(), false)
-	require.NoError(t, err)
-	assert.True(t, result.CanDeleteMessages)
-	assert.True(t, result.CanInviteUsers)
+			client := testutil.NewTestClient(t, server.BaseURL())
+			result, err := client.GetMyDefaultAdministratorRights(context.Background(), false)
+			require.NoError(t, err)
+			assert.Equal(t, tg.ChatAdministratorRights{CanDeleteMessages: true, CanInviteUsers: true, CanSendWelcomeMessages: welcome}, *result)
+		})
+	}
 }
 
 // ==================== BotCommandScope Constructors ====================

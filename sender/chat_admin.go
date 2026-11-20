@@ -32,6 +32,9 @@ type PromoteChatMemberRequest struct {
 
 	// Bot API 9.2; for channels only.
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
+
+	// Bot API 10.3: manage the chat's welcome messages (a bot sends them directly).
+	CanSendWelcomeMessages *bool `json:"can_send_welcome_messages,omitempty"`
 }
 
 // SetChatAdministratorCustomTitleRequest represents a setChatAdministratorCustomTitle request.
@@ -95,6 +98,7 @@ func (c *Client) PromoteChatMemberWithRights(ctx context.Context, chatID tg.Chat
 		CanManageTags:       rights.CanManageTags,
 
 		CanManageDirectMessages: rights.CanManageDirectMessages,
+		CanSendWelcomeMessages:  &rights.CanSendWelcomeMessages,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -126,6 +130,7 @@ func (c *Client) DemoteChatMember(ctx context.Context, chatID tg.ChatID, userID 
 		CanManageTags:       &f,
 
 		CanManageDirectMessages: &f,
+		CanSendWelcomeMessages:  &f,
 	}
 
 	return c.callJSON(ctx, "promoteChatMember", req, nil, extractChatID(chatID))
@@ -253,5 +258,13 @@ func WithCanManageDirectMessages(can bool) PromoteOption {
 func WithCanManageTags(can bool) PromoteOption {
 	return func(r *PromoteChatMemberRequest) {
 		r.CanManageTags = &can
+	}
+}
+
+// WithCanSendWelcomeMessages grants the right to manage the chat's welcome messages (a bot sends them directly).
+// Added in Bot API 10.3.
+func WithCanSendWelcomeMessages(can bool) PromoteOption {
+	return func(r *PromoteChatMemberRequest) {
+		r.CanSendWelcomeMessages = &can
 	}
 }

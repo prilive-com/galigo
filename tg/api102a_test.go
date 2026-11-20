@@ -242,8 +242,8 @@ func TestAPI102A_KeyOwners(t *testing.T) {
 	}
 	sort.Strings(owners)
 	assert.Equal(t, []string{
-		"ChatFullInfo.Community", "CommunityChatAdded.Community", "Message.CommunityChatAdded",
-		"Message.CommunityChatRemoved", "Update.Subscription",
+		"ChatFullInfo.Community", "CommunityChatAdded.Community", "CommunityChatJoined.Community", // B-65 65d
+		"Message.CommunityChatAdded", "Message.CommunityChatRemoved", "Update.Subscription",
 	}, owners)
 	for _, v := range []any{tg.Message{}, tg.Chat{}, tg.ChatFullInfo{}, tg.Update{}} {
 		assert.True(t, seen[reflect.TypeOf(v)], "the walk did not reach %T", v)

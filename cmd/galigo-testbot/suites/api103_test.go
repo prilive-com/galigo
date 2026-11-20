@@ -1,10 +1,13 @@
 package suites
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net/http"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -13,19 +16,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/evidence"
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/fixtures"
 	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/sender"
 	"github.com/prilive-com/galigo/tg"
 )
 
-// Bot API 10.3 rich messages, S74 (B-65 65c, TEST-PLAN §4, rows T-sc and T-run).
+// Bot API 10.3: S74 rich messages (B-65 65c, TEST-PLAN §4, rows T-sc and T-run), S75 reply markup (B-65 65d).
 
 // T-sc: S74's name, covered method, timeout and exact steps, every sent value written out here (not taken from
 // s74Blocks), so a changed value fails this row and not only the live run.
 func TestB65C_S74Steps(t *testing.T) {
 	got := AllAPI103Scenarios()
-	require.Len(t, got, 1)
+	require.Len(t, got, 2) // B-65 65d: S74, S75
+	assert.Equal(t, "S75-ReplyMarkupAPI103", got[1].Name())
 	s := got[0]
 	assert.Equal(t, "S74-RichAPI103", s.Name())
 	assert.Equal(t, []string{"sendRichMessage"}, s.Covers())
@@ -151,4 +156,243 @@ func TestB65C_S74RunVerifyFails(t *testing.T) {
 	assert.Contains(t, res.Error, "block 1 has no button node with callback data")
 	assert.Len(t, f.sent, 1)
 	assert.Equal(t, [][2]int64{{testutil.TestChatID, 741}}, f.deleted)
+}
+
+// Bot API 10.3 reply markup, S75 (B-65 65d, TEST-PLAN §5, rows T-sc, T-run and T-run-noleak).
+
+const (
+	b65dGroup = int64(-1009876543210) // the fake test group
+	b65dAdmin = int64(777000111)      // the fake admin id: not the group
+	b65dP     = "sendMessage (reply markup): the reply markup differs: "
+)
+
+// b65dS75Markup is S75's markup, written out here (not taken from the suite), so a changed value fails T-sc.
+func b65dS75Markup() tg.InlineKeyboardMarkup {
+	return tg.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tg.InlineKeyboardButton{{
+			{Text: "callback", CallbackData: "s75"},
+			{Text: "off", Disabled: &tg.DisabledButton{}},
+		}},
+		ForceReply: true,
+	}
+}
+
+// T-sc
+func TestB65D_S75Steps(t *testing.T) {
+	s := S75_ReplyMarkupAPI103()
+	assert.Equal(t, "S75-ReplyMarkupAPI103", s.Name())
+	assert.Equal(t, []string{"sendMessage"}, s.Covers())
+	assert.Equal(t, 30*time.Second, s.Timeout())
+	assert.Equal(t, []engine.Step{
+		&engine.SendReplyMarkupEchoStep{Text: "galigo 10.3 reply markup", Markup: b65dS75Markup()},
+		&engine.CleanupStep{},
+	}, s.Steps())
+}
+
+// fake75 runs S75 on the real runner: SendMessage replies with a fresh copy of the sent markup, changed by change;
+// every send and delete is recorded.
+type fake75 struct {
+	engine.SenderClient
+	change  func(*tg.InlineKeyboardMarkup)
+	msgID   int
+	chats   []int64
+	texts   []string
+	deleted [][2]int64
+}
+
+func (f *fake75) SendMessage(_ context.Context, chatID int64, text string, opts ...engine.SendOption) (*tg.Message, error) {
+	f.chats = append(f.chats, chatID)
+	f.texts = append(f.texts, text)
+	var o engine.SendOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	msg := &tg.Message{MessageID: f.msgID, Chat: &tg.Chat{ID: chatID}}
+	if o.ReplyMarkup != nil {
+		raw, err := json.Marshal(o.ReplyMarkup)
+		if err != nil {
+			return nil, err
+		}
+		var m tg.InlineKeyboardMarkup
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return nil, err
+		}
+		if f.change != nil {
+			f.change(&m)
+		}
+		msg.ReplyMarkup = &m
+	}
+	return msg, nil
+}
+
+func (f *fake75) DeleteMessage(_ context.Context, chatID int64, messageID int) error {
+	f.deleted = append(f.deleted, [2]int64{chatID, int64(messageID)})
+	return nil
+}
+
+// b65dRun runs S75 on the real runner with a budget of 10 and returns the result, the runner and the fake.
+func b65dRun(t *testing.T, f *fake75, logger *slog.Logger) (*engine.ScenarioResult, *engine.Runner) {
+	t.Helper()
+	rt := engine.NewRuntime(f, b65dGroup, b65dAdmin)
+	runner := engine.NewRunner(rt, engine.RunnerConfig{MaxMessages: 10}, logger)
+	res := runner.Run(context.Background(), S75_ReplyMarkupAPI103())
+	return res, runner
+}
+
+// T-run (i) and (iii): the echo is ok; the planned cleanup deletes the reply's message.
+func TestB65D_S75Run(t *testing.T) {
+	for _, id := range []int{42, 81} {
+		f := &fake75{msgID: id}
+		res, runner := b65dRun(t, f, slog.New(slog.DiscardHandler))
+		require.True(t, res.Success, "%+v", res)
+		require.Len(t, res.Steps, 2)
+		echo, clean := res.Steps[0], res.Steps[1]
+		assert.Equal(t, "sendMessage (reply markup)", echo.StepName)
+		assert.Equal(t, "sendMessage", echo.Method)
+		assert.True(t, echo.Success)
+		assert.Empty(t, echo.Error)
+		assert.Equal(t, []int{id}, echo.MessageIDs)
+		assert.Equal(t, map[string]any{"message_id": id, "rows": 1, "force_reply": true}, echo.Evidence)
+		assert.Empty(t, clean.StepName)
+		assert.Equal(t, "deleteMessage", clean.Method)
+		assert.True(t, clean.Success)
+		assert.Empty(t, clean.Error)
+		assert.Empty(t, clean.MessageIDs)
+		assert.Equal(t, map[string]any{"deleted_count": 1}, clean.Evidence)
+		assert.Equal(t, []int64{b65dGroup}, f.chats)
+		assert.Equal(t, []string{"galigo 10.3 reply markup"}, f.texts)
+		assert.Equal(t, [][2]int64{{b65dGroup, int64(id)}}, f.deleted)
+		assert.Equal(t, 1, runner.MessageCount())
+	}
+}
+
+// T-run (ii): a mismatch fails the echo step; the cleanup after the stop deletes the message.
+func TestB65D_S75RunMismatch(t *testing.T) {
+	f := &fake75{msgID: 42, change: func(m *tg.InlineKeyboardMarkup) { m.InlineKeyboard[0][1].Disabled = nil }}
+	res, runner := b65dRun(t, f, slog.New(slog.DiscardHandler))
+	require.False(t, res.Success)
+	require.Len(t, res.Steps, 2)
+	echo, clean := res.Steps[0], res.Steps[1]
+	assert.Equal(t, "sendMessage (reply markup)", echo.StepName)
+	assert.False(t, echo.Success)
+	assert.Equal(t, b65dP+"row 0 button 1: Disabled differs (sent set=true, received set=false)", echo.Error)
+	assert.Equal(t, []int{42}, echo.MessageIDs)
+	assert.Equal(t, "cleanup after stop", clean.StepName)
+	assert.Equal(t, "deleteMessage", clean.Method)
+	assert.True(t, clean.Success)
+	assert.Equal(t, map[string]any{"deleted_count": 1}, clean.Evidence)
+	assert.Equal(t, [][2]int64{{b65dGroup, 42}}, f.deleted)
+	assert.Equal(t, 1, runner.MessageCount())
+}
+
+// T-run-noleak: a reply with server text in one field fails the step with an error that names only positions and
+// lengths; the text is in neither the log nor the saved report (X-P3-01). The strings are for S75's markup.
+func TestB65D_S75RunNoLeak(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*tg.InlineKeyboardMarkup)
+		want   string
+	}{
+		{"1 text", func(m *tg.InlineKeyboardMarkup) { m.InlineKeyboard[0][1].Text = "B65D-SECRET-TEXT" },
+			b65dP + "row 0 button 1: Text differs (sent 3 bytes, received 16 bytes)"},
+		{"2 callback", func(m *tg.InlineKeyboardMarkup) { m.InlineKeyboard[0][0].CallbackData = "B65D-SECRET-DATA" },
+			b65dP + "row 0 button 0: CallbackData differs (sent 3 bytes, received 16 bytes)"},
+		{"3 web app", func(m *tg.InlineKeyboardMarkup) {
+			m.InlineKeyboard[0][0].WebApp = &tg.WebAppInfo{URL: "https://B65D-SECRET-URL.example/"}
+		}, b65dP + "row 0 button 0: WebApp differs (sent set=false, received set=true)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			f := &fake75{msgID: 42, change: tc.change}
+			res, _ := b65dRun(t, f, logger)
+			report := evidence.NewReport()
+			report.AddScenario(res)
+			report.Finalize()
+			path, err := report.Save(t.TempDir())
+			require.NoError(t, err)
+			saved, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			// the positive control: the mismatch happened and was reported
+			require.False(t, res.Success)
+			require.Len(t, res.Steps, 2)
+			assert.Equal(t, tc.want, res.Steps[0].Error)
+			assert.Equal(t, "cleanup after stop", res.Steps[1].StepName)
+			assert.Equal(t, map[string]any{"deleted_count": 1}, res.Steps[1].Evidence)
+			assert.Contains(t, logs.String(), tc.want)
+			wantJSON, err := json.Marshal(tc.want)
+			require.NoError(t, err)
+			assert.Contains(t, string(saved), string(wantJSON[1:len(wantJSON)-1]))
+
+			assert.NotContains(t, logs.String(), "B65D-SECRET")
+			assert.NotContains(t, string(saved), "B65D-SECRET")
+		})
+	}
+}
+
+// b65dEchoServer is a mock Bot API for S75 on the real adapter (C1-01): sendMessage replies with a message whose
+// reply_markup is the request's own reply_markup, changed by change; a markup that change leaves empty is left out
+// of the reply (C3-02); deleteMessage replies true.
+func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTelegramServer {
+	t.Helper()
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			testutil.ReplyBadRequest(w, "bad body")
+			return
+		}
+		markup, _ := req["reply_markup"].(map[string]any)
+		if change != nil {
+			change(markup)
+		}
+		reply := map[string]any{"message_id": 42, "date": 1, "chat": map[string]any{"id": req["chat_id"], "type": "supergroup"}}
+		if len(markup) > 0 {
+			reply["reply_markup"] = markup
+		}
+		testutil.ReplyOK(w, reply)
+	})
+	server.On("/bot"+testutil.TestToken+"/deleteMessage", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+	return server
+}
+
+// T-run on the real adapter (C1-01): S75 through engine.SenderAdapter and sender.Client against a mock HTTP server.
+// The exact sendMessage body carries the whole 10.3 markup; the echo passes, and a reply without force_reply or
+// without a button's disabled (C2-04), or without reply_markup (C3-02), fails, with the message still deleted.
+func TestB65D_S75RealAdapter(t *testing.T) {
+	const wantSend = `{"chat_id":-1009876543210,"text":"galigo 10.3 reply markup","reply_markup":{"inline_keyboard":` +
+		`[[{"text":"callback","callback_data":"s75"},{"text":"off","disabled":{}}]],"force_reply":true}}`
+	for _, tc := range []struct {
+		name   string
+		change func(map[string]any)
+		want   string // the echo step's whole error; "" = success
+	}{
+		{"echo", nil, ""},
+		{"force_reply dropped", func(m map[string]any) { delete(m, "force_reply") },
+			"sendMessage (reply markup): the reply markup differs: force_reply sent true, received false"},
+		{"disabled dropped", func(m map[string]any) {
+			delete(m["inline_keyboard"].([]any)[0].([]any)[1].(map[string]any), "disabled")
+		}, "sendMessage (reply markup): the reply markup differs: row 0 button 1: Disabled differs (sent set=true, received set=false)"},
+		{"reply markup omitted", func(m map[string]any) { clear(m) }, "sendMessage (reply markup): the reply has no reply markup"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := b65dEchoServer(t, tc.change)
+			rt := engine.NewRuntime(engine.NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), b65dGroup, b65dAdmin)
+			res := engine.NewRunner(rt, engine.RunnerConfig{MaxMessages: 10}, slog.New(slog.DiscardHandler)).
+				Run(context.Background(), S75_ReplyMarkupAPI103())
+			require.Equal(t, 2, server.CaptureCount())
+			server.CaptureAt(0).AssertPath(t, "/bot"+testutil.TestToken+"/sendMessage")
+			assert.JSONEq(t, wantSend, server.CaptureAt(0).BodyString())
+			server.CaptureAt(1).AssertPath(t, "/bot"+testutil.TestToken+"/deleteMessage")
+			assert.JSONEq(t, `{"chat_id":-1009876543210,"message_id":42}`, server.CaptureAt(1).BodyString())
+			require.Len(t, res.Steps, 2)
+			assert.Equal(t, tc.want == "", res.Success, "%+v", res)
+			assert.Equal(t, tc.want, res.Steps[0].Error)
+			assert.Equal(t, []int{42}, res.Steps[0].MessageIDs)
+			assert.Equal(t, map[string]any{"deleted_count": 1}, res.Steps[1].Evidence)
+		})
+	}
 }

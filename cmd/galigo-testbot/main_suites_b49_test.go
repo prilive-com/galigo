@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -181,6 +182,25 @@ func TestB49_SuiteRoutes(t *testing.T) {
 			assert.Equal(t, want, b49Names(got), in)
 		}
 	}
+}
+
+// T-routes (B-65 65d): the 10.3 labels select S74 then S75, and all holds the pair in that order; the names are
+// written out here, not taken from the builders, so S75 missing from AllAPI103Scenarios fails this row.
+func TestB65D_SuiteRoutesAPI103(t *testing.T) {
+	pair := []string{"S74-RichAPI103", "S75-ReplyMarkupAPI103"}
+	for _, in := range []string{"api103", "api-103", "10.3"} {
+		got, ok := suiteScenarios(in)
+		require.True(t, ok, in)
+		assert.Equal(t, pair, b49Names(got), in)
+	}
+	got, ok := suiteScenarios("all")
+	require.True(t, ok)
+	names := b49Names(got)
+	i := slices.Index(names, pair[0])
+	require.GreaterOrEqual(t, i, 0, "all has no S74")
+	require.Less(t, i+1, len(names), "all ends at S74")
+	assert.Equal(t, pair, names[i:i+2])
+	assert.Equal(t, 1, strings.Count(strings.Join(names, ","), pair[1]))
 }
 
 // T-refuse: names suiteScenarios does not select, including the two each caller runs itself.

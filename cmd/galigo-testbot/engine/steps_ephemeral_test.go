@@ -64,6 +64,8 @@ type b65aFake struct {
 	replies []string // callback query ids of SendEphemeralReply
 	reply   b65aResp
 	nextEph int
+	edits   []any            // B-65 65b: the requests of the four edit methods, in order (steps_ephemeral_b65b_test.go)
+	editErr map[string]error // B-65 65b: the error each edit method returns, by method name
 }
 
 func newB65aFake() *b65aFake { return &b65aFake{b30Fake: newB30Fake(), nextEph: 9} }
@@ -173,12 +175,12 @@ func b65aArgs(t *testing.T, c *testutil.Capture) map[string]string {
 		if err != nil {
 			break
 		}
-		if part.FileName() != "" {
-			out["file:"+part.FormName()] = part.FileName()
-			continue
-		}
 		b, err := io.ReadAll(part)
 		require.NoError(t, err)
+		if part.FileName() != "" { // B-65 65b: the file name and the bytes
+			out["file:"+part.FormName()] = part.FileName() + "\x00" + string(b)
+			continue
+		}
 		out[part.FormName()] = string(b)
 	}
 	return out
@@ -849,12 +851,16 @@ func TestB65A_NoEphemeralCarry(t *testing.T) {
 }
 
 // b65aS73 runs the real S73 steps (the suites package imports engine, so the scenario is rebuilt here; T-sc checks
-// that suites.S73_EphemeralMessages has exactly these steps).
+// that suites.S73_EphemeralMessages has exactly these steps). B-65 65b: the four edit steps.
 func b65aS73() Scenario {
-	return &BaseScenario{ScenarioName: "S73", ScenarioTimeout: 60 * time.Second, ScenarioSteps: []Step{
+	return &BaseScenario{ScenarioName: "S73", ScenarioTimeout: 90 * time.Second, ScenarioSteps: []Step{
 		&EphemeralReplyStep{CallbackQueryID: "65000000000000001"},
 		&SendEphemeralStep{Method: "sendMessage"},
+		&EditEphemeralStep{Method: "editEphemeralMessageText"},
+		&EditEphemeralStep{Method: "editEphemeralMessageReplyMarkup"},
 		&SendEphemeralStep{Method: "sendPhoto"},
+		&EditEphemeralStep{Method: "editEphemeralMessageCaption"},
+		&EditEphemeralStep{Method: "editEphemeralMessageMedia"},
 		&CleanupStep{},
 	}}
 }
@@ -876,10 +882,11 @@ func TestB65A_RunnerS73(t *testing.T) {
 		assert.Equal(t, map[string]any{"deleted_count": 0, "ephemeral_deleted": 2}, evMap(t, lastStep(res)))
 		assert.Equal(t, 2, r.messageCount)
 		assert.Empty(t, rt.ephemeralMessages)
+		assert.Len(t, f.edits, 4, "B-65 65b: the four edits")
 		// The report key the live checker reads (register O1-07): the two sends name their ids, the other steps
-		// have no key.
-		require.Len(t, res.Steps, 4)
-		for i, want := range []string{"", "[9]", "[10]", ""} {
+		// have no key (B-65 65b: the four edits neither).
+		require.Len(t, res.Steps, 8)
+		for i, want := range []string{"", "[9]", "", "", "[10]", "", "", ""} {
 			b, err := json.Marshal(res.Steps[i])
 			require.NoError(t, err)
 			var raw map[string]json.RawMessage
@@ -898,6 +905,7 @@ func TestB65A_RunnerS73(t *testing.T) {
 		res := r.Run(context.Background(), b65aS73())
 		require.True(t, res.Success, res.Error)
 		assert.Len(t, f.sent, 2, "one send per method")
+		assert.Len(t, f.edits, 4, "B-65 65b: the four edits, once each")
 		assert.Equal(t, []string{ephKey(b30Chat, b65aAdmin, 9), ephKey(b30Chat, b65aAdmin, 10), ephKey(b30Chat, b65aAdmin, 9)}, f.keys())
 		assert.Equal(t, map[string]any{"deleted_count": 0, "ephemeral_deleted": 2}, evMap(t, lastStep(res)))
 		assert.Empty(t, rt.ephemeralMessages)
@@ -910,6 +918,7 @@ func TestB65A_RunnerS73(t *testing.T) {
 		assert.Contains(t, res.Error, "message budget exceeded (1)")
 		require.Len(t, f.sent, 1)
 		assert.Equal(t, "sendMessage", f.sent[0].method)
+		assert.Empty(t, f.edits, "B-65 65b: the budget check before the text edit stops the run")
 		assert.Equal(t, []string{ephKey(b30Chat, b65aAdmin, 9)}, f.keys())
 		assert.Equal(t, map[string]any{"deleted_count": 0, "ephemeral_deleted": 1}, evMap(t, lastStep(res)))
 	})
@@ -919,6 +928,7 @@ func TestB65A_RunnerS73(t *testing.T) {
 		res := r.Run(context.Background(), b65aS73())
 		assert.False(t, res.Success)
 		assert.Len(t, f.sent, 2)
+		assert.Len(t, f.edits, 2, "B-65 65b: the text edits run; the check before the caption edit stops the run")
 		s := lastStep(res)
 		require.Equal(t, "cleanup after stop", s.StepName)
 		assert.Equal(t, map[string]any{"deleted_count": 0, "ephemeral_deleted": 2}, evMap(t, s))
@@ -931,6 +941,10 @@ func TestB65A_RunnerS73(t *testing.T) {
 		res := r.Run(context.Background(), b65aS73())
 		assert.False(t, res.Success)
 		assert.Equal(t, []string{ephKey(b30Chat, b65aAdmin, 9)}, f.keys())
+		require.Len(t, f.edits, 2, "B-65 65b: the two edits of the first message, none after the failed send")
+		for _, e := range f.edits {
+			assert.Contains(t, fmt.Sprintf("%+v", e), "EphemeralMessageID:9 ")
+		}
 	})
 	t.Run("not_admin", func(t *testing.T) {
 		f := newFake()
@@ -940,6 +954,7 @@ func TestB65A_RunnerS73(t *testing.T) {
 		assert.True(t, res.Skipped)
 		assert.Equal(t, []string{"65000000000000001"}, f.replies)
 		assert.Empty(t, f.sent)
+		assert.Empty(t, f.edits)
 		assert.False(t, hasCleanupAfterStop(res))
 	})
 	t.Run("wrong_receiver", func(t *testing.T) {
@@ -949,6 +964,7 @@ func TestB65A_RunnerS73(t *testing.T) {
 		res := r.Run(context.Background(), b65aS73())
 		assert.False(t, res.Success)
 		assert.Equal(t, 1, r.messageCount, "the failed step's send counts")
+		assert.Empty(t, f.edits, "B-65 65b: no edit after the failed send")
 		assert.Equal(t, []string{ephKey(b30Chat, b65aOther, 9)}, f.keys(), "deleted for the receiver the server named")
 	})
 }

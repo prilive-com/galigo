@@ -118,9 +118,10 @@ func TestAPI102C_EditText(t *testing.T) {
 		})
 }
 
-// T-txt-2: text is required, so an empty text is sent as ""; no optional key is sent.
+// T-txt-2: no optional key is sent. B-65 65b: text is optional since Bot API 10.3 (required if rich_message is not
+// set), so an empty text is left out; the server answers it as it answered "text":"" (400 "message text is empty").
 func TestAPI102C_EditTextMinimal(t *testing.T) {
-	api102cJSONCall(t, "editEphemeralMessageText", `{`+api102cBody+`,"text":""}`,
+	api102cJSONCall(t, "editEphemeralMessageText", `{`+api102cBody+`}`,
 		func(ctx context.Context, c *sender.Client) error {
 			return c.EditEphemeralMessageText(ctx, sender.EditEphemeralMessageTextRequest{
 				ChatID: api102cChat, ReceiverUserID: api102cRecv, EphemeralMessageID: api102cEph})
@@ -509,18 +510,21 @@ func TestAPI102C_Shapes(t *testing.T) {
 		fields []field
 	}{
 		{reflect.TypeFor[sender.EditEphemeralMessageTextRequest](), cat(
-			field{"Text", "string", `json:"text"`}, pm,
+			field{"Text", "string", `json:"text,omitempty"`}, pm, // B-65 65b: text optional since 10.3
 			field{"Entities", "[]tg.MessageEntity", `json:"entities,omitempty"`},
+			field{"RichMessage", "*tg.InputRichMessage", `json:"rich_message,omitempty"`}, // B-65 65b
 			field{"LinkPreviewOptions", "*tg.LinkPreviewOptions", `json:"link_preview_options,omitempty"`}, rm)},
 		{reflect.TypeFor[sender.EditEphemeralMessageMediaRequest](), cat(
 			field{"Media", "sender.InputMedia", `json:"media"`}, rm)},
 		{reflect.TypeFor[sender.EditEphemeralMessageCaptionRequest](), cat(
 			field{"Caption", "string", `json:"caption,omitempty"`}, pm,
-			field{"CaptionEntities", "[]tg.MessageEntity", `json:"caption_entities,omitempty"`}, rm)},
+			field{"CaptionEntities", "[]tg.MessageEntity", `json:"caption_entities,omitempty"`},
+			field{"ShowCaptionAboveMedia", "bool", `json:"show_caption_above_media,omitempty"`}, rm)}, // B-65 65b
 		{reflect.TypeFor[sender.EditEphemeralMessageReplyMarkupRequest](), cat(rm)},
 		{reflect.TypeFor[sender.DeleteEphemeralMessageRequest](), cat()},
 	}
 	total := 0
+	keys10_3 := map[string][]string{} // B-65 65b: each 10.3 key, the request types that carry it
 	for _, r := range rows {
 		t.Run(r.typ.Name(), func(t *testing.T) {
 			require.Equal(t, len(r.fields), r.typ.NumField(), "field count")
@@ -530,8 +534,9 @@ func TestAPI102C_Shapes(t *testing.T) {
 				assert.Equal(t, want.typ, f.Type.String(), "%s type", f.Name)
 				assert.Equal(t, want.tag, string(f.Tag), "%s tag", f.Name)
 				assert.False(t, f.Anonymous, "%s is not embedded", f.Name)
-				key := strings.Split(f.Tag.Get("json"), ",")[0]
-				assert.NotContains(t, []string{"rich_message", "show_caption_above_media"}, key, "10.3 key")
+				if key := strings.Split(f.Tag.Get("json"), ",")[0]; key == "rich_message" || key == "show_caption_above_media" {
+					keys10_3[key] = append(keys10_3[key], r.typ.Name())
+				}
 			}
 			// no exported method (pattern: joinreq101b_test.go:433-434)
 			assert.Equal(t, 0, r.typ.NumMethod(), "no method on the value type")
@@ -539,8 +544,10 @@ func TestAPI102C_Shapes(t *testing.T) {
 		})
 		total += len(r.fields)
 	}
-	assert.Equal(t, 27, total)
-	assert.Equal(t, []int{8, 5, 7, 4, 3}, []int{rows[0].typ.NumField(), rows[1].typ.NumField(), rows[2].typ.NumField(),
+	assert.Equal(t, map[string][]string{"rich_message": {"EditEphemeralMessageTextRequest"},
+		"show_caption_above_media": {"EditEphemeralMessageCaptionRequest"}}, keys10_3)
+	assert.Equal(t, 29, total) // B-65 65b: 27 + RichMessage + ShowCaptionAboveMedia
+	assert.Equal(t, []int{9, 5, 8, 4, 3}, []int{rows[0].typ.NumField(), rows[1].typ.NumField(), rows[2].typ.NumField(),
 		rows[3].typ.NumField(), rows[4].typ.NumField()})
 }
 

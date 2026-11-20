@@ -686,7 +686,7 @@ go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters, approve and decline reach the server
 
 # Ephemeral messages (S73; Bot API 10.3/10.4; the bot must be an administrator of the test chat)
-go run ./cmd/galigo-testbot --run ephemeral              # ephemeral messages to the first admin, sent and deleted
+go run ./cmd/galigo-testbot --run ephemeral              # ephemeral messages to the first admin, sent, edited and deleted
 
 # Show method coverage
 go run ./cmd/galigo-testbot --status
@@ -854,9 +854,9 @@ S71 and S72 run in `--run suggested-posts` and `--run all`. A successful suggest
 
 | Scenario | Methods | Description |
 |----------|---------|-------------|
-| S73-EphemeralMessages | sendMessage, sendPhoto, deleteEphemeralMessage | First an ephemeral reply to an unknown callback query without `chat_id` (Bot API 10.4) must be refused with 400 `query is too old and response timeout expired or query ID is invalid` (`tg.ErrCallbackExpired`). Then `ephemeral_message_parameters` (10.3) with `receiver_user_id` = the first admin (`TESTBOT_ADMINS`) on the JSON path (`sendMessage`) and the form path (`sendPhoto` upload): the reply must have `message_id` 0, an `ephemeral_message_id` and `receiver_user` = the admin; the cleanup deletes both with `deleteEphemeralMessage`. A message posted for everyone fails the step, and the cleanup deletes it |
+| S73-EphemeralMessages | sendMessage, sendPhoto, editEphemeralMessageText, editEphemeralMessageReplyMarkup, editEphemeralMessageCaption, editEphemeralMessageMedia, deleteEphemeralMessage | First an ephemeral reply to an unknown callback query without `chat_id` (Bot API 10.4) must be refused with 400 `query is too old and response timeout expired or query ID is invalid` (`tg.ErrCallbackExpired`). Then `ephemeral_message_parameters` (10.3) with `receiver_user_id` = the first admin (`TESTBOT_ADMINS`) on the JSON path (`sendMessage`) and the form path (`sendPhoto` upload): the reply must have `message_id` 0, an `ephemeral_message_id` and `receiver_user` = the admin. Each is then edited with the 10.3 changes: the text message to a rich message (`rich_message`, Markdown with an uploaded photo), then its inline keyboard; the photo's caption with `show_caption_above_media`, then its media (an upload). The cleanup deletes both with `deleteEphemeralMessage`. A message posted for everyone fails the step, and the cleanup deletes it |
 
-S73 runs in `--run ephemeral` and `--run all`. The two sends need the bot to be an administrator of the test chat (an administrator bot can send an ephemeral message to any non-bot member at any time); otherwise the scenario is skipped after the reply step. S73 shows that Telegram accepts the sends for the named receiver, accepts the deletes and refuses the unknown callback query; it does not show what the admin's app displays. The server gives the same refusal when `chat_id` is set, so only the mock tests check that galigo leaves `chat_id` out. A successful ephemeral reply to a callback query needs a real button press (interactive): the mock tests check galigo's request and its handling of a fake success only.
+S73 runs in `--run ephemeral` and `--run all`. The two sends need the bot to be an administrator of the test chat (an administrator bot can send an ephemeral message to any non-bot member at any time); otherwise the scenario is skipped after the reply step. S73 shows that Telegram accepts the sends for the named receiver, accepts the edits and the deletes and refuses the unknown callback query; it does not show what the admin's app displays. The server gives the same refusal when `chat_id` is set, so only the mock tests check that galigo leaves `chat_id` out. In the same way the server answers True to an edit even when a value has the wrong type (it accepts a `show_caption_above_media` that is not a Boolean), so only the mock tests prove what galigo sends: `rich_message`, `show_caption_above_media` and the rich upload in `sender/ephemeral_edit_b65b_test.go`, the media upload in `sender/api102c_test.go`. A successful ephemeral reply to a callback query needs a real button press (interactive): the mock tests check galigo's request and its handling of a fake success only.
 
 #### Interactive (opt-in, excluded from `--run all`)
 
@@ -879,7 +879,7 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 Current registry: **101 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 88 covered methods and 14 missing. 87 of the 101 registry methods have a scenario; the 88th covered method, `getUserProfileAudios` (S39), is not in the registry. The 14 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`); the four 10.2 methods `editEphemeralMessageText`, `editEphemeralMessageMedia`, `editEphemeralMessageCaption` and `editEphemeralMessageReplyMarkup` have no live scenario yet (planned with their 10.3 changes) (`sender/api102c_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 92 covered methods and 10 missing. 91 of the 101 registry methods have a scenario; the 92nd covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -966,7 +966,7 @@ cmd/galigo-testbot/
 │   ├── steps_api100.go        # Bot API 10.0 steps (reaction deletes, can_react_to_messages, admins with bots, empty draft, live photos, polls)
 │   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
 │   ├── steps_suggested_post.go # Suggested post steps: parameters (sendMessage, sendPhoto; S71), approve and decline (S72)
-│   ├── steps_ephemeral.go # Ephemeral message steps: send to the admin (sendMessage, sendPhoto), reply without chat_id (S73)
+│   ├── steps_ephemeral.go # Ephemeral message steps: send to the admin (sendMessage, sendPhoto), edit (the four edit methods), reply without chat_id (S73)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests

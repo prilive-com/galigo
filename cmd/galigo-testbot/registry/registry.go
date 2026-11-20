@@ -174,10 +174,10 @@ var AllMethods = []Method{
 	{Name: "sendChatJoinRequestWebApp", Category: CategoryChatAdmin, Notes: "needs a join request query (guard bot)"},
 
 	// === Bot API 10.2 ===
-	{Name: "editEphemeralMessageText", Category: CategoryMessaging, Notes: "no live scenario yet (needs an ephemeral message; with the 10.3 changes)"},
-	{Name: "editEphemeralMessageMedia", Category: CategoryMessaging, Notes: "no live scenario yet (needs an ephemeral message; with the 10.3 changes)"},
-	{Name: "editEphemeralMessageCaption", Category: CategoryMessaging, Notes: "no live scenario yet (needs an ephemeral message; with the 10.3 changes)"},
-	{Name: "editEphemeralMessageReplyMarkup", Category: CategoryMessaging, Notes: "no live scenario yet (needs an ephemeral message; with the 10.3 changes)"},
+	{Name: "editEphemeralMessageText", Category: CategoryMessaging, Notes: "S73: edits the ephemeral messages it sends"},
+	{Name: "editEphemeralMessageMedia", Category: CategoryMessaging, Notes: "S73: edits the ephemeral messages it sends"},
+	{Name: "editEphemeralMessageCaption", Category: CategoryMessaging, Notes: "S73: edits the ephemeral messages it sends"},
+	{Name: "editEphemeralMessageReplyMarkup", Category: CategoryMessaging, Notes: "S73: edits the ephemeral messages it sends"},
 	{Name: "deleteEphemeralMessage", Category: CategoryMessaging, Notes: "S73: its cleanup deletes the ephemeral messages it sends"},
 
 	// === Legacy Methods ===

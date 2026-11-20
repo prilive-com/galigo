@@ -102,13 +102,13 @@ func TestB65A_MainRoutes(t *testing.T) {
 	}
 }
 
-// b65aEdits are the four ephemeral edit methods S73 does not cover.
+// b65aEdits are the four ephemeral edit methods; S73 covers them since B-65 65b.
 var b65aEdits = []string{"editEphemeralMessageText", "editEphemeralMessageMedia", "editEphemeralMessageCaption",
 	"editEphemeralMessageReplyMarkup"}
 
 // B-65 65a T-status-out (register O2-02): the real status output. `--status` (showCoverageStatus, on stdout) lists
-// deleteEphemeralMessage as covered and the four edits as missing; the bot's /status text (handleStatus, sent to a mock
-// server) lists the four edits as missing and not the delete. A status function that drops S73's group, or passes
+// deleteEphemeralMessage as covered and, since B-65 65b, the four edits as covered too; the bot's /status text
+// (handleStatus, sent to a mock server) lists neither the delete nor the edits as missing. A status function that drops S73's group, or passes
 // another list to registry.CheckCoverage, changes this output.
 // b65aCLIStatus returns the lines that showCoverageStatus prints.
 func b65aCLIStatus(t *testing.T) []string {
@@ -147,9 +147,12 @@ func TestB65A_StatusOutput(t *testing.T) {
 		lines := b65aCLIStatus(t)
 		assert.Contains(t, lines, "  + deleteEphemeralMessage")
 		assert.NotContains(t, lines, "  - deleteEphemeralMessage")
-		for _, m := range b65aEdits {
-			assert.Contains(t, lines, "  - "+m)
+		for _, m := range b65aEdits { // B-65 65b: covered by S73
+			assert.Contains(t, lines, "  + "+m)
+			assert.NotContains(t, lines, "  - "+m)
 		}
+		assert.Equal(t, "92", b65aCount(t, lines, "Covered: ", " methods")) // B-65 65b
+		assert.Equal(t, "10", b65aCount(t, lines, "Missing: ", " methods"))
 	})
 	t.Run("bot", func(t *testing.T) {
 		server := testutil.NewMockServer(t)
@@ -167,8 +170,10 @@ func TestB65A_StatusOutput(t *testing.T) {
 		assert.Contains(t, lines, "Covered: "+b65aCount(t, cli, "Covered: ", " methods"))
 		assert.Contains(t, lines, "Missing: "+b65aCount(t, cli, "Missing: ", " methods"))
 		assert.NotContains(t, lines, "  - deleteEphemeralMessage")
-		for _, m := range b65aEdits {
-			assert.Contains(t, lines, "  - "+m)
+		for _, m := range b65aEdits { // B-65 65b: covered by S73
+			assert.NotContains(t, lines, "  - "+m)
 		}
+		assert.Contains(t, lines, "Missing methods:")       // the list the edits would be in
+		assert.Contains(t, lines, "  - getManagedBotToken") // a positive control in the same format (A-T3-05)
 	})
 }

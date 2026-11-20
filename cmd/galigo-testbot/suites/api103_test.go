@@ -356,7 +356,8 @@ func b65dEchoServer(t *testing.T, change func(map[string]any)) *testutil.MockTel
 }
 
 // T-run on the real adapter (C1-01): S75 through engine.SenderAdapter and sender.Client against a mock HTTP server.
-// The exact sendMessage body carries the whole 10.3 markup; the echo passes, and a reply without force_reply fails.
+// The exact sendMessage body carries the whole 10.3 markup; the echo passes, and a reply without force_reply or
+// without a button's disabled fails (C2-04), with the message still deleted.
 func TestB65D_S75RealAdapter(t *testing.T) {
 	const wantSend = `{"chat_id":-1009876543210,"text":"galigo 10.3 reply markup","reply_markup":{"inline_keyboard":` +
 		`[[{"text":"callback","callback_data":"s75"},{"text":"off","disabled":{}}]],"force_reply":true}}`
@@ -368,6 +369,9 @@ func TestB65D_S75RealAdapter(t *testing.T) {
 		{"echo", nil, ""},
 		{"force_reply dropped", func(m map[string]any) { delete(m, "force_reply") },
 			"sendMessage (reply markup): the reply markup differs: force_reply sent true, received false"},
+		{"disabled dropped", func(m map[string]any) {
+			delete(m["inline_keyboard"].([]any)[0].([]any)[1].(map[string]any), "disabled")
+		}, "sendMessage (reply markup): the reply markup differs: row 0 button 1: Disabled differs (sent set=true, received set=false)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := b65dEchoServer(t, tc.change)

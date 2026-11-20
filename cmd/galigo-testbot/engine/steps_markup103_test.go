@@ -206,6 +206,23 @@ func TestB65D_StepNoLeak(t *testing.T) {
 	}
 }
 
+// T-step-noleak with the pointer set on both sides (C2-01): the received pointer's contents are not printed.
+func TestB65D_StepNoLeakBothSet(t *testing.T) {
+	markup := func(url string) tg.InlineKeyboardMarkup {
+		return tg.InlineKeyboardMarkup{InlineKeyboard: [][]tg.InlineKeyboardButton{{{Text: "w", WebApp: &tg.WebAppInfo{URL: url}}}}}
+	}
+	f := &fakeMarkup{reply: func() *tg.InlineKeyboardMarkup { m := markup("https://B65D-SECRET-URL.example/"); return &m }}
+	rt := NewRuntime(f, b65dGroup, b65dAdmin)
+	step := &SendReplyMarkupEchoStep{Text: b65dText, Markup: markup("https://w.example/")}
+	res, err := step.Execute(context.Background(), rt)
+	require.Error(t, err)
+	assert.Equal(t, b65dP+"row 0 button 0: WebApp differs (sent set=true, received set=true)", err.Error())
+	assert.NotContains(t, err.Error(), "B65D-SECRET")
+	assert.NotContains(t, fmt.Sprintf("%v", res.Evidence), "B65D-SECRET")
+	assert.Equal(t, []CreatedMessage{{ChatID: b65dGroup, MessageID: b65dMsgID}}, rt.CreatedMessages)
+	assert.Equal(t, map[string]any{"message_id": b65dMsgID, "rows": 1, "force_reply": false}, res.Evidence)
+}
+
 // T-step-senderr (guard): a send error is returned; nothing is tracked or reported.
 func TestB65D_StepSendError(t *testing.T) {
 	sendErr := errors.New("send failed")

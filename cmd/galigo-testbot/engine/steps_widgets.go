@@ -21,7 +21,8 @@ const (
 	WidgetInlineInvalid   = "invalid inline message identifier specified"
 )
 
-// widgetHTML is the html of the sendWidget row; the server refuses widgets for this bot before it reads the html.
+// widgetHTML is the html of the sendWidget row: with a non-empty html the server refuses widgets for this bot with
+// WidgetNotAllowed (an empty html gets a different refusal, `parameter "html" is required`).
 const widgetHTML = "<b>galigo widget</b>"
 
 // WidgetRefusalStep calls one widget method (Bot API 10.4) that the server must refuse with 400 and WantError: the

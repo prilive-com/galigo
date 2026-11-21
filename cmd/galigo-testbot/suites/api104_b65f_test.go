@@ -73,10 +73,13 @@ func TestB65F_S76Steps(t *testing.T) {
 // b65fTargetID is the target message id: odd and above 2^53 where int has 64 bits, else 70.
 func b65fTargetID() int {
 	if strconv.IntSize == 64 {
-		return 9007199254740993 // odd, above 2^53: a float64 step changes its digits; +1000000 still fits
+		return int(b65fHugeTarget) // odd, above 2^53: a float64 step changes its digits; +1000000 still fits
 	}
 	return 70
 }
+
+// b65fHugeTarget is a variable, so the file builds where int has 32 bits (a constant would overflow there).
+var b65fHugeTarget int64 = 9007199254740993
 
 // b65fWidgetBodies are S76's planned widget bodies, in order, for target id id.
 func b65fWidgetBodies(id int) []struct{ method, body, refusal string } {

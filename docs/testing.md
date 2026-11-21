@@ -896,7 +896,7 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **101 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **106 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
 `--status` reports 97 covered methods and 10 missing. 96 of the 106 registry methods have a scenario (the five widget methods of S76 are refusal-only); the 97th covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 

@@ -78,7 +78,7 @@ func TestHandleHelp_Text(t *testing.T) {
 			api104 = append(api104, l)
 		}
 	}
-	assert.Equal(t, []string{"  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)"}, api104)
+	require.Equal(t, []string{"  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)"}, api104)
 	require.Greater(t, len(lines), h104+1)
 	assert.Equal(t, api104[0], lines[h104+1], "the api104 line is under its heading")
 

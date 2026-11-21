@@ -55,4 +55,8 @@ func TestB65E_ReceiveQuery(t *testing.T) {
 func TestB65E_ReceiveShared(t *testing.T) {
 	t.Run("webhook", func(t *testing.T) { assert.Equal(t, b65eWantShared(), api102aWebhook(t, b65eSharedBody)) })
 	t.Run("polling", func(t *testing.T) { assert.Equal(t, b65eWantShared(), b65dPoll(t, b65eSharedBody)) })
+	// a shared widget query that is not the first update of a getUpdates batch (change round c3, OC3-01)
+	t.Run("polling_batch", func(t *testing.T) {
+		assert.Equal(t, []tg.Update{{UpdateID: 9}, b65eWantShared()}, b65dPollN(t, `{"update_id":9},`+b65eSharedBody, 2))
+	})
 }

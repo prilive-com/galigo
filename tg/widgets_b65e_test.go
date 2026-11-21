@@ -107,7 +107,7 @@ const (
 	b65eSticker1 = `{"file_id":"f1","file_unique_id":"u1","type":"custom_emoji","width":100,"height":101,"is_animated":true,"is_video":false}`
 	b65eSticker2 = `{"file_id":"f2","file_unique_id":"u2","type":"regular","width":102,"height":103,"is_animated":false,"is_video":true}`
 	b65eGiftHead = `{"base_name":"bn","name":"gn","number":11,` +
-		`"model":{"name":"mn","sticker":` + b65eSticker1 + `,"rarity_per_mille":12,"rarity":"rare"},` +
+		`"model":{"name":"mn","sticker":` + b65eSticker1 + `,"rarity_per_mille":0,"rarity":"rare"},` +
 		`"symbol":{"name":"sn","sticker":` + b65eSticker2 + `,"rarity_per_mille":13},` +
 		`"backdrop":{"name":"bd","colors":{"center_color":14,"edge_color":15,"symbol_color":16,"text_color":17},"rarity_per_mille":18},` +
 		`"colors":{"model_custom_emoji_id":"me","symbol_custom_emoji_id":"se","light_theme_main_color":19,` +
@@ -131,7 +131,7 @@ func b65ePositionV() tg.AreaPosition {
 func b65eCardV() *tg.TonWalletCard {
 	gift := &tg.UniqueGift{BaseName: "bn", Name: "gn", Number: 11,
 		Model: tg.UniqueGiftModel{Name: "mn", Sticker: tg.Sticker{FileID: "f1", FileUniqueID: "u1", Type: "custom_emoji",
-			Width: 100, Height: 101, IsAnimated: true}, RarityPerMille: 12, Rarity: "rare"},
+			Width: 100, Height: 101, IsAnimated: true}, RarityPerMille: 0, Rarity: "rare"},
 		Symbol: tg.UniqueGiftSymbol{Name: "sn", Sticker: tg.Sticker{FileID: "f2", FileUniqueID: "u2", Type: "regular",
 			Width: 102, Height: 103, IsVideo: true}, RarityPerMille: 13},
 		Backdrop: tg.UniqueGiftBackdrop{Name: "bd", Colors: tg.UniqueGiftBackdropColors{CenterColor: 14, EdgeColor: 15,

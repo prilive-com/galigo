@@ -39,6 +39,12 @@ func b65dWantJoined() tg.Update {
 // first update from the updates channel.
 func b65dPoll(t *testing.T, body string) tg.Update {
 	t.Helper()
+	return b65dPollN(t, body, 1)[0]
+}
+
+// b65dPollN is b65dPoll for a body of n updates: it returns the first n updates from the channel, in order (B-65 65e).
+func b65dPollN(t *testing.T, body string, n int) []tg.Update {
+	t.Helper()
 	var served atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/bot123:abc/getUpdates" {
@@ -63,13 +69,17 @@ func b65dPoll(t *testing.T, body string) tg.Update {
 	defer cancel()
 	require.NoError(t, c.Start(ctx))
 	defer c.Stop()
-	select {
-	case u := <-updates:
-		return u
-	case <-time.After(10 * time.Second):
-		t.Fatal("no update from the polling client")
-		return tg.Update{}
+	got := make([]tg.Update, 0, n)
+	for len(got) < n {
+		select {
+		case u := <-updates:
+			got = append(got, u)
+		case <-time.After(10 * time.Second):
+			t.Fatalf("%d of %d updates from the polling client", len(got), n)
+			return nil
+		}
 	}
+	return got
 }
 
 // T-recv-stop

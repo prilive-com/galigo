@@ -44,7 +44,8 @@ type WidgetQueryWallet struct {
 }
 
 // WidgetQuery is a query from a widget in a message sent by the bot or via the bot (Bot API 10.4). Answer it with
-// answerWidgetQuery. A user can send at most 5 queries per 5 seconds to the bot from all its widgets.
+// answerWidgetQuery (sender.Client.AnswerWidgetQuery). A user can send at most 5 queries per 5 seconds to the bot
+// from all its widgets.
 type WidgetQuery struct {
 	ID              string          `json:"id"`
 	From            *User           `json:"from"`
@@ -59,7 +60,8 @@ type WidgetQuery struct {
 }
 
 // SharedWidgetQuery is a query from a forwarded message with a shared widget created by the bot (Bot API 10.4).
-// Answer it with answerWidgetQuery. A user can send at most 5 queries per 5 seconds to the bot from all its widgets.
+// Answer it with answerWidgetQuery (sender.Client.AnswerWidgetQuery). A user can send at most 5 queries per 5 seconds
+// to the bot from all its widgets.
 type SharedWidgetQuery struct {
 	ID       string          `json:"id"`
 	From     *User           `json:"from"`

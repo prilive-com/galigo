@@ -178,6 +178,14 @@ var (
 	}
 )
 
+// b65fChatTags are the chat_id tags of the request types B-65 65f added after 8d762ce (a named addition: the 77-name
+// list above stays the historical one).
+var b65fChatTags = map[string]string{
+	"SendWidgetRequest":            "chat_id",
+	"SendSharedWidgetRequest":      "chat_id",
+	"EditMessageWidgetDataRequest": "chat_id,omitempty",
+}
+
 // T-census: in the sender package source, ephemeral_message_parameters is carried by exactly the 14 request types
 // (also through embedding or a type definition), and every type that had a chat_id key at 8d762ce keeps its tag,
 // except the 14, which become chat_id,omitempty: an extra omitempty on any other type fails.
@@ -264,6 +272,10 @@ func TestB65A_Census(t *testing.T) {
 	}
 	slices.Sort(tagged)
 	base := slices.Clone(b65aBaseChatTypes)
+	for name, tag := range b65fChatTags {
+		base = append(base, name)
+		assert.Equal(t, tag, chatTag[name], "chat_id tag of %s (65f)", name)
+	}
 	slices.Sort(base)
 	assert.Equal(t, base, tagged, "types with a chat_id key")
 	for _, name := range b65aBaseChatTypes {

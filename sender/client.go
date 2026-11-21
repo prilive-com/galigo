@@ -490,7 +490,8 @@ func (c *Client) ForwardMessage(ctx context.Context, req ForwardMessageRequest) 
 	return c.parseMessage(resp)
 }
 
-// CopyMessage copies a message.
+// CopyMessage copies a message. Service, paid media, giveaway, giveaway winners, invoice and widget messages (Bot
+// API 10.4) can't be copied.
 func (c *Client) CopyMessage(ctx context.Context, req CopyMessageRequest) (*tg.MessageID, error) {
 	resp, err := c.executeRequest(ctx, "copyMessage", req, extractChatID(req.ChatID))
 	if err != nil {
@@ -560,7 +561,8 @@ func (c *Client) Forward(ctx context.Context, e tg.Editable, toChatID tg.ChatID,
 	return c.ForwardMessage(ctx, req)
 }
 
-// Copy copies a message using Editable.
+// Copy copies a message using Editable. A widget message (Bot API 10.4) can't be copied, like the other kinds
+// CopyMessage names.
 func (c *Client) Copy(ctx context.Context, e tg.Editable, toChatID tg.ChatID, opts ...CopyOption) (*tg.MessageID, error) {
 	msgID, chatID := e.MessageSig()
 	if chatID == 0 {

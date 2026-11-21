@@ -284,7 +284,8 @@ func (c *Client) ForwardMessages(ctx context.Context, req ForwardMessagesRequest
 	return ids, nil
 }
 
-// CopyMessages copies multiple messages at once.
+// CopyMessages copies multiple messages at once. Messages that can't be found or copied are skipped: among them
+// service, paid media, giveaway, giveaway winners, invoice and widget messages (Bot API 10.4).
 func (c *Client) CopyMessages(ctx context.Context, req CopyMessagesRequest) ([]tg.MessageID, error) {
 	resp, err := c.executeRequest(ctx, "copyMessages", req, extractChatID(req.ChatID))
 	if err != nil {

@@ -338,7 +338,7 @@ func (b *Bot) Forward(ctx context.Context, e tg.Editable, toChatID tg.ChatID, op
 	return b.sender.Forward(ctx, e, toChatID, opts...)
 }
 
-// Copy copies a message.
+// Copy copies a message. A widget message (Bot API 10.4) can't be copied (see sender.Client.CopyMessage).
 func (b *Bot) Copy(ctx context.Context, e tg.Editable, toChatID tg.ChatID, opts ...sender.CopyOption) (*tg.MessageID, error) {
 	return b.sender.Copy(ctx, e, toChatID, opts...)
 }

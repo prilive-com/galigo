@@ -119,6 +119,9 @@ var b49Routes = []struct {
 	{"api103", suites.AllAPI103Scenarios},
 	{"api-103", suites.AllAPI103Scenarios},
 	{"10.3", suites.AllAPI103Scenarios},
+	{"api104", suites.AllAPI104Scenarios}, // B-65 65f
+	{"api-104", suites.AllAPI104Scenarios},
+	{"10.4", suites.AllAPI104Scenarios},
 	{"all", func() []engine.Scenario {
 		var s []engine.Scenario
 		for _, g := range [][]engine.Scenario{
@@ -128,6 +131,7 @@ var b49Routes = []struct {
 			suites.AllAPI94Scenarios(), suites.AllAPI95Scenarios(), suites.AllAPI96Scenarios(),
 			suites.AllAPI100Scenarios(), suites.AllAPI101Scenarios(), suites.AllAPI102Scenarios(),
 			suites.AllAPI103Scenarios(), suites.AllSuggestedPostScenarios(), suites.AllEphemeralScenarios(),
+			suites.AllAPI104Scenarios(), // B-65 65f
 		} {
 			s = append(s, g...)
 		}
@@ -137,7 +141,7 @@ var b49Routes = []struct {
 
 // b49SuiteList is the expected text after "Available suites: ", copied from the CLI's unknown-suite message at
 // 6d9160e (B-49) and kept apart from availableSuites so a changed list is seen; docs/testing.md step 5 updates both.
-const b49SuiteList = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, live-photos, all"
+const b49SuiteList = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, api104, live-photos, all"
 
 func b49Names(ss []engine.Scenario) []string {
 	names := make([]string, len(ss))

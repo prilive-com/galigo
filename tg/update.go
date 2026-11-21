@@ -13,6 +13,8 @@ type Update struct {
 	ChannelPost        *Message            `json:"channel_post,omitempty"`
 	EditedChannelPost  *Message            `json:"edited_channel_post,omitempty"`
 	CallbackQuery      *CallbackQuery      `json:"callback_query,omitempty"`
+	WidgetQuery        *WidgetQuery        `json:"widget_query,omitempty"`        // 10.4: a query from a widget in a message sent by or via the bot
+	SharedWidgetQuery  *SharedWidgetQuery  `json:"shared_widget_query,omitempty"` // 10.4: a query from a forwarded message with the bot's shared widget
 	InlineQuery        *InlineQuery        `json:"inline_query,omitempty"`
 	ChosenInlineResult *ChosenInlineResult `json:"chosen_inline_result,omitempty"`
 	ShippingQuery      *ShippingQuery      `json:"shipping_query,omitempty"`

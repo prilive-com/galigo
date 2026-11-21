@@ -11,7 +11,7 @@ type ChatPermissions struct {
 	CanSendVideoNotes     *bool `json:"can_send_video_notes,omitempty"`
 	CanSendVoiceNotes     *bool `json:"can_send_voice_notes,omitempty"`
 	CanSendPolls          *bool `json:"can_send_polls,omitempty"`
-	CanSendOtherMessages  *bool `json:"can_send_other_messages,omitempty"`
+	CanSendOtherMessages  *bool `json:"can_send_other_messages,omitempty"` // animations, games, stickers, widgets (10.4) and inline bots
 	CanAddWebPagePreviews *bool `json:"can_add_web_page_previews,omitempty"`
 	CanChangeInfo         *bool `json:"can_change_info,omitempty"`
 	CanInviteUsers        *bool `json:"can_invite_users,omitempty"`

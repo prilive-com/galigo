@@ -91,7 +91,7 @@ type ChatMemberRestricted struct {
 	CanSendVideoNotes     bool   `json:"can_send_video_notes"`
 	CanSendVoiceNotes     bool   `json:"can_send_voice_notes"`
 	CanSendPolls          bool   `json:"can_send_polls"`
-	CanSendOtherMessages  bool   `json:"can_send_other_messages"`
+	CanSendOtherMessages  bool   `json:"can_send_other_messages"` // animations, games, stickers, widgets (10.4) and inline bots
 	CanAddWebPagePreviews bool   `json:"can_add_web_page_previews"`
 	CanChangeInfo         bool   `json:"can_change_info"`
 	CanInviteUsers        bool   `json:"can_invite_users"`

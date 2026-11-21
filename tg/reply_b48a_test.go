@@ -45,6 +45,7 @@ const (
 		`"video":{"file_id":"vi","file_unique_id":"viu","width":1,"height":1,"duration":1},` +
 		`"video_note":{"file_id":"vn","file_unique_id":"vnu","length":1,"duration":1},` +
 		`"voice":{"file_id":"vo","file_unique_id":"vou","duration":1},` +
+		`"widget":{"html":"h","width":10},` +
 		`"has_media_spoiler":true,` +
 		`"checklist":{"title":"Todo","tasks":[],"others_can_add_tasks":false,"others_can_mark_tasks_as_done":false},` +
 		`"contact":{"phone_number":"+10000000000","first_name":"Con"},` +
@@ -239,6 +240,7 @@ func TestB48A_ExternalFull(t *testing.T) {
 	assert.Equal(t, "vn", e.VideoNote.FileID)
 	require.NotNil(t, e.Voice)
 	assert.Equal(t, "vo", e.Voice.FileID)
+	assert.Equal(t, &tg.Widget{HTML: "h", Width: 10}, e.Widget) // B-65 65e
 	assert.True(t, e.HasMediaSpoiler)
 	require.NotNil(t, e.Checklist)
 	assert.Equal(t, "Todo", e.Checklist.Title)
@@ -273,14 +275,13 @@ func TestB48A_ExternalFull(t *testing.T) {
 	assert.JSONEq(t, b48aOriginChannel, string(keys["origin"]))
 }
 
-// T-eri-2: the left-out keys (widget, rich_texts: 10.4) decode leniently and have no field. (paid_media has a field
+// T-eri-2: the left-out key (rich_texts: 10.4) decodes leniently and has no field (widget has a field since B-65 65e). (paid_media has a field
 // since B-48b1: tg/paid_media_b48b_test.go T-hold-2.)
 func TestB48A_LeftOut(t *testing.T) {
 	for _, tc := range []struct {
 		name, in, key string
 		v             func() any
 	}{
-		{"widget", `{"origin":{"type":"user","date":1},"widget":{"id":"w"}}`, "widget", func() any { return &tg.ExternalReplyInfo{} }},
 		{"rich_texts", `{"text":"a","position":0,"rich_texts":["a"]}`, "rich_texts", func() any { return &tg.TextQuote{} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -387,7 +388,7 @@ var b48aSpecKeys = map[string][]string{
 	"MessageOrigin": {"type", "date", "sender_user", "sender_user_name", "sender_chat", "author_signature", "chat", "message_id"},
 	"TextQuote":     {"text", "entities", "position", "is_manual"},
 	"ExternalReplyInfo": {"origin", "chat", "message_id", "link_preview_options", "animation", "audio", "document", "live_photo",
-		"paid_media", "photo", "sticker", "story", "video", "video_note", "voice", "has_media_spoiler", "checklist", "contact", "dice", "game",
+		"paid_media", "photo", "sticker", "story", "video", "video_note", "voice", "widget", "has_media_spoiler", "checklist", "contact", "dice", "game",
 		"giveaway", "giveaway_winners", "invoice", "location", "poll", "venue"},
 	"Giveaway": {"chats", "winners_selection_date", "winner_count", "only_new_members", "has_public_winners", "prize_description",
 		"country_codes", "prize_star_count", "premium_subscription_month_count"},
@@ -423,6 +424,7 @@ func TestB48A_Shapes(t *testing.T) {
 			{"PaidMedia", "*tg.PaidMediaInfo", "paid_media,omitempty"}, {"Photo", "[]tg.PhotoSize", "photo,omitempty"}, {"Sticker", "*tg.Sticker", "sticker,omitempty"},
 			{"Story", "*tg.Story", "story,omitempty"}, {"Video", "*tg.Video", "video,omitempty"},
 			{"VideoNote", "*tg.VideoNote", "video_note,omitempty"}, {"Voice", "*tg.Voice", "voice,omitempty"},
+			{"Widget", "*tg.Widget", "widget,omitempty"},
 			{"HasMediaSpoiler", "bool", "has_media_spoiler,omitempty"}, {"Checklist", "*tg.Checklist", "checklist,omitempty"},
 			{"Contact", "*tg.Contact", "contact,omitempty"}, {"Dice", "*tg.Dice", "dice,omitempty"}, {"Game", "*tg.Game", "game,omitempty"},
 			{"Giveaway", "*tg.Giveaway", "giveaway,omitempty"}, {"GiveawayWinners", "*tg.GiveawayWinners", "giveaway_winners,omitempty"},

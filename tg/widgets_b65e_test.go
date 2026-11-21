@@ -120,7 +120,7 @@ func b65eCard(gift string) string {
 	return `{"address":"EQfake1","amount":"1000","stickers":[{"position":` + b65ePosition + `,` +
 		`"nft":{"address":"EQfake2","collection_address":"EQfake3","index":"7","name":"n","description":"d",` +
 		`"attributes":[{"trait_type":"a1","value":"v1"},{"trait_type":"a2","value":"v2"}],"gift":` + gift + `}}],` +
-		`"background_nft_address":"EQfake4"}`
+		`"background_nft_address":"EQfake2"}`
 }
 
 func b65ePositionV() tg.AreaPosition {
@@ -139,7 +139,7 @@ func b65eCardV() *tg.TonWalletCard {
 		Colors: &tg.UniqueGiftColors{ModelCustomEmojiID: "me", SymbolCustomEmojiID: "se", LightThemeMainColor: 19,
 			LightThemeOtherColors: []int{20, 21}, DarkThemeMainColor: 22, DarkThemeOtherColors: []int{23}},
 		IsBurned: true}
-	return &tg.TonWalletCard{Address: "EQfake1", Amount: "1000", BackgroundNFTAddress: "EQfake4",
+	return &tg.TonWalletCard{Address: "EQfake1", Amount: "1000", BackgroundNFTAddress: "EQfake2",
 		Stickers: []tg.TonWalletCardSticker{{Position: b65ePositionV(), NFT: tg.TonNFT{Address: "EQfake2",
 			CollectionAddress: "EQfake3", Index: "7", Name: "n", Description: "d",
 			Attributes: []tg.TonNFTAttribute{{TraitType: "a1", Value: "v1"}, {TraitType: "a2", Value: "v2"}}, Gift: gift}}}}
@@ -172,10 +172,10 @@ func TestB65E_QueryType(t *testing.T) {
 					NFT: tg.TonNFT{Address: "EQfake2", Index: "1", Name: "n", Description: "d"}}}}},
 			out: `{"type":"data","wallet_card":` + minCard + `}`},
 		{name: "02_data_no_card", in: `{"type":"data"}`, want: tg.WidgetQueryType{Type: "data"}, out: `{"type":"data"}`},
-		{name: "03_sign_data", in: `{"type":"sign_data","wallet":{"address":"EQfake5","amount":"2","public_key":"ab","state_init":"te6"},"sign_data":"s3"}`,
+		{name: "03_sign_data", in: `{"type":"sign_data","wallet":{"address":"EQfake5","amount":"2","public_key":"ab","state_init":"te6"},"sign_data":"{\"t\":3}"}`,
 			want: tg.WidgetQueryType{Type: "sign_data", Wallet: &tg.WidgetQueryWallet{Address: "EQfake5", Amount: "2",
-				PublicKey: "ab", StateInit: "te6"}, SignData: "s3"},
-			out: `{"type":"sign_data","wallet":{"address":"EQfake5","amount":"2","public_key":"ab","state_init":"te6"},"sign_data":"s3"}`},
+				PublicKey: "ab", StateInit: "te6"}, SignData: `{"t":3}`},
+			out: `{"type":"sign_data","wallet":{"address":"EQfake5","amount":"2","public_key":"ab","state_init":"te6"},"sign_data":"{\"t\":3}"}`},
 		{name: "04_sent_transaction", in: `{"type":"sent_transaction","wallet":{"address":"EQfake6","amount":"3"},"msg_hash":"h4"}`,
 			want: tg.WidgetQueryType{Type: "sent_transaction", Wallet: &tg.WidgetQueryWallet{Address: "EQfake6", Amount: "3"}, MsgHash: "h4"},
 			out:  `{"type":"sent_transaction","wallet":{"address":"EQfake6","amount":"3"},"msg_hash":"h4"}`},
@@ -192,8 +192,8 @@ func TestB65E_QueryType(t *testing.T) {
 		{name: "08b_empty_msg_hash", in: `{"type":"sent_transaction","wallet":{"address":"a","amount":"1"},"msg_hash":""}`,
 			want: tg.WidgetQueryType{Type: "sent_transaction", Wallet: b65eWallet()},
 			out:  `{"type":"sent_transaction","wallet":{"address":"a","amount":"1"}}`},
-		{name: "09_folded_keys", in: `{"TYPE":"sign_data","WaLlEt":{"ADDRESS":"a","amount":"1"},"Sign_Data":"s"}`,
-			want: tg.WidgetQueryType{Type: "sign_data", Wallet: b65eWallet(), SignData: "s"}},
+		{name: "09_folded_keys", in: `{"TYPE":"sign_data","WaLlEt":{"ADDRESS":"a","amount":"1"},"Sign_Data":"{\"t\":9}"}`,
+			want: tg.WidgetQueryType{Type: "sign_data", Wallet: b65eWallet(), SignData: `{"t":9}`}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := tc.prefill
@@ -228,7 +228,7 @@ func TestB65E_QueryType(t *testing.T) {
 // The T-query and T-shared children, as the encoder writes them.
 const (
 	b65eQueryChat = `{"id":"q1","from":` + b65eUser + `,"chat":` + b65eGroup + `,"message_id":5,"chat_instance":"ci1",` +
-		`"type":{"type":"sign_data","wallet":{"address":"a","amount":"1"},"sign_data":"s"},"data":"d1","widget_id":"w1"}`
+		`"type":{"type":"sign_data","wallet":{"address":"a","amount":"1"},"sign_data":"{\"t\":1}"},"data":"d1","widget_id":"w1"}`
 	b65eQueryInline = `{"id":"q2","from":` + b65eUser + `,"inline_message_id":"im1","chat_instance":"ci2","chat_type":"sender",` +
 		`"type":{"type":"data"},"data":"d2"}`
 	b65eShared = `{"id":"q3","from":` + b65eUser + `,"type":{"type":"data"},"data":"d3","widget_id":"w3"}`
@@ -241,7 +241,7 @@ func TestB65E_Query(t *testing.T) {
 		want        *tg.WidgetQuery
 	}{
 		{"chat", b65eQueryChat, &tg.WidgetQuery{ID: "q1", From: b65eUserV(), Chat: b65eGroupV(), MessageID: 5, ChatInstance: "ci1",
-			Type: tg.WidgetQueryType{Type: "sign_data", Wallet: b65eWallet(), SignData: "s"}, Data: "d1", WidgetID: "w1"}},
+			Type: tg.WidgetQueryType{Type: "sign_data", Wallet: b65eWallet(), SignData: `{"t":1}`}, Data: "d1", WidgetID: "w1"}},
 		{"inline", b65eQueryInline, &tg.WidgetQuery{ID: "q2", From: b65eUserV(), InlineMessageID: "im1", ChatInstance: "ci2",
 			ChatType: "sender", Type: tg.WidgetQueryType{Type: "data"}, Data: "d2"}},
 	} {

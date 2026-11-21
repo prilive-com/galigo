@@ -9,7 +9,7 @@ type Widget struct {
 	Width      int    `json:"width,omitempty"`       // in logical pixels; 0: the whole width of the message bubble
 	Height     int    `json:"height,omitempty"`      // in logical pixels; 0: the height is not fixed
 	HTML       string `json:"html"`                  // the widget's HTML code
-	PublicData string `json:"public_data,omitempty"` // shown wherever the widget is shown; the same for every message with a shared widget
+	PublicData string `json:"public_data,omitempty"` // available wherever the widget is shown; the same for every message with a shared widget
 	ChatData   string `json:"chat_data,omitempty"`   // specific to the message
 }
 

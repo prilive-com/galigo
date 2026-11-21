@@ -58,6 +58,7 @@ type Message struct {
 	LivePhoto             *LivePhoto            `json:"live_photo,omitempty"` // 10.0; Photo is also set (spec)
 	Audio                 *Audio                `json:"audio,omitempty"`
 	Voice                 *Voice                `json:"voice,omitempty"`
+	Widget                *Widget               `json:"-"` // RED STUB
 	Sticker               *Sticker              `json:"sticker,omitempty"`
 	VideoNote             *VideoNote            `json:"video_note,omitempty"`
 	Contact               *Contact              `json:"contact,omitempty"`

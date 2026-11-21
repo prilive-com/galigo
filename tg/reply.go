@@ -43,6 +43,7 @@ type ExternalReplyInfo struct {
 	Video              *Video              `json:"video,omitempty"`
 	VideoNote          *VideoNote          `json:"video_note,omitempty"`
 	Voice              *Voice              `json:"voice,omitempty"`
+	Widget             *Widget             `json:"-"` // RED STUB
 	HasMediaSpoiler    bool                `json:"has_media_spoiler,omitempty"`
 	Checklist          *Checklist          `json:"checklist,omitempty"`
 	Contact            *Contact            `json:"contact,omitempty"`

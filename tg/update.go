@@ -13,6 +13,8 @@ type Update struct {
 	ChannelPost        *Message            `json:"channel_post,omitempty"`
 	EditedChannelPost  *Message            `json:"edited_channel_post,omitempty"`
 	CallbackQuery      *CallbackQuery      `json:"callback_query,omitempty"`
+	WidgetQuery        *WidgetQuery        `json:"-"` // RED STUB
+	SharedWidgetQuery  *SharedWidgetQuery  `json:"-"` // RED STUB
 	InlineQuery        *InlineQuery        `json:"inline_query,omitempty"`
 	ChosenInlineResult *ChosenInlineResult `json:"chosen_inline_result,omitempty"`
 	ShippingQuery      *ShippingQuery      `json:"shipping_query,omitempty"`

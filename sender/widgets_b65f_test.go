@@ -39,7 +39,7 @@ func b65fPtr(s string) *string { return &s }
 // b65fBigID is a message id above 2^31 where int has 64 bits (70 on 32-bit builds).
 func b65fBigID() int {
 	if strconv.IntSize == 64 {
-		return 3000000000
+		return int(b65fBig)
 	}
 	return 70
 }
@@ -47,10 +47,13 @@ func b65fBigID() int {
 // b65fHugeID is an odd message id above 2^53 where int has 64 bits: a float64 step on the way changes its digits.
 func b65fHugeID() int {
 	if strconv.IntSize == 64 {
-		return 9007199254740993
+		return int(b65fHuge)
 	}
 	return 71
 }
+
+// b65fBig and b65fHuge are variables, so the file builds where int has 32 bits (a constant would overflow there).
+var b65fBig, b65fHuge int64 = 3000000000, 9007199254740993
 
 // b65fFast are the limiter options of every row that is not about the limiter.
 func b65fFast() []sender.Option {
@@ -1083,4 +1086,24 @@ func TestB65F_U1_HugeID(t *testing.T) {
 	require.NoError(t, client.EditMessageWidgetData(context.Background(), sender.EditMessageWidgetDataRequest{ChatID: api100Chat, MessageID: b65fHugeID()}))
 	body := b65fNumbers(t, b65fOne(t, server, "editMessageWidgetData").Body)
 	assert.Equal(t, json.Number(strconv.Itoa(b65fHugeID())), body["message_id"])
+}
+
+// U4d: width and height are sent as given, also outside the range the app clamps them to (width from 200, height
+// 50-600): the clamping is the app's (Bot API 10.4), not galigo's.
+func TestB65F_U4d_SizeAsGiven(t *testing.T) {
+	sizes := []struct{ w, h int }{{100, 10}, {199, 49}, {1, 601}, {5000, 700}}
+	for _, z := range sizes {
+		t.Run(fmt.Sprintf("sendWidget %dx%d", z.w, z.h), func(t *testing.T) {
+			server, client := b65fClient(t)
+			_, err := client.SendWidget(context.Background(), sender.SendWidgetRequest{ChatID: api100Chat, HTML: "h", Width: z.w, Height: z.h})
+			require.NoError(t, err)
+			assert.JSONEq(t, fmt.Sprintf(`{"chat_id":-1001234567890,"html":"h","width":%d,"height":%d}`, z.w, z.h),
+				b65fOne(t, server, "sendWidget").BodyString())
+		})
+		t.Run(fmt.Sprintf("InputWidgetMessageContent %dx%d", z.w, z.h), func(t *testing.T) {
+			b, err := json.Marshal(tg.InputWidgetMessageContent{HTML: "h", Width: z.w, Height: z.h})
+			require.NoError(t, err)
+			assert.JSONEq(t, fmt.Sprintf(`{"html":"h","width":%d,"height":%d}`, z.w, z.h), string(b))
+		})
+	}
 }

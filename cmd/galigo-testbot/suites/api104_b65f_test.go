@@ -151,7 +151,7 @@ func newB65FMock(t *testing.T, types map[int64]string, id int, takeSend bool) *b
 	on("deleteMessage", func(w http.ResponseWriter, _ []byte) { testutil.ReplyBool(w, true) })
 	for _, method := range []string{"sendWidget", "sendSharedWidget", "answerWidgetQuery", "editMessageWidgetData", "editSharedWidgetData"} {
 		on(method, func(w http.ResponseWriter, body []byte) {
-			if refusal, ok := m.refusals[method+" "+canonOrRaw(body)]; ok && !(takeSend && method == "sendWidget") {
+			if refusal, ok := m.refusals[method+" "+canonOrRaw(body)]; ok && (!takeSend || method != "sendWidget") {
 				testutil.ReplyBadRequest(w, refusal)
 				return
 			}
@@ -263,11 +263,11 @@ func TestB65F_S76RealRunnerGroup(t *testing.T) {
 		assert.Equal(t, pairs[i], [2]string{name, st["method"].(string)}, "step %d", i)
 		assert.Equal(t, true, st["success"], "step %d", i)
 		ev, _ := st["evidence"].(map[string]any)
-		switch {
-		case i == 1:
+		switch i {
+		case 1:
 			assert.Equal(t, []any{b65fNum(id)}, st["message_ids"])
 			assert.Equal(t, b65fNum(id), ev["message_id"])
-		case i == 8:
+		case 8:
 			assert.Equal(t, b65fNum(1), ev["deleted_count"])
 			assert.NotContains(t, ev, "failed")
 			assert.Nil(t, st["message_ids"])

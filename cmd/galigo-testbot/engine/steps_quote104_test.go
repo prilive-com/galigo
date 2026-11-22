@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,15 @@ func (f *b65gCtxFake) SendMessage(ctx context.Context, chatID int64, text string
 
 type b65gCtxKey struct{}
 
+// b65gEvidence is the evidence a reply that reaches the quote checks must give: the server's own quote, position and
+// is_manual (A-C2-03, A-C3-01, O-C3-02).
+func b65gEvidence(t *testing.T, label string, reply *tg.Message) map[string]any {
+	t.Helper()
+	q, err := json.Marshal(reply.Quote)
+	require.NoError(t, err)
+	return map[string]any{"label": label, "quote": string(q), "position": reply.Quote.Position, "is_manual": reply.Quote.IsManual}
+}
+
 func b65gIn(id int) []CreatedMessage {
 	return []CreatedMessage{{ChatID: testutil.TestChatID, MessageID: id}}
 }
@@ -62,7 +72,8 @@ func TestB65G_StepOK(t *testing.T) {
 	rt.LastMessage = b65gSource()
 	src := rt.LastMessage
 	step := &ReplyRichQuoteStep{Label: "bold", Texts: b65gTexts(), Position: 7}
-	ctx := context.WithValue(context.Background(), b65gCtxKey{}, "run")
+	ctx, cancel := context.WithTimeout(context.WithValue(context.Background(), b65gCtxKey{}, "run"), time.Minute) // a real deadline, as the runner sets (O-C3-01)
+	defer cancel()
 	res, err := step.Execute(ctx, rt)
 	require.NoError(t, err)
 	assert.True(t, cf.ctx == ctx, "the send gets the step's context itself, with the runner's deadline (O-C1-02, O-C2-02)")
@@ -113,10 +124,12 @@ func TestB65G_StepBadReply(t *testing.T) {
 			assert.Same(t, src, rt.LastMessage, "rt.LastMessage unchanged after a failure")
 			assert.Equal(t, 1, f.calls)
 			if reply.Quote != nil && reply.ReplyToMessage != nil && reply.ReplyToMessage.MessageID == 7 {
-				// The evidence shows what the server sent back, so a failure can be read (A-C2-03).
-				ev, _ := res.Evidence.(map[string]any)
-				assert.Equal(t, reply.Quote.Position, ev["position"])
-				assert.Equal(t, reply.Quote.IsManual, ev["is_manual"])
+				// The evidence shows what the server sent back, so a failure can be read (A-C2-03, A-C3-01).
+				want := b65gEvidence(t, "bold", reply)
+				assert.Equal(t, want, res.Evidence)
+				if tc.want == "rich_texts" {
+					assert.Contains(t, err.Error(), want["quote"], "the error shows the server's quote")
+				}
 			}
 		})
 	}
@@ -164,6 +177,7 @@ func TestB65G_StepBadSecondText(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rich_texts")
 	require.NotNil(t, res)
+	assert.Equal(t, b65gEvidence(t, "two texts", reply), res.Evidence) // O-C3-02
 	assert.Equal(t, []int{42}, res.MessageIDs)
 	assert.Equal(t, b65gIn(42), b65gTracked(rt))
 	assert.Same(t, src, rt.LastMessage)

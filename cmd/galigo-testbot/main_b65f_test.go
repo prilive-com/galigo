@@ -130,17 +130,17 @@ func newB65FBot(t *testing.T) *b65fBot {
 		})
 	}
 	chat := func(body map[string]any) int64 { f, _ := body["chat_id"].(float64); return int64(f) }
-	on("getChat", func(w http.ResponseWriter, body map[string]any) {
-		typ := map[int64]string{77: "private", b65fGroup: "group"}[chat(body)]
-		testutil.ReplyOK(w, map[string]any{"id": chat(body), "type": typ})
-	})
+	chatObj := func(body map[string]any) map[string]any { // the getChat type in every chat object (O-C3-03)
+		return map[string]any{"id": chat(body), "type": map[int64]string{77: "private", b65fGroup: "group"}[chat(body)]}
+	}
+	on("getChat", func(w http.ResponseWriter, body map[string]any) { testutil.ReplyOK(w, chatObj(body)) })
 	on("getMe", func(w http.ResponseWriter, _ map[string]any) { testutil.ReplyUser(w) })
 	on("getChatMember", func(w http.ResponseWriter, _ map[string]any) {
 		testutil.ReplyOK(w, map[string]any{"status": "member", "user": map[string]any{"id": testutil.TestBotID, "is_bot": true, "first_name": "b"}})
 	})
 	quoteID := 770
 	on("sendRichMessage", func(w http.ResponseWriter, body map[string]any) {
-		testutil.ReplyOK(w, map[string]any{"message_id": 770, "date": 1, "chat": map[string]any{"id": chat(body), "type": "group"},
+		testutil.ReplyOK(w, map[string]any{"message_id": 770, "date": 1, "chat": chatObj(body),
 			"rich_message": map[string]any{"blocks": []any{map[string]any{"type": "paragraph", "text": "a"}, map[string]any{"type": "paragraph", "text": "b"}}}})
 	})
 	on("sendMessage", func(w http.ResponseWriter, body map[string]any) {
@@ -156,8 +156,8 @@ func newB65FBot(t *testing.T) *b65fBot {
 		}
 		pos, _ := rp["quote_position"].(float64)
 		quoteID++
-		testutil.ReplyOK(w, map[string]any{"message_id": quoteID, "date": 1, "chat": map[string]any{"id": chat(body), "type": "group"},
-			"text": body["text"], "reply_to_message": map[string]any{"message_id": rp["message_id"], "date": 1, "chat": map[string]any{"id": chat(body), "type": "group"}},
+		testutil.ReplyOK(w, map[string]any{"message_id": quoteID, "date": 1, "chat": chatObj(body),
+			"text": body["text"], "reply_to_message": map[string]any{"message_id": rp["message_id"], "date": 1, "chat": chatObj(body)},
 			"quote": map[string]any{"text": "", "rich_texts": rp["quote_rich_texts"], "position": pos, "is_manual": true}})
 	})
 	on("deleteMessage", func(w http.ResponseWriter, _ map[string]any) { testutil.ReplyBool(w, true) })

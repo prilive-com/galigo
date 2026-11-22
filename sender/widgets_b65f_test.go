@@ -342,10 +342,13 @@ func TestB65F_U1_Keys(t *testing.T) {
 
 // U2: the two data fields of editMessageWidgetData have three states each, on both target forms.
 func TestB65F_U2_ThreeStates(t *testing.T) {
-	states := []struct {
+	type state struct {
 		name string
 		v    *string
-	}{{"nil", nil}, {"empty", b65fPtr("")}, {"set", b65fPtr("x")}}
+	}
+	// The set values differ, so a wrong version that sends one field's value in the other field fails (O-C2-03).
+	pubStates := []state{{"nil", nil}, {"empty", b65fPtr("")}, {"set", b65fPtr("pub-x")}}
+	chatStates := []state{{"nil", nil}, {"empty", b65fPtr("")}, {"set", b65fPtr("chat-y")}}
 	forms := []struct {
 		name string
 		req  sender.EditMessageWidgetDataRequest
@@ -355,8 +358,8 @@ func TestB65F_U2_ThreeStates(t *testing.T) {
 		{"inline", sender.EditMessageWidgetDataRequest{InlineMessageID: "i"}, map[string]any{"inline_message_id": "i"}},
 	}
 	for _, f := range forms {
-		for _, pub := range states {
-			for _, chat := range states {
+		for _, pub := range pubStates {
+			for _, chat := range chatStates {
 				t.Run(f.name+"/public_"+pub.name+"/chat_"+chat.name, func(t *testing.T) {
 					server, client := b65fClient(t)
 					req := f.req
@@ -1089,9 +1092,9 @@ func TestB65F_U1_HugeID(t *testing.T) {
 }
 
 // U4d: width and height are sent as given, also outside the range the app clamps them to (width from 200, height
-// 50-600): the clamping is the app's (Bot API 10.4), not galigo's.
+// 50-600), and also when negative: the clamping is the app's (Bot API 10.4), not galigo's.
 func TestB65F_U4d_SizeAsGiven(t *testing.T) {
-	sizes := []struct{ w, h int }{{100, 10}, {199, 49}, {1, 601}, {5000, 700}}
+	sizes := []struct{ w, h int }{{100, 10}, {199, 49}, {1, 601}, {5000, 700}, {-1, -2}}
 	for _, z := range sizes {
 		t.Run(fmt.Sprintf("sendWidget %dx%d", z.w, z.h), func(t *testing.T) {
 			server, client := b65fClient(t)

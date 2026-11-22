@@ -19,8 +19,9 @@ import (
 //     map element, an interface value) printed with a verb other than v, p, b, o, d, x and X, when the pointed-to
 //     type has no method fmt uses for that verb (for example %s of a []*T where T holds the token), or when the
 //     pointer is in an unexported struct field, where fmt cannot call a method;
-//   - encoder paths that read the string itself: a SecretToken map key in encoding/json (and slog's JSON handler),
-//     and a *SecretToken map key depending on the Go version; in encoding/xml, a ",comment" field, a ",chardata"
+//   - encoder paths that read the string itself: a SecretToken map key in encoding/json (and slog's JSON handler;
+//     go1.27.0 and go1.27.1 call MarshalText for it and write [REDACTED], golang/go#81362), and a *SecretToken map
+//     key depending on the Go version; in encoding/xml, a ",comment" field, a ",chardata"
 //     or ",cdata" field of type **SecretToken, and, depending on the Go version, a chardata, cdata or attribute
 //     field of interface type; encodings that never call MarshalText, such as encoding/gob;
 //   - other code that reads the value by reflection without calling these methods, such as go-spew with methods

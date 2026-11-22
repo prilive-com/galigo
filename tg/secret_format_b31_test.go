@@ -270,6 +270,28 @@ func b31NoTime(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
+// b31TextKey is a map key of string kind with a MarshalText method, for b31JSONKey.
+type b31TextKey string
+
+func (b31TextKey) MarshalText() ([]byte, error) { return []byte("text"), nil }
+
+// b31JSONKey returns the key encoding/json writes for a SecretToken map key on this Go version. go1.27.0 and go1.27.1
+// call MarshalText for a map key of string kind, so they write [REDACTED]; Go 1.26 and go1.27.2 and later do not
+// (golang/go#81362, a 1.27 backport; golang/go#81355 is still open for Go 1.28). The probe asks encoding/json, not the
+// version string.
+func b31JSONKey(t *testing.T) string {
+	b, err := json.Marshal(map[b31TextKey]int{"k": 1})
+	require.NoError(t, err)
+	switch string(b) {
+	case `{"k":1}`:
+		return b31Secret
+	case `{"text":1}`:
+		return "[REDACTED]"
+	}
+	t.Fatalf("encoding/json wrote %s for a string-kind TextMarshaler map key", b)
+	return ""
+}
+
 type b31Unexported struct{ token tg.SecretToken }
 
 type b31HasPtr struct{ P *b31Exported }
@@ -331,12 +353,12 @@ func TestB31_DocumentedLimits(t *testing.T) {
 	t.Run("json_map_key", func(t *testing.T) {
 		b, err := json.Marshal(map[tg.SecretToken]string{tok: "x"})
 		require.NoError(t, err)
-		assert.Equal(t, `{"`+b31Secret+`":"x"}`, string(b))
+		assert.Equal(t, `{"`+b31JSONKey(t)+`":"x"}`, string(b))
 	})
 	t.Run("slog_json_map_key", func(t *testing.T) {
 		var b bytes.Buffer
 		slog.New(slog.NewJSONHandler(&b, &slog.HandlerOptions{ReplaceAttr: b31NoTime})).Info("m", "m", map[tg.SecretToken]string{tok: "x"})
-		assert.Equal(t, `{"level":"INFO","msg":"m","m":{"`+b31Secret+`":"x"}}`+"\n", b.String())
+		assert.Equal(t, `{"level":"INFO","msg":"m","m":{"`+b31JSONKey(t)+`":"x"}}`+"\n", b.String())
 	})
 	t.Run("xml_comment", func(t *testing.T) {
 		b, err := xml.Marshal(b31XMLComment{tok})

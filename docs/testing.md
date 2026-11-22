@@ -685,6 +685,9 @@ go run ./cmd/galigo-testbot --run api102                 # All 10.2 tests
 # Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73)
 go run ./cmd/galigo-testbot --run api103                 # Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup
 
+# Bot API 10.4 (S76 widgets, refusal only; the 10.4 ephemeral changes are in ephemeral, S73)
+go run ./cmd/galigo-testbot --run api104                 # sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)
+
 # Suggested posts (S71, S72; Bot API 9.2)
 go run ./cmd/galigo-testbot --run suggested-posts        # suggested_post_parameters, approve and decline reach the server
 
@@ -851,6 +854,12 @@ Note: S41 (setMyProfilePhoto/removeMyProfilePhoto) is excluded from automated te
 | S74-RichAPI103 | sendRichMessage | Rich message of blocks with the 10.3 kinds: a `buttons` row aligned center (a callback button with style `primary`, a URL button, a `copy_text` button, a disabled button), a paragraph with a button node, a compact table and an expandable block quotation; the reply's block kinds and the decoded values are checked (`VerifyRichAPI103Step`); then a markdown rich message with a `tg://document` link and a document upload in the media list (the reply has a paragraph and a document block), then a `document` block by the file_id of that reply; cleaned up. A block that decodes as unknown fails the step (it is named `unknown:<type>`). Not live-proved: the `web_app`, `login_url` and switch-inline buttons (mock tests and the slice's probes) |
 | S75-ReplyMarkupAPI103 | sendMessage | Inline keyboard with the 10.3 reply markup: a callback button, a disabled button (`disabled`) and `force_reply`; the server must return the same markup as a whole value (`SendReplyMarkupEchoStep`); on a difference the error gives a safe reason (for a differing button field: the row, button and field), never the server's text; cleaned up. A button with `callback_data` and `disabled` is kept by the server as a callback button (the slice's probe), so S75 does not send one. Not live-proved: `force_reply` on a reply keyboard, the `can_send_welcome_messages` right, the draft `can_stop` and `keep_on_stop` flags (a draft to a group is refused), the `stopped_message_generation` update and the `community_chat_joined` service message (mock tests) |
 
+#### Bot API 10.4 (S76 widgets, refusal only)
+
+| Scenario | Methods | Description |
+|----------|---------|-------------|
+| S76-Widgets | sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData, sendMessage | Refusal only: the server refuses `sendWidget` for the test bot (`INPUT_MEDIA_WIDGET_NOT_ALLOWED`, measured 2026-11-21 in the test group and in a private chat), so no widget is sent. Each `WidgetRefusalStep` row must get its measured 400 text: `sendWidget` (an html), `sendSharedWidget` (a fake widget id: `invalid widget identifier specified`), `answerWidgetQuery` (a fake query id: `query is too old`), `editMessageWidgetData` on a plain target message with `chat_data` (`MESSAGE_ID_INVALID`), on a missing message (the target id + 1000000: `message with widget to edit not found`) and on a fake inline message id (`invalid inline message identifier specified`), `editSharedWidgetData` (a fake widget id); the target message is cleaned up. A refusal shows that the method reached the server and took that branch, not that every field was read (the same text comes without them): the request bodies are proved by mock tests (`sender/widgets_b65f_test.go`). The rows run only in a group or supergroup and skip elsewhere (a `/run` from a private chat makes no widget call). A call the server takes fails the step; a returned message is tracked and deleted |
+
 #### Suggested posts (S71, S72)
 
 | Scenario | Methods | Description |
@@ -887,9 +896,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **101 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **106 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 92 covered methods and 10 missing. 91 of the 101 registry methods have a scenario; the 92nd covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 97 covered methods and 10 missing. 96 of the 106 registry methods have a scenario (the five widget methods of S76 are refusal-only); the 97th covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -980,6 +989,7 @@ cmd/galigo-testbot/
 │   ├── steps_paid_media.go    # Paid media step (sendPaidMedia, S70)
 │   ├── steps_suggested_post.go # Suggested post steps: parameters (sendMessage, sendPhoto; S71), approve and decline (S72)
 │   ├── steps_ephemeral.go # Ephemeral message steps: send to the admin (sendMessage, sendPhoto), edit (the four edit methods), reply without chat_id (S73)
+│   ├── steps_widgets.go   # Bot API 10.4 widget refusal step (WidgetRefusalStep; S76)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -1003,6 +1013,7 @@ cmd/galigo-testbot/
 │   ├── api101.go      # Bot API 10.1 (S66: poll option links, S67: rich messages)
 │   ├── api102.go      # Bot API 10.2 (S68: rich message blocks, S69: rich message media)
 │   ├── api103.go      # Bot API 10.3 (S74: rich message buttons, button nodes, compact tables, expandable quotations, document blocks; S75: reply markup)
+│   ├── api104.go      # Bot API 10.4 (S76: the five widget methods, refusal only)
 │   ├── suggested_post.go # Suggested posts, Bot API 9.2 (S71, S72)
 │   ├── ephemeral.go   # Ephemeral messages, Bot API 10.3/10.4 (S73)
 │   ├── interactive.go # Interactive scenarios (S12, opt-in)
@@ -1012,7 +1023,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (101 methods)
+├── registry/       # Target method list and coverage checking (106 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

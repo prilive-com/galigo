@@ -180,6 +180,13 @@ var AllMethods = []Method{
 	{Name: "editEphemeralMessageReplyMarkup", Category: CategoryMessaging, Notes: "S73: edits the ephemeral messages it sends"},
 	{Name: "deleteEphemeralMessage", Category: CategoryMessaging, Notes: "S73: its cleanup deletes the ephemeral messages it sends"},
 
+	// === Bot API 10.4 (B-65 65f) ===
+	{Name: "sendWidget", Category: CategoryMessaging, Notes: "S76: refusal only (the server refuses widgets for this bot)"},
+	{Name: "sendSharedWidget", Category: CategoryMessaging, Notes: "S76: refusal only (the server refuses widgets for this bot)"},
+	{Name: "answerWidgetQuery", Category: CategoryMessaging, Notes: "S76: refusal only (the server refuses widgets for this bot)"},
+	{Name: "editMessageWidgetData", Category: CategoryMessaging, Notes: "S76: refusal only (the server refuses widgets for this bot)"},
+	{Name: "editSharedWidgetData", Category: CategoryMessaging, Notes: "S76: refusal only (the server refuses widgets for this bot)"},
+
 	// === Legacy Methods ===
 	// Webhook management
 	{Name: "setWebhook", Category: CategoryLegacy, Notes: "requires webhook infra"},

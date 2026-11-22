@@ -391,6 +391,13 @@ type SenderClient interface {
 	ApproveSuggestedPost(ctx context.Context, req sender.ApproveSuggestedPostRequest) error
 	DeclineSuggestedPost(ctx context.Context, req sender.DeclineSuggestedPostRequest) error
 
+	// Widgets (10.4)
+	SendWidget(ctx context.Context, req sender.SendWidgetRequest) (*tg.Message, error)
+	SendSharedWidget(ctx context.Context, req sender.SendSharedWidgetRequest) (*tg.Message, error)
+	AnswerWidgetQuery(ctx context.Context, req sender.AnswerWidgetQueryRequest) error
+	EditMessageWidgetData(ctx context.Context, req sender.EditMessageWidgetDataRequest) error
+	EditSharedWidgetData(ctx context.Context, req sender.EditSharedWidgetDataRequest) error
+
 	SavePreparedKeyboardButton(ctx context.Context, userID int64, button tg.KeyboardButton) (*tg.PreparedKeyboardButton, error)
 
 	// Ephemeral messages (Bot API 10.2–10.4)

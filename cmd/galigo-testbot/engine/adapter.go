@@ -819,6 +819,31 @@ func (a *SenderAdapter) DeclineSuggestedPost(ctx context.Context, req sender.Dec
 	return a.client.DeclineSuggestedPost(ctx, req)
 }
 
+// SendWidget sends a message with an HTML widget (Bot API 10.4).
+func (a *SenderAdapter) SendWidget(ctx context.Context, req sender.SendWidgetRequest) (*tg.Message, error) {
+	return a.client.SendWidget(ctx, req)
+}
+
+// SendSharedWidget sends again a shared widget (Bot API 10.4).
+func (a *SenderAdapter) SendSharedWidget(ctx context.Context, req sender.SendSharedWidgetRequest) (*tg.Message, error) {
+	return a.client.SendSharedWidget(ctx, req)
+}
+
+// AnswerWidgetQuery answers a query from a widget (Bot API 10.4).
+func (a *SenderAdapter) AnswerWidgetQuery(ctx context.Context, req sender.AnswerWidgetQueryRequest) error {
+	return a.client.AnswerWidgetQuery(ctx, req)
+}
+
+// EditMessageWidgetData edits the data of a widget in a message (Bot API 10.4).
+func (a *SenderAdapter) EditMessageWidgetData(ctx context.Context, req sender.EditMessageWidgetDataRequest) error {
+	return a.client.EditMessageWidgetData(ctx, req)
+}
+
+// EditSharedWidgetData edits the public data of a shared widget (Bot API 10.4).
+func (a *SenderAdapter) EditSharedWidgetData(ctx context.Context, req sender.EditSharedWidgetDataRequest) error {
+	return a.client.EditSharedWidgetData(ctx, req)
+}
+
 // SendEphemeralReply sends a text message as an ephemeral reply to a callback query (Bot API 10.4): no chat_id,
 // ephemeral_message_parameters with only callback_query_id.
 func (a *SenderAdapter) SendEphemeralReply(ctx context.Context, callbackQueryID, text string) (*tg.Message, error) {

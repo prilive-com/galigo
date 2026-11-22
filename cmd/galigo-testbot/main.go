@@ -102,6 +102,7 @@ func showCoverageStatus(logger *slog.Logger) {
 	scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 	scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
+	scenarios = append(scenarios, suites.AllAPI104Scenarios()...)
 
 	// Convert to Coverer interface
 	coverers := make([]registry.Coverer, len(scenarios))
@@ -124,7 +125,7 @@ func showCoverageStatus(logger *slog.Logger) {
 }
 
 // availableSuites is the suite list the CLI prints for an unknown --run name.
-const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, live-photos, all"
+const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, api104, live-photos, all"
 
 // isInteractiveSuite reports whether a suite name (any case) is interactive or callback, which each caller runs
 // itself (B-49).
@@ -279,6 +280,9 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	// Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in "ephemeral", S73)
 	case "api103", "api-103", "10.3":
 		scenarios = suites.AllAPI103Scenarios()
+	// Bot API 10.4 (S76 widgets, refusal only)
+	case "api104", "api-104", "10.4":
+		scenarios = suites.AllAPI104Scenarios()
 	case "all":
 		scenarios = append(suites.AllPhaseAScenarios(), suites.AllPhaseBScenarios()...)
 		scenarios = append(scenarios, suites.AllPhaseCScenarios()...)
@@ -297,6 +301,7 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 		scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 		scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 		scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
+		scenarios = append(scenarios, suites.AllAPI104Scenarios()...)
 		// Checklists require Telegram Premium — opt-in via --run checklists
 	default:
 		return nil, false
@@ -644,6 +649,7 @@ func handleStatus(ctx context.Context, adapter *engine.SenderAdapter, chatID int
 	scenarios = append(scenarios, suites.AllAPI103Scenarios()...)
 	scenarios = append(scenarios, suites.AllSuggestedPostScenarios()...)
 	scenarios = append(scenarios, suites.AllEphemeralScenarios()...)
+	scenarios = append(scenarios, suites.AllAPI104Scenarios()...)
 
 	coverers := make([]registry.Coverer, len(scenarios))
 	for i, s := range scenarios {
@@ -729,6 +735,9 @@ Bot API 10.2 (S68, S69):
 
 Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73):
   api103 - Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup
+
+Bot API 10.4 (S76 widgets, refusal only):
+  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

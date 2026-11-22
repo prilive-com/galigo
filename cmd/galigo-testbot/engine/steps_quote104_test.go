@@ -62,13 +62,10 @@ func TestB65G_StepOK(t *testing.T) {
 	rt.LastMessage = b65gSource()
 	src := rt.LastMessage
 	step := &ReplyRichQuoteStep{Label: "bold", Texts: b65gTexts(), Position: 7}
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), b65gCtxKey{}, "run"))
-	defer cancel()
+	ctx := context.WithValue(context.Background(), b65gCtxKey{}, "run")
 	res, err := step.Execute(ctx, rt)
 	require.NoError(t, err)
-	require.NotNil(t, cf.ctx)
-	assert.Equal(t, "run", cf.ctx.Value(b65gCtxKey{}), "the send gets the step's context")
-	assert.Equal(t, ctx.Done(), cf.ctx.Done(), "the send keeps the runner's cancel and deadline (O-C1-02)")
+	assert.True(t, cf.ctx == ctx, "the send gets the step's context itself, with the runner's deadline (O-C1-02, O-C2-02)")
 	require.Len(t, f.messages, 1)
 	assert.Equal(t, testutil.TestChatID, f.messages[0].chatID)
 	assert.Equal(t, "galigo 10.4 rich quote bold", f.messages[0].text)
@@ -115,6 +112,12 @@ func TestB65G_StepBadReply(t *testing.T) {
 			assert.Equal(t, b65gIn(42), b65gTracked(rt))
 			assert.Same(t, src, rt.LastMessage, "rt.LastMessage unchanged after a failure")
 			assert.Equal(t, 1, f.calls)
+			if reply.Quote != nil && reply.ReplyToMessage != nil && reply.ReplyToMessage.MessageID == 7 {
+				// The evidence shows what the server sent back, so a failure can be read (A-C2-03).
+				ev, _ := res.Evidence.(map[string]any)
+				assert.Equal(t, reply.Quote.Position, ev["position"])
+				assert.Equal(t, reply.Quote.IsManual, ev["is_manual"])
+			}
 		})
 	}
 	// A good reply that comes with an error (A-T2-07), and no message with no error (the nil-message guard; O-T2-04).

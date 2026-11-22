@@ -140,6 +140,17 @@ func TestB65G_TonAddress(t *testing.T) {
 		assert.Equal(t, tg.RichBlockParagraph{Type: "paragraph", Text: tg.RichText{Parts: []tg.RichText{{Node: nested}}}}, m.RichMessage.Blocks[0])
 		assert.Equal(t, `[`+node+`]`, b65gMarshal(t, m.RichMessage.Blocks[0].(tg.RichBlockParagraph).Text))
 	})
+	t.Run("inner_unknown_text", func(t *testing.T) { // upgrade note item 2: an inner text that does not decode keeps the outer type (O-C2-03)
+		for _, text := range []string{`5`, `{"type":"z_future","k":1}`} {
+			var r tg.RichText
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"ton_address","text":`+text+`,"address":"EQfake1"}`), &r), text)
+			inner := tg.RichTextUnknown{Raw: json.RawMessage(text)}
+			if text != `5` {
+				inner.Type = "z_future"
+			}
+			assert.Equal(t, tg.RichText{Node: tg.RichTextTonAddress{Type: "ton_address", Text: tg.RichText{Node: inner}, Address: "EQfake1"}}, r, text)
+		}
+	})
 	t.Run("extra_key_dropped", func(t *testing.T) { // PLAN section 9: the typed node keeps only its fields
 		var r tg.RichText
 		require.NoError(t, json.Unmarshal([]byte(`{"type":"ton_address","text":"t","address":"EQfake1","future_key":1}`), &r))

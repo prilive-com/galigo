@@ -200,6 +200,10 @@ func TestB65G_StepRefusedBad(t *testing.T) {
 			src := rt.LastMessage
 			res, err := (&ReplyRichQuoteStep{Label: "absent", Texts: []tg.RichText{{Plain: "absent text"}}, WantError: "QUOTE_TEXT_INVALID"}).Execute(context.Background(), rt)
 			require.Error(t, err)
+			if tc.reply.err != nil {
+				require.ErrorIs(t, err, tc.reply.err, "the step wraps the send error")
+			}
+			assert.NotContains(t, err.Error(), "%!", "no bad format verb in the error text")
 			require.NotNil(t, res)
 			if tc.msgID != 0 {
 				assert.Equal(t, b65gIn(tc.msgID), b65gTracked(rt))

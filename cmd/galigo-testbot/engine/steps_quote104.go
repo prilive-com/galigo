@@ -40,8 +40,11 @@ func (s *ReplyRichQuoteStep) Execute(ctx context.Context, rt *Runtime) (*StepRes
 		res.MessageIDs = []int{msg.MessageID}
 	}
 	if s.WantError != "" {
-		if err == nil || msg != nil {
-			return res, fmt.Errorf("sendMessage: the server took the quote; want no message and a 400 error containing %q (error: %v)", s.WantError, err)
+		if err == nil {
+			return res, fmt.Errorf("sendMessage: the server took the quote; want no message and a 400 error containing %q", s.WantError)
+		}
+		if msg != nil {
+			return res, fmt.Errorf("sendMessage: a message came with the error; want no message and a 400 error containing %q: %w", s.WantError, err)
 		}
 		var apiErr *tg.APIError
 		if !errors.As(err, &apiErr) || apiErr.Code != 400 || !strings.Contains(apiErr.Description, s.WantError) {

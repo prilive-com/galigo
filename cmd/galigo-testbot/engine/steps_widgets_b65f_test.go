@@ -388,6 +388,38 @@ func TestB65F_Step_MissingIDRange(t *testing.T) {
 	assert.Equal(t, math.MaxInt, ev["message_id"])
 }
 
+// S6c: the range check runs before the chat probe, so a cold runtime makes no call at all; it applies only to the
+// missing row: the target row sends a target id above the bound as it is.
+func TestB65F_Step_MissingIDRangeScope(t *testing.T) {
+	steps := b65fAllSteps()
+	missing, target := steps[4], steps[3]
+	require.Equal(t, "missing", missing.Variant)
+	require.Equal(t, "target", target.Variant)
+	t.Run("cold missing row", func(t *testing.T) {
+		f := &fakeWidget{chatType: "group", err: b48c2Refusal(missing.WantError)}
+		_, err := missing.Execute(context.Background(), b65fRT(f, math.MaxInt-999999, ""))
+		require.Error(t, err)
+		assert.Equal(t, fmt.Sprintf("editMessageWidgetData: target message id %d is too large for the missing message id (target + 1000000)",
+			math.MaxInt-999999), err.Error())
+		assert.Empty(t, f.reqs)
+		assert.Empty(t, f.chats)
+		assert.Zero(t, f.mes)
+		assert.Empty(t, f.members)
+	})
+	for _, tgt := range []int{math.MaxInt - 999999, math.MaxInt} {
+		t.Run(fmt.Sprintf("target row %d", tgt), func(t *testing.T) {
+			f := &fakeWidget{err: b48c2Refusal(target.WantError)}
+			res, err := target.Execute(context.Background(), b65fRT(f, tgt, "group"))
+			require.NoError(t, err)
+			require.Len(t, f.reqs, 1)
+			assert.Equal(t, b65fWantReq(target, tgt), f.reqs[0])
+			ev, ok := res.Evidence.(map[string]any)
+			require.True(t, ok, "evidence %T", res.Evidence)
+			assert.Equal(t, tgt, ev["message_id"])
+		})
+	}
+}
+
 // S7: the refusal constants are the measured texts.
 func TestB65F_Step_Constants(t *testing.T) {
 	assert.Equal(t, "INPUT_MEDIA_WIDGET_NOT_ALLOWED", WidgetNotAllowed)
@@ -458,6 +490,16 @@ func b65fAdapterCalls() []struct {
 		{"editMessageWidgetData inline", "editMessageWidgetData", `{"inline_message_id":"inl-7","public_data":"pub-1"}`,
 			func(ctx context.Context, a *SenderAdapter) error {
 				return a.EditMessageWidgetData(ctx, sender.EditMessageWidgetDataRequest{InlineMessageID: "inl-7", PublicData: b65fPtrS("pub-1")})
+			}},
+		{"editMessageWidgetData chat both data", "editMessageWidgetData", `{"chat_id":5000000001,"message_id":7,"public_data":"pub-x","chat_data":"chat-y"}`,
+			func(ctx context.Context, a *SenderAdapter) error {
+				return a.EditMessageWidgetData(ctx, sender.EditMessageWidgetDataRequest{ChatID: int64(5000000001), MessageID: 7,
+					PublicData: b65fPtrS("pub-x"), ChatData: b65fPtrS("chat-y")})
+			}},
+		{"editMessageWidgetData inline both data", "editMessageWidgetData", `{"inline_message_id":"inl-7","public_data":"pub-x","chat_data":"chat-y"}`,
+			func(ctx context.Context, a *SenderAdapter) error {
+				return a.EditMessageWidgetData(ctx, sender.EditMessageWidgetDataRequest{InlineMessageID: "inl-7",
+					PublicData: b65fPtrS("pub-x"), ChatData: b65fPtrS("chat-y")})
 			}},
 		{"editSharedWidgetData", "editSharedWidgetData", `{"widget_id":"wid-4","public_data":"pub-1","cache_time":5}`,
 			func(ctx context.Context, a *SenderAdapter) error {
@@ -532,14 +574,22 @@ func TestB65F_A1_Adapter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 42, msg.MessageID)
 	})
-	// The adapter sends width and height as given, also outside the range the app clamps them to and when negative.
-	for _, z := range []struct{ w, h int }{{100, 10}, {199, 601}, {5000, 700}, {-1, -2}} {
+	// The adapter sends width and height as given, also outside the range the app clamps them to and when negative,
+	// and each one alone (a zero size is left out).
+	for _, z := range []struct{ w, h int }{{100, 10}, {199, 601}, {5000, 700}, {-1, -2}, {300, 0}, {0, 450}} {
 		t.Run(fmt.Sprintf("sendWidget size %dx%d", z.w, z.h), func(t *testing.T) {
 			server, a := b65fAdapter(t)
 			_, err := a.SendWidget(context.Background(), sender.SendWidgetRequest{ChatID: b65fChat, HTML: "h", Width: z.w, Height: z.h})
 			require.NoError(t, err)
 			require.Equal(t, 1, server.CaptureCount())
-			b65fExact(t, fmt.Sprintf(`{"chat_id":%d,"html":"h","width":%d,"height":%d}`, b65fChat, z.w, z.h), server.LastCapture().Body)
+			want := fmt.Sprintf(`{"chat_id":%d,"html":"h"`, b65fChat)
+			if z.w != 0 {
+				want += fmt.Sprintf(`,"width":%d`, z.w)
+			}
+			if z.h != 0 {
+				want += fmt.Sprintf(`,"height":%d`, z.h)
+			}
+			b65fExact(t, want+"}", server.LastCapture().Body)
 		})
 	}
 }

@@ -33,7 +33,8 @@ const widgetHTML = "<b>galigo widget</b>"
 // or "inline" (a fake inline message id) for editMessageWidgetData, and empty otherwise. The step runs only in a
 // group or supergroup, where the texts were measured: it probes the chat once when rt.ChatCtx is nil (a probe error
 // fails the step before any write) and skips in any other chat, so a /run from a private chat makes no widget call.
-// A call the server takes fails the step; a returned message is tracked for cleanup.
+// A call the server takes fails the step; a returned message is tracked for cleanup. A missing row whose target id is
+// too large for target + 1000000 in an int fails before any call, also before the chat probe.
 type WidgetRefusalStep struct {
 	Method    string
 	Variant   string
@@ -54,6 +55,10 @@ func (s *WidgetRefusalStep) Name() string {
 
 func (s *WidgetRefusalStep) Execute(ctx context.Context, rt *Runtime) (*StepResult, error) {
 	res := &StepResult{StepName: s.Name(), Method: s.Method}
+	// The missing row's id (target + 1000000) must fit in an int; checked first, so a too large target makes no call.
+	if s.Variant == "missing" && rt.LastMessage != nil && rt.LastMessage.MessageID > math.MaxInt-1000000 {
+		return res, fmt.Errorf("%s: target message id %d is too large for the missing message id (target + 1000000)", s.Method, rt.LastMessage.MessageID)
+	}
 	if rt.ChatCtx == nil {
 		if err := rt.ProbeChat(ctx); err != nil {
 			return res, fmt.Errorf("%s: %w", s.Method, err)
@@ -69,9 +74,6 @@ func (s *WidgetRefusalStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 		}
 		id = rt.LastMessage.MessageID
 		if s.Variant == "missing" {
-			if id > math.MaxInt-1000000 {
-				return res, fmt.Errorf("%s: target message id %d is too large for the missing message id (target + 1000000)", s.Method, id)
-			}
 			id += 1000000
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 )
 
-// Bot API 10.1–10.3 rich messages, read side: Message.RichMessage and the RichText and RichBlock types.
+// Bot API 10.1–10.4 rich messages, read side: Message.RichMessage and the RichText and RichBlock types.
 // Kinds this version of galigo does not model (added later) decode as RichTextUnknown or RichBlockUnknown and keep
 // their raw JSON.
 
@@ -167,6 +167,8 @@ func unmarshalRichTextNode(data []byte) RichTextNode {
 		return decodeRichTextNode[RichTextPhoneNumber](data, probe.Type)
 	case "bank_card_number":
 		return decodeRichTextNode[RichTextBankCardNumber](data, probe.Type)
+	case "ton_address":
+		return decodeRichTextNode[RichTextTonAddress](data, probe.Type)
 	case "mention":
 		return decodeRichTextNode[RichTextMention](data, probe.Type)
 	case "hashtag":
@@ -399,6 +401,13 @@ type RichTextBankCardNumber struct {
 	Type           string   `json:"type"`
 	Text           RichText `json:"text"`
 	BankCardNumber string   `json:"bank_card_number"`
+}
+
+// RichTextTonAddress is a text with an address in the TON blockchain (Bot API 10.4).
+type RichTextTonAddress struct {
+	Type    string   `json:"type"`
+	Text    RichText `json:"text"`
+	Address string   `json:"address"`
 }
 
 // RichTextMention is a mention by a username (Bot API 10.1).
@@ -714,6 +723,9 @@ func (RichTextReferenceLink) richTextNode()          {}
 
 // Bot API 10.3 node.
 func (RichTextButton) richTextNode() {}
+
+// Bot API 10.4 node.
+func (RichTextTonAddress) richTextNode() {}
 
 func (RichBlockParagraph) richBlock()              {}
 func (RichBlockSectionHeading) richBlock()         {}

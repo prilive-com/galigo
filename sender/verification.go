@@ -16,14 +16,18 @@ type SetPassportDataErrorsRequest struct {
 
 // VerifyUserRequest represents a verifyUser request.
 type VerifyUserRequest struct {
-	UserID            int64  `json:"user_id"`
-	CustomDescription string `json:"custom_description,omitempty"`
+	UserID                     int64              `json:"user_id"`
+	CustomDescription          string             `json:"custom_description,omitempty"`
+	CustomDescriptionParseMode tg.ParseMode       `json:"custom_description_parse_mode,omitempty"` // 10.4: only text_link entities are supported
+	CustomDescriptionEntities  []tg.MessageEntity `json:"custom_description_entities,omitempty"`   // 10.4: instead of the parse mode; only text_link entities are supported
 }
 
 // VerifyChatRequest represents a verifyChat request.
 type VerifyChatRequest struct {
-	ChatID            tg.ChatID `json:"chat_id"`
-	CustomDescription string    `json:"custom_description,omitempty"`
+	ChatID                     tg.ChatID          `json:"chat_id"`
+	CustomDescription          string             `json:"custom_description,omitempty"`
+	CustomDescriptionParseMode tg.ParseMode       `json:"custom_description_parse_mode,omitempty"` // 10.4: only text_link entities are supported
+	CustomDescriptionEntities  []tg.MessageEntity `json:"custom_description_entities,omitempty"`   // 10.4: instead of the parse mode; only text_link entities are supported
 }
 
 // RemoveUserVerificationRequest represents a removeUserVerification request.

@@ -38,6 +38,10 @@ type Invoice struct {
 	TotalAmount    int    `json:"total_amount"` // in the smallest units of the currency
 }
 
+// PaidMessagesWaived is a service message: the sender used a link of the other user that allows sending messages
+// to that user without paying Telegram Stars. It holds no information. Added in Bot API 10.4.
+type PaidMessagesWaived struct{}
+
 // BotSubscriptionUpdated is an update: a user payment subscription toward the bot changed. Added in Bot API 10.2.
 type BotSubscriptionUpdated struct {
 	User           *User  `json:"user"`            // the user who subscribed

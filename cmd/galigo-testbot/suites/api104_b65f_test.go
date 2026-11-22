@@ -24,12 +24,17 @@ import (
 
 // Bot API 10.4 widgets, S76 (B-65 65f, TEST-PLAN M1-M3, M6).
 
-// b65fS76 returns the one 10.4 scenario; a missing scenario fails the row, it does not panic the binary.
+// b65fS76 returns the 10.4 scenario S76 by name (B-65 65g added S77); a missing scenario fails the row, it does not
+// panic the binary.
 func b65fS76(t *testing.T) engine.Scenario {
 	t.Helper()
-	all := AllAPI104Scenarios()
-	require.Len(t, all, 1, "AllAPI104Scenarios")
-	return all[0]
+	for _, sc := range AllAPI104Scenarios() {
+		if sc.Name() == "S76-Widgets" {
+			return sc
+		}
+	}
+	require.Fail(t, "AllAPI104Scenarios has no S76-Widgets")
+	return nil
 }
 
 const (

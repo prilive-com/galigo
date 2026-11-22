@@ -69,7 +69,7 @@ func TestHandleHelp_Text(t *testing.T) {
 	assert.Equal(t, []string{"  api103 - Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup"}, api103)
 	// B-65 65f: one api104 line under its heading, after the 10.3 lines.
 	h103 := slices.Index(lines, "Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73):")
-	h104 := slices.Index(lines, "Bot API 10.4 (S76 widgets, refusal only):")
+	h104 := slices.Index(lines, "Bot API 10.4 (S76 widgets, refusal only; S77 rich quotes):")
 	require.GreaterOrEqual(t, h104, 0, "no 10.4 heading")
 	assert.Greater(t, h104, h103, "the 10.4 heading comes after the 10.3 heading")
 	var api104 []string
@@ -78,7 +78,7 @@ func TestHandleHelp_Text(t *testing.T) {
 			api104 = append(api104, l)
 		}
 	}
-	require.Equal(t, []string{"  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)"}, api104)
+	require.Equal(t, []string{"  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only); rich quotes (quote_rich_texts)"}, api104)
 	require.Greater(t, len(lines), h104+1)
 	assert.Equal(t, api104[0], lines[h104+1], "the api104 line is under its heading")
 

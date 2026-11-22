@@ -15,12 +15,18 @@ type MessageOrigin struct {
 }
 
 // TextQuote is the quoted part of the message that a message replies to (Bot API 7.0).
-// The 10.4 field rich_texts is not supported yet.
 type TextQuote struct {
 	Text     string          `json:"text"` // may be empty if the quote was chosen from a rich message
 	Entities []MessageEntity `json:"entities,omitempty"`
-	Position int             `json:"position"` // approximate position in the original message, in UTF-16 code units
-	IsManual bool            `json:"is_manual,omitempty"`
+	// RichTexts (Bot API 10.4) is the rich text of the quote if it was chosen from a rich message. A null element
+	// decodes as a zero RichText and an unknown kind as RichTextUnknown, but a non-null value that is not an array
+	// fails the decode of the whole message.
+	RichTexts []RichText `json:"rich_texts,omitempty"`
+	// Position is the approximate position of the quote in the original message, in UTF-16 code units. For a quote
+	// from a rich message it is the position in the text made by joining the plain texts of all quotable texts with
+	// line feeds.
+	Position int  `json:"position"`
+	IsManual bool `json:"is_manual,omitempty"`
 }
 
 // ExternalReplyInfo describes the message a message replies to, which may come from another chat

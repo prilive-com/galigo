@@ -162,7 +162,10 @@ func b100EmptyLists(v reflect.Value) {
 // field has, so a wrong Format that drops, swaps, re-encodes or writes through a field changes the output or the JSON:
 // strings hold an invalid UTF-8 byte and a space at each
 // end, every second number is negative, bools are true, a list has two items in descending order, an interface holds an
-// int64. Another kind panics, so a new field type cannot go untested. The caller sets the token.
+// int64, except a tg.RichTextNode (reached through ReplyParameters.QuoteRichTexts, Bot API 10.4), which holds a
+// tg.RichTextBold with such strings. The tg twin (tg/inline_format_b100_test.go) keeps int64 for every interface,
+// because InputInvoiceMessageContent reaches no RichTextNode. Another kind panics, so a new field type cannot go
+// untested. The caller sets the token.
 func b100Fill(p any) {
 	n := 0
 	b100FillValue(reflect.ValueOf(p).Elem(), 0, &n)
@@ -192,6 +195,10 @@ func b100FillValue(v reflect.Value, depth int, n *int) {
 	case reflect.Float32, reflect.Float64:
 		v.SetFloat(float64(i) + 0.5)
 	case reflect.Interface:
+		if v.Type() == reflect.TypeFor[tg.RichTextNode]() { // an int64 is no node
+			v.Set(reflect.ValueOf(tg.RichTextBold{Type: fmt.Sprintf(" f%d\xff ", *n), Text: tg.RichText{Plain: fmt.Sprintf(" g%d\xff ", *n)}}))
+			return
+		}
 		v.Set(reflect.ValueOf(i * 1000))
 	case reflect.Pointer:
 		v.Set(reflect.New(v.Type().Elem()))
@@ -938,4 +945,29 @@ func b100NoToken(t *testing.T, got string) {
 	assert.NotContains(t, got, b100Token)
 	assert.NotContains(t, got, fmt.Sprintf("%x", b100Token))
 	assert.NotContains(t, got, fmt.Sprintf("%X", b100Token))
+}
+
+// S-b100 filler (O-T1-02, A-T1-03): b100Fill puts two distinct, populated RichTextBold nodes into QuoteRichTexts, keeps
+// an int64 in an ordinary interface, and still panics on another named interface, so each wrong filler fails a named
+// assertion here (a panic elsewhere is no kill for the mutation runner).
+func TestB65G_B100Filler(t *testing.T) {
+	var v struct {
+		RP *tg.ReplyParameters
+		A  any
+	}
+	require.NotPanics(t, func() { b100Fill(&v) })
+	require.NotNil(t, v.RP)
+	require.Len(t, v.RP.QuoteRichTexts, 2)
+	var seen []string
+	for i, rt := range v.RP.QuoteRichTexts {
+		b, ok := rt.Node.(tg.RichTextBold)
+		require.True(t, ok, "element %d: %T", i, rt.Node)
+		require.NotEmpty(t, b.Type, "element %d", i)
+		require.NotEmpty(t, b.Text.Plain, "element %d", i)
+		seen = append(seen, b.Type+"|"+b.Text.Plain)
+	}
+	assert.NotEqual(t, seen[0], seen[1], "the two nodes are distinct")
+	assert.IsType(t, int64(0), v.A, "an ordinary interface keeps an int64")
+	var w struct{ S fmt.Stringer }
+	assert.Panics(t, func() { b100Fill(&w) }, "another named interface still panics")
 }

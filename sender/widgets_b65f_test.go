@@ -1092,21 +1092,28 @@ func TestB65F_U1_HugeID(t *testing.T) {
 }
 
 // U4d: width and height are sent as given, also outside the range the app clamps them to (width from 200, height
-// 50-600), and also when negative: the clamping is the app's (Bot API 10.4), not galigo's.
+// 50-600), also when negative, and each one alone (a zero size is left out): the clamping is the app's (Bot API
+// 10.4), not galigo's.
 func TestB65F_U4d_SizeAsGiven(t *testing.T) {
-	sizes := []struct{ w, h int }{{100, 10}, {199, 49}, {1, 601}, {5000, 700}, {-1, -2}}
+	sizes := []struct{ w, h int }{{100, 10}, {199, 49}, {1, 601}, {5000, 700}, {-1, -2}, {300, 0}, {0, 450}}
 	for _, z := range sizes {
+		dims := ""
+		if z.w != 0 {
+			dims += fmt.Sprintf(`,"width":%d`, z.w)
+		}
+		if z.h != 0 {
+			dims += fmt.Sprintf(`,"height":%d`, z.h)
+		}
 		t.Run(fmt.Sprintf("sendWidget %dx%d", z.w, z.h), func(t *testing.T) {
 			server, client := b65fClient(t)
 			_, err := client.SendWidget(context.Background(), sender.SendWidgetRequest{ChatID: api100Chat, HTML: "h", Width: z.w, Height: z.h})
 			require.NoError(t, err)
-			assert.JSONEq(t, fmt.Sprintf(`{"chat_id":-1001234567890,"html":"h","width":%d,"height":%d}`, z.w, z.h),
-				b65fOne(t, server, "sendWidget").BodyString())
+			assert.JSONEq(t, `{"chat_id":-1001234567890,"html":"h"`+dims+`}`, b65fOne(t, server, "sendWidget").BodyString())
 		})
 		t.Run(fmt.Sprintf("InputWidgetMessageContent %dx%d", z.w, z.h), func(t *testing.T) {
 			b, err := json.Marshal(tg.InputWidgetMessageContent{HTML: "h", Width: z.w, Height: z.h})
 			require.NoError(t, err)
-			assert.JSONEq(t, fmt.Sprintf(`{"html":"h","width":%d,"height":%d}`, z.w, z.h), string(b))
+			assert.JSONEq(t, `{"html":"h"`+dims+`}`, string(b))
 		})
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 
@@ -39,7 +38,13 @@ func TestB65F_SuiteRoutesAPI104(t *testing.T) {
 	got, ok := suiteScenarios("all")
 	require.True(t, ok)
 	for _, name := range []string{"S76-Widgets", "S77-RichQuote"} {
-		assert.Equal(t, 1, strings.Count(","+strings.Join(b49Names(got), ",")+",", ","+name+","), name)
+		n := 0
+		for _, g := range b49Names(got) {
+			if g == name {
+				n++
+			}
+		}
+		assert.Equal(t, 1, n, name) // exact names: adjacent duplicates count twice (O-C1-03)
 	}
 }
 

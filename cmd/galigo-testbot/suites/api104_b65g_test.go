@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
 	"github.com/prilive-com/galigo/tg"
@@ -30,5 +29,4 @@ func TestB65G_S77(t *testing.T) {
 		&engine.ReplyRichQuoteStep{Label: "not in the message", Texts: []tg.RichText{{Plain: "absent text"}}, WantError: "QUOTE_TEXT_INVALID"},
 		&engine.CleanupStep{},
 	}, sc.Steps())
-	require.Equal(t, "QUOTE_TEXT_INVALID", s77QuoteInvalid)
 }

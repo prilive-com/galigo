@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,11 +62,13 @@ func TestB65G_StepOK(t *testing.T) {
 	rt.LastMessage = b65gSource()
 	src := rt.LastMessage
 	step := &ReplyRichQuoteStep{Label: "bold", Texts: b65gTexts(), Position: 7}
-	ctx := context.WithValue(context.Background(), b65gCtxKey{}, "run")
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), b65gCtxKey{}, "run"))
+	defer cancel()
 	res, err := step.Execute(ctx, rt)
 	require.NoError(t, err)
 	require.NotNil(t, cf.ctx)
 	assert.Equal(t, "run", cf.ctx.Value(b65gCtxKey{}), "the send gets the step's context")
+	assert.Equal(t, ctx.Done(), cf.ctx.Done(), "the send keeps the runner's cancel and deadline (O-C1-02)")
 	require.Len(t, f.messages, 1)
 	assert.Equal(t, testutil.TestChatID, f.messages[0].chatID)
 	assert.Equal(t, "galigo 10.4 rich quote bold", f.messages[0].text)
@@ -93,6 +96,7 @@ func TestB65G_StepBadReply(t *testing.T) {
 				{Node: tg.RichTextUnknown{Type: "bold", Raw: json.RawMessage(`{"type":"bold","text":"bold"}`)}}}}}
 		}},
 		{"position", "position 8", func(m *tg.Message) { m.Quote.Position = 8 }},
+		{"position lower", "position 6", func(m *tg.Message) { m.Quote.Position = 6 }}, // A-C1-01: both sides
 		{"not manual", "is_manual", func(m *tg.Message) { m.Quote.IsManual = false }},
 		{"no reply target", "does not point", func(m *tg.Message) { m.ReplyToMessage = nil }},
 		{"other reply target", "does not point", func(m *tg.Message) { m.ReplyToMessage.MessageID = 8 }},
@@ -179,6 +183,18 @@ func TestB65G_StepRefused(t *testing.T) {
 	assert.Equal(t, &tg.ReplyParameters{MessageID: 7, QuoteRichTexts: []tg.RichText{{Plain: "absent text"}}}, f.messages[0].opts.ReplyParameters)
 }
 
+// E-refused-wrapped (U1-04): a matching 400 wrapped by another error is still the refusal (errors.As, not a type
+// assertion).
+func TestB65G_StepRefusedWrapped(t *testing.T) {
+	refusal := &tg.APIError{Code: 400, Description: "Bad Request: QUOTE_TEXT_INVALID"}
+	f := &fake96{replies: []fake96Reply{{err: fmt.Errorf("send: %w", refusal)}}}
+	rt := b65gRuntime(f)
+	res, err := (&ReplyRichQuoteStep{Label: "absent", Texts: []tg.RichText{{Plain: "absent text"}}, WantError: "QUOTE_TEXT_INVALID"}).Execute(context.Background(), rt)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"label": "absent", "error_code": 400, "description": "Bad Request: QUOTE_TEXT_INVALID"}, res.Evidence)
+	assert.Empty(t, b65gTracked(rt))
+}
+
 // E-refused-bad (O-T1-04): a refusal row needs no message AND a 400 with the text; each other case fails. A returned
 // message is tracked (exact chat and id) and in MessageIDs; rt.LastMessage stays the source.
 func TestB65G_StepRefusedBad(t *testing.T) {
@@ -189,6 +205,7 @@ func TestB65G_StepRefusedBad(t *testing.T) {
 		msgID int
 	}{
 		{"nil, code 403", fake96Reply{err: &tg.APIError{Code: 403, Description: "Bad Request: QUOTE_TEXT_INVALID"}}, 0},
+		{"nil, code 399", fake96Reply{err: &tg.APIError{Code: 399, Description: "Bad Request: QUOTE_TEXT_INVALID"}}, 0}, // A-C1-01
 		{"nil, other text", fake96Reply{err: &tg.APIError{Code: 400, Description: "Bad Request: MESSAGE_ID_INVALID"}}, 0},
 		{"nil, not an API error", fake96Reply{err: errors.New("QUOTE_TEXT_INVALID")}, 0},
 		{"message, no error", fake96Reply{msg: &tg.Message{MessageID: 43}}, 43},

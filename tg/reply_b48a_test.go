@@ -1,7 +1,6 @@
 package tg_test
 
 import (
-	"encoding/json"
 	"reflect"
 	"sort"
 	"strings"
@@ -275,24 +274,6 @@ func TestB48A_ExternalFull(t *testing.T) {
 	assert.JSONEq(t, b48aOriginChannel, string(keys["origin"]))
 }
 
-// T-eri-2: the left-out key (rich_texts: 10.4) decodes leniently and has no field (widget has a field since B-65 65e). (paid_media has a field
-// since B-48b1: tg/paid_media_b48b_test.go T-hold-2.)
-func TestB48A_LeftOut(t *testing.T) {
-	for _, tc := range []struct {
-		name, in, key string
-		v             func() any
-	}{
-		{"rich_texts", `{"text":"a","position":0,"rich_texts":["a"]}`, "rich_texts", func() any { return &tg.TextQuote{} }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			require.NoError(t, json.Unmarshal([]byte(tc.in), tc.v()))
-			err := api96Strict(t, []byte(tc.in), tc.v())
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), `unknown field "`+tc.key+`"`)
-		})
-	}
-}
-
 // T-msg-1..5: the three Message holders decode from server-shaped messages; the other holders and the old forward
 // fields stay empty; the message re-encodes to the input.
 func TestB48A_MessageFields(t *testing.T) {
@@ -383,10 +364,10 @@ func TestB48A_ZeroEncode(t *testing.T) {
 	}
 }
 
-// The spec key lists, in spec order, without the left-out keys.
+// The spec key lists, in spec order (B-65 65g: rich_texts, the last left-out key, has a field).
 var b48aSpecKeys = map[string][]string{
 	"MessageOrigin": {"type", "date", "sender_user", "sender_user_name", "sender_chat", "author_signature", "chat", "message_id"},
-	"TextQuote":     {"text", "entities", "position", "is_manual"},
+	"TextQuote":     {"text", "entities", "rich_texts", "position", "is_manual"},
 	"ExternalReplyInfo": {"origin", "chat", "message_id", "link_preview_options", "animation", "audio", "document", "live_photo",
 		"paid_media", "photo", "sticker", "story", "video", "video_note", "voice", "widget", "has_media_spoiler", "checklist", "contact", "dice", "game",
 		"giveaway", "giveaway_winners", "invoice", "location", "poll", "venue"},
@@ -414,6 +395,7 @@ func TestB48A_Shapes(t *testing.T) {
 		}},
 		{tg.TextQuote{}, []row{
 			{"Text", "string", "text"}, {"Entities", "[]tg.MessageEntity", "entities,omitempty"},
+			{"RichTexts", "[]tg.RichText", "rich_texts,omitempty"},
 			{"Position", "int", "position"}, {"IsManual", "bool", "is_manual,omitempty"},
 		}},
 		{tg.ExternalReplyInfo{}, []row{
@@ -495,7 +477,8 @@ func TestB48A_Shapes(t *testing.T) {
 // that the new keys live only on their planned holders. The walk stops at interface fields.
 func TestB48A_KeyOwners(t *testing.T) {
 	watched := map[string]bool{"forward_origin": true, "external_reply": true, "quote": true, "origin": true,
-		"sender_user_name": true, "is_manual": true, "giveaway_winners": true, "winners_selection_date": true}
+		"sender_user_name": true, "is_manual": true, "giveaway_winners": true, "winners_selection_date": true,
+		"rich_texts": true, "quote_rich_texts": true, "paid_messages_waived": true} // B-65 65g: the 10.4 keys
 	seen := map[reflect.Type]bool{}
 	var owners []string
 	queue := []reflect.Type{reflect.TypeOf(tg.Update{}), reflect.TypeOf(tg.ReplyParameters{})}
@@ -520,8 +503,8 @@ func TestB48A_KeyOwners(t *testing.T) {
 	sort.Strings(owners)
 	assert.Equal(t, []string{
 		"ExternalReplyInfo.GiveawayWinners", "ExternalReplyInfo.Origin", "Giveaway.WinnersSelectionDate",
-		"GiveawayWinners.WinnersSelectionDate", "Message.ExternalReply", "Message.ForwardOrigin", "Message.Quote",
-		"MessageOrigin.SenderUserName", "ReplyParameters.Quote", "TextQuote.IsManual",
+		"GiveawayWinners.WinnersSelectionDate", "Message.ExternalReply", "Message.ForwardOrigin", "Message.PaidMessagesWaived", "Message.Quote",
+		"MessageOrigin.SenderUserName", "ReplyParameters.Quote", "ReplyParameters.QuoteRichTexts", "TextQuote.IsManual", "TextQuote.RichTexts",
 	}, owners)
 	for _, v := range []any{tg.Message{}, tg.MessageOrigin{}, tg.TextQuote{}, tg.ExternalReplyInfo{}, tg.Giveaway{},
 		tg.GiveawayWinners{}, tg.Invoice{}, tg.ReplyParameters{}} {

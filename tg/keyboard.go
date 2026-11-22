@@ -282,8 +282,11 @@ type KeyboardButton struct {
 
 // KeyboardButtonRequestManagedBot defines the parameters of a request to create a managed bot. Added in Bot API 9.6.
 type KeyboardButtonRequestManagedBot struct {
-	RequestID         int    `json:"request_id"`
-	SuggestedName     string `json:"suggested_name,omitempty"`
+	RequestID     int    `json:"request_id"`
+	SuggestedName string `json:"suggested_name,omitempty"`
+	// SuggestedUsername must end with "bot". If the user who creates the bot has Telegram Premium, it may also end
+	// with "agent", "ai", "app", "game" or "gay" (Bot API 10.4); such a username is assigned to the bot as a secondary
+	// username, and a regular username that ends with "bot" is assigned to the bot automatically.
 	SuggestedUsername string `json:"suggested_username,omitempty"`
 }
 

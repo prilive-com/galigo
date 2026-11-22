@@ -381,6 +381,7 @@ func TestAPI101C_RichTextNodeFallback(t *testing.T) {
 		{`{"text":"x"}`, ""},
 		{`{"type":"Bold","text":"a"}`, "Bold"},
 		{`{"type":"bold ","text":"a"}`, "bold "},
+		{`{"type":"ton_address","text":"t","address":5}`, "ton_address"}, // B-65 65g (O-T2-06): a field of the wrong JSON type
 	}
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
@@ -432,6 +433,8 @@ func rich101cTextKinds() []rich101cKind {
 			tg.RichTextPhoneNumber{Type: "phone_number", Text: t, PhoneNumber: "+1 (23) 45"}},
 		{"bank_card_number", false, `{"type":"bank_card_number","text":"t","bank_card_number":"4242 4242 4242 4242"}`,
 			tg.RichTextBankCardNumber{Type: "bank_card_number", Text: t, BankCardNumber: "4242 4242 4242 4242"}},
+		{"ton_address", false, `{"type":"ton_address","text":"t","address":"EQfake1"}`, // B-65 65g (10.4)
+			tg.RichTextTonAddress{Type: "ton_address", Text: t, Address: "EQfake1"}},
 		{"mention", true, `{"type":"mention","text":"t","username":"user_1"}`, tg.RichTextMention{Type: "mention", Text: t, Username: "user_1"}},
 		{"hashtag", true, `{"type":"hashtag","text":"t","hashtag":"tag"}`, tg.RichTextHashtag{Type: "hashtag", Text: t, Hashtag: "tag"}},
 		{"cashtag", true, `{"type":"cashtag","text":"t","cashtag":"USD"}`, tg.RichTextCashtag{Type: "cashtag", Text: t, Cashtag: "USD"}},
@@ -480,7 +483,7 @@ func TestAPI101C_RichTextKinds(t *testing.T) {
 		for _, k := range rich101cTextKinds() {
 			seen[fmt.Sprintf("%T", k.want)] = true
 		}
-		assert.Len(t, seen, 25)
+		assert.Len(t, seen, 26) // B-65 65g: ton_address
 	})
 }
 
@@ -744,7 +747,8 @@ func rich101cFuzzStable(t *testing.T, out1 []byte, decode func([]byte) any) {
 func FuzzRichText(f *testing.F) {
 	for _, s := range []string{`"abc"`, `""`, `[]`, `["a",{"type":"bold","text":"b"}]`, `[["x"],"y"]`,
 		`{"type":"italic","text":["p",{"type":"code","text":"q"}]}`, `null`, `123`, `true`, `"%2f +x "`,
-		`  "a"`, `"\q"`, `[1,`, ``, `{"type":"bold","text":"x"}`, `"s"`, `{invalid`, `[`, `"A"`} {
+		`  "a"`, `"\q"`, `[1,`, ``, `{"type":"bold","text":"x"}`, `"s"`, `{invalid`, `[`, `"A"`,
+		`{"type":"ton_address","text":"t","address":"EQfake1"}`} {
 		f.Add([]byte(s))
 	}
 	for _, b := range rich101cFixtureValues(f, "text") {
@@ -819,7 +823,7 @@ func init() {
 		tg.RichTextBold{}, tg.RichTextItalic{}, tg.RichTextUnderline{}, tg.RichTextStrikethrough{}, tg.RichTextSpoiler{},
 		tg.RichTextDateTime{}, tg.RichTextTextMention{}, tg.RichTextSubscript{}, tg.RichTextSuperscript{}, tg.RichTextMarked{},
 		tg.RichTextCode{}, tg.RichTextCustomEmoji{}, tg.RichTextMathematicalExpression{}, tg.RichTextURL{},
-		tg.RichTextEmailAddress{}, tg.RichTextPhoneNumber{}, tg.RichTextBankCardNumber{}, tg.RichTextMention{},
+		tg.RichTextEmailAddress{}, tg.RichTextPhoneNumber{}, tg.RichTextBankCardNumber{}, tg.RichTextTonAddress{}, tg.RichTextMention{},
 		tg.RichTextHashtag{}, tg.RichTextCashtag{}, tg.RichTextBotCommand{}, tg.RichTextAnchor{}, tg.RichTextAnchorLink{},
 		tg.RichTextReference{}, tg.RichTextReferenceLink{}, tg.RichTextButton{},
 		tg.RichBlockCaption{}, tg.RichBlockTableCell{}, tg.RichBlockListItem{}, tg.RichMessageButton{},
@@ -853,13 +857,13 @@ func rich101cTypeString(t reflect.Type) string {
 
 // T-shape
 func TestAPI101C_Shapes(t *testing.T) {
-	require.Len(t, rich101cShapes, 168)
+	require.Len(t, rich101cShapes, 171) // B-65 65g: RichTextTonAddress
 	byType := map[string][]rich101cShape{}
 	for _, s := range rich101cShapes {
 		byType[s.typ] = append(byType[s.typ], s)
 	}
-	require.Len(t, byType, 55)
-	require.Len(t, rich101cTypes, 55)
+	require.Len(t, byType, 56)
+	require.Len(t, rich101cTypes, 56)
 	for name, rows := range byType {
 		rt, ok := rich101cTypes[name]
 		require.True(t, ok, name)
@@ -922,7 +926,7 @@ func TestAPI101C_Sealed(t *testing.T) {
 			nBlock++
 		}
 	}
-	assert.Equal(t, 26, nText)
+	assert.Equal(t, 27, nText) // B-65 65g: RichTextTonAddress
 	assert.Equal(t, 24, nBlock)
 	assert.True(t, reflect.TypeOf(tg.RichTextUnknown{}).Implements(textNode))
 	assert.True(t, reflect.TypeOf(tg.RichBlockUnknown{}).Implements(block))
@@ -1030,6 +1034,9 @@ var rich101cShapes = []rich101cShape{
 	{"RichTextBankCardNumber", "Type", "string", `type`},
 	{"RichTextBankCardNumber", "Text", "RichText", `text`},
 	{"RichTextBankCardNumber", "BankCardNumber", "string", `bank_card_number`},
+	{"RichTextTonAddress", "Type", "string", `type`},
+	{"RichTextTonAddress", "Text", "RichText", `text`},
+	{"RichTextTonAddress", "Address", "string", `address`},
 	{"RichTextMention", "Type", "string", `type`},
 	{"RichTextMention", "Text", "RichText", `text`},
 	{"RichTextMention", "Username", "string", `username`},

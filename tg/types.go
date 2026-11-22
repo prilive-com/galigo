@@ -77,6 +77,7 @@ type Message struct {
 	ChatOwnerChanged      *ChatOwnerChanged     `json:"chat_owner_changed,omitempty"`      // 9.4
 	SenderTag             string                `json:"sender_tag,omitempty"`              // 9.5
 	ManagedBotCreated     *ManagedBotCreated    `json:"managed_bot_created,omitempty"`     // 9.6
+	PaidMessagesWaived    *PaidMessagesWaived   `json:"paid_messages_waived,omitempty"`    // 10.4
 	PollOptionAdded       *PollOptionAdded      `json:"poll_option_added,omitempty"`       // 9.6
 	PollOptionDeleted     *PollOptionDeleted    `json:"poll_option_deleted,omitempty"`     // 9.6
 	ReplyToPollOptionID   string                `json:"reply_to_poll_option_id,omitempty"` // 9.6: persistent id of the option replied to
@@ -172,6 +173,8 @@ type ChatPhoto struct {
 
 // MessageEntity represents a special entity in a text message.
 type MessageEntity struct {
+	// Type is the entity type as the spec names it, for example "bold" or "url". Bot API 10.4 added "ton_address"
+	// and "bank_card_number".
 	Type           string `json:"type"`
 	Offset         int    `json:"offset"`
 	Length         int    `json:"length"`
@@ -469,8 +472,18 @@ type ReplyParameters struct {
 	Quote                    string          `json:"quote,omitempty"`
 	QuoteParseMode           string          `json:"quote_parse_mode,omitempty"`
 	QuoteEntities            []MessageEntity `json:"quote_entities,omitempty"`
-	QuotePosition            int             `json:"quote_position,omitempty"`
-	PollOptionID             string          `json:"poll_option_id,omitempty"` // 9.6: persistent id of a poll option to reply to
+	// QuoteRichTexts (Bot API 10.4) are the quoted parts of a rich message to reply to: one element for each quoted
+	// text of the message, in order of appearance. Only plain text, bold, italic, underline, strikethrough, spoiler,
+	// subscript, superscript, date time, custom emoji, mathematical expression and arrays of them are kept in the
+	// quote; other kinds are replaced with their text. Up to 32 quoted texts with a total length up to 1024
+	// characters. galigo does not check them; the server does. If non-empty, then Quote, QuoteParseMode and
+	// QuoteEntities are ignored.
+	QuoteRichTexts []RichText `json:"quote_rich_texts,omitempty"`
+	// QuotePosition is the position of the quote in the original message, in UTF-16 code units. For a quote from a
+	// rich message it is the position in the text made by joining the plain texts of all quotable texts with line
+	// feeds.
+	QuotePosition int    `json:"quote_position,omitempty"`
+	PollOptionID  string `json:"poll_option_id,omitempty"` // 9.6: persistent id of a poll option to reply to
 }
 
 // LinkPreviewOptions describes options for link preview generation.

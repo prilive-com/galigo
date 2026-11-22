@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/prilive-com/galigo/sender"
@@ -68,6 +69,9 @@ func (s *WidgetRefusalStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 		}
 		id = rt.LastMessage.MessageID
 		if s.Variant == "missing" {
+			if id > math.MaxInt-1000000 {
+				return res, fmt.Errorf("%s: target message id %d is too large for the missing message id (target + 1000000)", s.Method, id)
+			}
 			id += 1000000
 		}
 	}

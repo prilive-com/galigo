@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"testing"
@@ -366,6 +367,27 @@ func TestB65F_Step_NoTarget(t *testing.T) {
 	}
 }
 
+// S6b: the missing row's id (target + 1000000) must fit in an int. A target too close to the int maximum stops the
+// step with a named error before any call; the largest target that fits is used.
+func TestB65F_Step_MissingIDRange(t *testing.T) {
+	s := b65fAllSteps()[4]
+	require.Equal(t, "missing", s.Variant)
+	f := &fakeWidget{err: b48c2Refusal(s.WantError)}
+	_, err := s.Execute(context.Background(), b65fRT(f, math.MaxInt-999999, "group"))
+	require.Error(t, err)
+	assert.Equal(t, fmt.Sprintf("editMessageWidgetData: target message id %d is too large for the missing message id (target + 1000000)",
+		math.MaxInt-999999), err.Error())
+	assert.Empty(t, f.reqs)
+	f = &fakeWidget{err: b48c2Refusal(s.WantError)}
+	res, err := s.Execute(context.Background(), b65fRT(f, math.MaxInt-1000000, "group"))
+	require.NoError(t, err)
+	require.Len(t, f.reqs, 1)
+	assert.Equal(t, b65fWantReq(s, math.MaxInt-1000000), f.reqs[0])
+	ev, ok := res.Evidence.(map[string]any)
+	require.True(t, ok, "evidence %T", res.Evidence)
+	assert.Equal(t, math.MaxInt, ev["message_id"])
+}
+
 // S7: the refusal constants are the measured texts.
 func TestB65F_Step_Constants(t *testing.T) {
 	assert.Equal(t, "INPUT_MEDIA_WIDGET_NOT_ALLOWED", WidgetNotAllowed)
@@ -510,6 +532,16 @@ func TestB65F_A1_Adapter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 42, msg.MessageID)
 	})
+	// The adapter sends width and height as given, also outside the range the app clamps them to and when negative.
+	for _, z := range []struct{ w, h int }{{100, 10}, {199, 601}, {5000, 700}, {-1, -2}} {
+		t.Run(fmt.Sprintf("sendWidget size %dx%d", z.w, z.h), func(t *testing.T) {
+			server, a := b65fAdapter(t)
+			_, err := a.SendWidget(context.Background(), sender.SendWidgetRequest{ChatID: b65fChat, HTML: "h", Width: z.w, Height: z.h})
+			require.NoError(t, err)
+			require.Equal(t, 1, server.CaptureCount())
+			b65fExact(t, fmt.Sprintf(`{"chat_id":%d,"html":"h","width":%d,"height":%d}`, b65fChat, z.w, z.h), server.LastCapture().Body)
+		})
+	}
 }
 
 // A1 (bools and markup): each bool alone and each reply_markup form reach the wire through the adapter.

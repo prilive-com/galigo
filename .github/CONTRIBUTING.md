@@ -38,7 +38,7 @@ We welcome:
 
 ### Prerequisites
 
-- Go 1.23 or later (1.25 recommended)
+- Go 1.27 or later
 - Git
 - A Telegram bot token (for integration tests)
 

@@ -78,10 +78,10 @@ jobs:
           fi
 
   # ============================================================
-  # JOB 2b: Minimum Go - the go 1.25 line in go.mod still builds and passes
+  # JOB 2b: Minimum Go - the go line in go.mod (go 1.27.0) still builds and passes
   # ============================================================
   test-minimum:
-    name: Test (ubuntu-latest, Go 1.25 minimum)
+    name: Test (ubuntu-latest, Go 1.27.0 minimum)
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local  # do not switch to the toolchain line
@@ -90,7 +90,7 @@ jobs:
 
       - uses: actions/setup-go@v7.0.0
         with:
-          go-version: '1.25.14'  # newest 1.25 patch
+          go-version: '1.27.0'  # the go line in go.mod (the minimum)
 
       - name: Build, vet and test on the minimum
         run: |

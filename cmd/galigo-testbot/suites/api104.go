@@ -4,12 +4,43 @@ import (
 	"time"
 
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
+	"github.com/prilive-com/galigo/tg"
 )
 
-// AllAPI104Scenarios returns the Bot API 10.4 scenarios (B-65 65f: S76; the 10.4 widget read side is decode-only,
-// B-65 65e).
+// AllAPI104Scenarios returns the Bot API 10.4 scenarios: S76 widget methods, refusal only (B-65 65f), and S77 rich
+// quotes (B-65 65g). The 10.4 widget read side is decode-only (B-65 65e). S76's rows run only in a group or
+// supergroup; S77 runs in an ordinary chat (private, group, supergroup), not in a channel direct messages chat.
 func AllAPI104Scenarios() []engine.Scenario {
-	return []engine.Scenario{S76_Widgets()}
+	return []engine.Scenario{S76_Widgets(), S77_RichQuote()}
+}
+
+// s77QuoteInvalid is the refusal of a quote that is not in the message (measured 2026-11-22 in the test group).
+const s77QuoteInvalid = "QUOTE_TEXT_INVALID"
+
+// S77_RichQuote sends a rich message with two paragraphs (the first with a bold node) and replies to it three times
+// with ReplyParameters.QuoteRichTexts (Bot API 10.4): plain text, a bold node, and two quoted texts that span both
+// paragraphs. Each reply's quote must come back with the same rich texts, position and is_manual. A fourth reply
+// quotes text that is not in the message and must get the measured 400. The cleanup deletes the four messages.
+// Positions are UTF-16 indexes in the joined plain text "galigo quote bold end\nsecond para".
+func S77_RichQuote() engine.Scenario {
+	bold := tg.RichText{Node: tg.RichTextBold{Type: "bold", Text: tg.RichText{Plain: "bold"}}}
+	return &engine.BaseScenario{
+		ScenarioName:        "S77-RichQuote",
+		ScenarioDescription: "Replies quote parts of a rich message with quote_rich_texts (Bot API 10.4)",
+		CoveredMethods:      []string{"sendRichMessage", "sendMessage"},
+		ScenarioTimeout:     60 * time.Second,
+		ScenarioSteps: []engine.Step{
+			&engine.SendRichMessageStep{RichMessage: tg.InputRichMessage{Blocks: []tg.InputRichBlock{
+				tg.InputRichBlockParagraph{Text: tg.RichText{Parts: []tg.RichText{{Plain: "galigo quote "}, bold, {Plain: " end"}}}},
+				tg.InputRichBlockParagraph{Text: tg.RichText{Plain: "second para"}},
+			}}, WantBlocks: []string{"paragraph", "paragraph"}},
+			&engine.ReplyRichQuoteStep{Label: "plain", Texts: []tg.RichText{{Plain: "quote"}}, Position: 7},
+			&engine.ReplyRichQuoteStep{Label: "bold", Texts: []tg.RichText{{Parts: []tg.RichText{{Plain: "quote "}, bold}}}, Position: 7},
+			&engine.ReplyRichQuoteStep{Label: "two texts", Texts: []tg.RichText{{Plain: "end"}, {Plain: "second"}}, Position: 18},
+			&engine.ReplyRichQuoteStep{Label: "not in the message", Texts: []tg.RichText{{Plain: "absent text"}}, WantError: s77QuoteInvalid},
+			&engine.CleanupStep{},
+		},
+	}
 }
 
 // S76_Widgets calls the five widget methods (Bot API 10.4), refusal only: the server refuses sendWidget for this bot

@@ -88,6 +88,15 @@ func TestSenderAdapter96(t *testing.T) {
 		assert.JSONEq(t, `{"chat_id":123456789,"text":"t","reply_parameters":{"message_id":5,"poll_option_id":"pb"}}`,
 			server.LastCapture().BodyString())
 	})
+	t.Run("SendMessage with QuoteRichTexts", func(t *testing.T) { // B-65 65g: the adapter passes the 10.4 field on
+		a, server := newAdapter(t, "sendMessage", msg)
+		_, err := a.SendMessage(context.Background(), testutil.TestChatID, "t",
+			WithReplyParameters(&tg.ReplyParameters{MessageID: 5, QuoteRichTexts: []tg.RichText{{Plain: "q"}}, QuotePosition: 3}))
+		require.NoError(t, err)
+		require.Equal(t, 1, server.CaptureCount())
+		assert.Equal(t, `{"chat_id":123456789,"text":"t","reply_parameters":{"message_id":5,"quote_rich_texts":["q"],"quote_position":3}}`,
+			server.LastCapture().BodyString())
+	})
 	t.Run("SendMessage without the option", func(t *testing.T) {
 		a, server := newAdapter(t, "sendMessage", msg)
 		_, err := a.SendMessage(context.Background(), testutil.TestChatID, "t")

@@ -280,7 +280,7 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	// Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in "ephemeral", S73)
 	case "api103", "api-103", "10.3":
 		scenarios = suites.AllAPI103Scenarios()
-	// Bot API 10.4 (S76 widgets, refusal only)
+	// Bot API 10.4 (S76 widgets, refusal only; S77 rich quotes)
 	case "api104", "api-104", "10.4":
 		scenarios = suites.AllAPI104Scenarios()
 	case "all":
@@ -736,8 +736,8 @@ Bot API 10.2 (S68, S69):
 Bot API 10.3 (S74 rich messages, S75 reply markup; the 10.3 ephemeral changes are in ephemeral, S73):
   api103 - Rich message buttons, button nodes, compact tables, expandable quotations, document blocks; reply markup
 
-Bot API 10.4 (S76 widgets, refusal only):
-  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only)
+Bot API 10.4 (S76 widgets, refusal only; S77 rich quotes):
+  api104 - Widget methods: sendWidget, sendSharedWidget, answerWidgetQuery, editMessageWidgetData, editSharedWidgetData (refusal only); rich quotes (quote_rich_texts)
 
 Interactive (opt-in, excluded from "all"):
   interactive - Callback query tests (requires user click)

@@ -481,7 +481,7 @@ go test -coverpkg=./... -coverprofile=coverage.out ./...
 GitHub Actions runs `.github/workflows/ci.yml` on every push to `main` or `develop` and on every pull request to `main`. Its test jobs:
 
 - `test`: `go test ./... -race -shuffle=on -count=1 -timeout=10m` on Linux. macOS and Windows run the same command without `-race`.
-- `test-minimum`: build, vet and test on the oldest supported Go line, 1.25 (`go 1.25` in `go.mod`), with Go 1.25.14 and `GOTOOLCHAIN=local`.
+- `test-minimum`: build, vet and test on the oldest supported Go version, `go 1.27.0` in `go.mod`, with Go 1.27.0 and `GOTOOLCHAIN=local`.
 - `coverage`: the coverage gate below.
 
 `govulncheck ./...` runs in `.github/workflows/security.yml` (push and pull request to `main`, and weekly), not in `ci.yml`.

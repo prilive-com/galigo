@@ -17,7 +17,7 @@ galigo is designed for high-load environments where reliability matters. Unlike 
 - **Secure** — fmt and slog redact the bot token, the webhook secret and the client and config types that hold them, and fmt and slog's text handler redact the payment `ProviderToken` of the invoice requests (JSON still sends it); errors from `http.NewRequestWithContext` and `http.Client.Do` are scrubbed of the token (some paths still print a secret: see [SECURITY.md](.github/SECURITY.md)); TLS 1.2+ enforced
 - **Complete** — Full Telegram Bot API coverage including Stars, Gifts, Business, and Forum Topics
 - **Flexible** — Use the unified Bot type or import only `sender/` or `receiver/` packages
-- **Modern** — Built for Go 1.25+ with generics, iterators, and structured logging
+- **Modern** — Built for Go 1.27+ with generics, iterators, and structured logging
 
 ## Installation
 
@@ -25,7 +25,7 @@ galigo is designed for high-load environments where reliability matters. Unlike 
 go get github.com/prilive-com/galigo
 ```
 
-**Requirements:** Go 1.25 or later
+**Requirements:** Go 1.27 or later
 
 ## Quick Start
 
@@ -96,7 +96,7 @@ func main() {
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| **Go** | 1.25+ | Uses generics, iter.Seq, log/slog |
+| **Go** | 1.27+ | Uses generics, iter.Seq, log/slog |
 | **Telegram Bot API** | 8.0–10.2 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming, Managed Bots, Live Photos, Poll Media, Rich Messages, Ephemeral Messages, Communities |
 | **Platforms** | Linux, macOS, Windows | Pure Go, no CGO |
 

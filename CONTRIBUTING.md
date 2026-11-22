@@ -15,7 +15,7 @@ Thank you for considering contributing to galigo! This guide will help you get s
 
 ### Prerequisites
 
-- Go 1.25 or later
+- Go 1.27 or later
 - golangci-lint (for linting)
 
 ### Setup

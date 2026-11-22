@@ -275,10 +275,10 @@ type b31TextKey string
 
 func (b31TextKey) MarshalText() ([]byte, error) { return []byte("text"), nil }
 
-// b31JSONKey returns the key encoding/json writes for a SecretToken map key on this Go version. go1.27.0 and go1.27.1
-// call MarshalText for a map key of string kind, so they write [REDACTED]; Go 1.26 and go1.27.2 and later do not
-// (golang/go#81362, a 1.27 backport; golang/go#81355 is still open for Go 1.28). The probe asks encoding/json, not the
-// version string.
+// b31JSONKey returns the key the active encoding/json writes for a SecretToken map key. The default encoder of go1.27.0
+// and go1.27.1 calls MarshalText for a map key of string kind, so it writes [REDACTED]; Go 1.26, go1.27.2 and later,
+// and GOEXPERIMENT=nojsonv2 do not (golang/go#81362, a 1.27 backport; golang/go#81355 is still open for Go 1.28). The
+// probe asks encoding/json, not the version string or GOEXPERIMENT.
 func b31JSONKey(t *testing.T) string {
 	b, err := json.Marshal(map[b31TextKey]int{"k": 1})
 	require.NoError(t, err)
@@ -300,10 +300,11 @@ type b31HasPtr struct{ P *b31Exported }
 // reached through an unexported field; fmt's bad-verb text (%w of a non-error value, and of an error outside
 // fmt.Errorf; %p; a pointer below the top level with a verb a pointer does not support: in a struct field, a slice,
 // an array, a map element and an interface value); encoder paths that read the string itself (a JSON map key, an
-// XML comment field, an XML chardata or cdata field of type **SecretToken, gob). The doc's Go-version-dependent
-// paths (a *SecretToken JSON map key, an XML field of interface type) have no row: their output differs between the
-// CI toolchains. If a Go release changes one of the pinned paths, this fails and the doc comment must change with
-// it.
+// XML comment field, an XML chardata or cdata field of type **SecretToken, gob). The two JSON map key rows are not
+// pinned: they take the key from b31JSONKey, which follows the active encoder (the go1.27.0 and go1.27.1 exception).
+// The doc's other Go-version-dependent paths (a *SecretToken JSON map key, an XML field of interface type) have no
+// row: their output differs between the CI toolchains. If a Go release changes one of the pinned paths, this fails
+// and the doc comment must change with it.
 func TestB31_DocumentedLimits(t *testing.T) {
 	tok := tg.SecretToken(b31Secret)
 	w, p, s := "x %w", "%p", "%s" // in variables: go vet rejects %w for this argument in a constant format

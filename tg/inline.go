@@ -111,6 +111,39 @@ type InputRichMessageContent struct {
 
 func (InputRichMessageContent) inputMessageContentTag() {}
 
+// InputWidgetMessageContent represents the content of a message with an HTML widget to be sent as the result of an
+// inline query (Bot API 10.4). Currently, widgets can't be sent in response to inline queries in the production
+// environment.
+type InputWidgetMessageContent struct {
+	HTML                  string          `json:"html"`
+	Width                 int             `json:"width,omitempty"`
+	Height                int             `json:"height,omitempty"`
+	PublicData            string          `json:"public_data,omitempty"`
+	ChatData              string          `json:"chat_data,omitempty"`
+	Caption               string          `json:"caption,omitempty"`
+	ParseMode             string          `json:"parse_mode,omitempty"`
+	CaptionEntities       []MessageEntity `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool            `json:"show_caption_above_media,omitempty"`
+	AllowQueries          bool            `json:"allow_queries,omitempty"`
+	IsShared              bool            `json:"is_shared,omitempty"`
+}
+
+func (InputWidgetMessageContent) inputMessageContentTag() {}
+
+// InputSharedWidgetMessageContent represents the content of a message with a shared widget to be sent as the result
+// of an inline query (Bot API 10.4). Currently, widgets can't be sent in response to inline queries in the
+// production environment.
+type InputSharedWidgetMessageContent struct {
+	WidgetID              string          `json:"widget_id"`
+	ChatData              string          `json:"chat_data,omitempty"`
+	Caption               string          `json:"caption,omitempty"`
+	ParseMode             string          `json:"parse_mode,omitempty"`
+	CaptionEntities       []MessageEntity `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool            `json:"show_caption_above_media,omitempty"`
+}
+
+func (InputSharedWidgetMessageContent) inputMessageContentTag() {}
+
 // InputLocationMessageContent represents location content for an inline query result.
 type InputLocationMessageContent struct {
 	Latitude             float64 `json:"latitude"`

@@ -347,6 +347,15 @@ func TestB51_ChatLessMethodsCensus(t *testing.T) {
 				Results: []tg.InlineQueryResult{tg.InlineQueryResultArticle{ID: "1", Title: "t",
 					InputMessageContent: tg.InputTextMessageContent{MessageText: "t"}}}})
 		}},
+		{"answerWidgetQuery", func(ctx context.Context, c *sender.Client) error { // B-65 65f
+			return c.AnswerWidgetQuery(ctx, sender.AnswerWidgetQueryRequest{WidgetQueryID: "q"})
+		}},
+		{"editSharedWidgetData", func(ctx context.Context, c *sender.Client) error { // B-65 65f
+			return c.EditSharedWidgetData(ctx, sender.EditSharedWidgetDataRequest{WidgetID: "w"})
+		}},
+		{"editMessageWidgetData inline", func(ctx context.Context, c *sender.Client) error { // B-65 65f
+			return c.EditMessageWidgetData(ctx, sender.EditMessageWidgetDataRequest{InlineMessageID: "i"})
+		}},
 		{"setGameScore inline", func(ctx context.Context, c *sender.Client) error {
 			_, err := c.SetGameScore(ctx, sender.SetGameScoreRequest{UserID: 5000000001, Score: 1, InlineMessageID: "i"})
 			return err

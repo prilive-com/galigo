@@ -84,7 +84,7 @@ func b145Count(server *testutil.MockTelegramServer, method string) int {
 
 func b145Super() *ChatContext { return &ChatContext{ChatID: b145CID, ChatType: "supergroup"} }
 
-// failTransport fails every round trip with err and counts the calls (no network).
+// b145FailTransport fails every round trip with err and counts the calls (no network).
 type b145FailTransport struct {
 	n   atomic.Int32
 	err error

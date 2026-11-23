@@ -303,7 +303,9 @@ func TestB48C2_Shapes(t *testing.T) {
 				assert.Equal(t, []int{p.Index[0] + 1}, f.Index, "Message.%s must follow %s", h.name, after[i])
 			}
 		}
-		assert.Equal(t, "SuggestedPostRefunded", rt.Field(rt.NumField()-1).Name, "the last Message field")
+		// B-65 65h: TonWalletTransfer (10.4) follows SuggestedPostRefunded, so the suggested post fields end just before it.
+		assert.Equal(t, "SuggestedPostRefunded", rt.Field(rt.NumField()-2).Name, "the last suggested post field")
+		assert.Equal(t, "TonWalletTransfer", rt.Field(rt.NumField()-1).Name, "the last Message field")
 	})
 }
 

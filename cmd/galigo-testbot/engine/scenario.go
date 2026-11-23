@@ -324,6 +324,7 @@ type SenderClient interface {
 
 	// Extended: Gifts
 	GetAvailableGifts(ctx context.Context) (*tg.Gifts, error)
+	GetChatShareThemeBackdrops(ctx context.Context) (*tg.ChatShareThemeBackdrops, error) // Bot API 10.4
 
 	// Extended: Checklists
 	SendChecklist(ctx context.Context, chatID int64, title string, tasks []string) (*tg.Message, error)

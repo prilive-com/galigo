@@ -57,6 +57,8 @@ type ChatFullInfo struct {
 	PaidMessageStarCount               int               `json:"paid_message_star_count,omitempty"` // 9.3
 	GuardBot                           *User             `json:"guard_bot,omitempty"`               // 10.1: chat administrators only
 	Community                          *Community        `json:"community,omitempty"`               // 10.2
+	TonWalletCard                      *TonWalletCard    `json:"ton_wallet_card,omitempty"`         // 10.4: private chats
+	ShareTheme                         *ChatShareTheme   `json:"share_theme,omitempty"`             // 10.4
 }
 
 // ChatLocation represents a location to which a chat is connected.

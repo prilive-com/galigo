@@ -37,6 +37,16 @@ func (c *Client) GetChat(ctx context.Context, chatID tg.ChatID) (*tg.ChatFullInf
 	return &result, nil
 }
 
+// GetChatShareThemeBackdrops returns the backdrops that a chat share theme can use (Bot API 10.4). A null result is an
+// empty list, not an error.
+func (c *Client) GetChatShareThemeBackdrops(ctx context.Context) (*tg.ChatShareThemeBackdrops, error) {
+	var result tg.ChatShareThemeBackdrops
+	if err := c.callJSON(ctx, "getChatShareThemeBackdrops", struct{}{}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // getChatAdministratorsRequest is the body of getChatAdministrators; ReturnBots is omitted when false.
 type getChatAdministratorsRequest struct {
 	ChatID     tg.ChatID `json:"chat_id"`

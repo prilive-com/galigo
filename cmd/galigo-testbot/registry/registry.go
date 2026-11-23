@@ -133,6 +133,9 @@ var AllMethods = []Method{
 	// === Extended: Gifts ===
 	{Name: "getAvailableGifts", Category: CategoryExtended},
 
+	// === Extended: Chat share themes (Bot API 10.4) ===
+	{Name: "getChatShareThemeBackdrops", Category: CategoryExtended},
+
 	// === Extended: Checklists ===
 	{Name: "sendChecklist", Category: CategoryExtended},
 	{Name: "editMessageChecklist", Category: CategoryExtended},

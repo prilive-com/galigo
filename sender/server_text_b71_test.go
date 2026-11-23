@@ -314,6 +314,15 @@ func TestResultDecodeScrubbed(t *testing.T) {
 		// one pass: label71Token holds "pars" and "REDACTED", so a scrub of the label or a second pass changes the text
 		{"callJSON getChat, one pass", `{"id":` + b71Big + `}`, func(c *sender.Client) error { _, err := c.GetChat(ctx, chat); return err }, "getChat",
 			"galigo: getChat: failed to parse response: " + num("ChatFullInfo.id of type int64"), num("ChatFullInfo.id of type int64"), true, chainNum, label71Token},
+		// B-65 65h (O-T3-03): the getter's result decode error goes through callJSON's scrub
+		{"callJSON getChatShareThemeBackdrops, one pass", `{"backdrops":[{"id":` + b71Big + `}]}`, func(c *sender.Client) error {
+			got, err := c.GetChatShareThemeBackdrops(ctx)
+			if got != nil {
+				return fmt.Errorf("backdrops returned with the error %w", err)
+			}
+			return err
+		}, "getChatShareThemeBackdrops", "galigo: getChatShareThemeBackdrops: failed to parse response: " + num("ChatShareThemeBackdrops.backdrops.0.id of type int"),
+			num("ChatShareThemeBackdrops.backdrops.0.id of type int"), true, chainNum, label71Token},
 		{"copyMessage, one pass", `{"message_id":` + b71Big + `}`, func(c *sender.Client) error {
 			_, err := c.CopyMessage(ctx, sender.CopyMessageRequest{ChatID: chat, FromChatID: chat, MessageID: 1})
 			return err

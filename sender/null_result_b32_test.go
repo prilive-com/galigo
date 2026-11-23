@@ -399,6 +399,7 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 	const btn = "galigo: savePreparedKeyboardButton: empty id in response"
 	const gst = "galigo: answerGuestQuery: empty inline_message_id in response"
 	const acc = "galigo: getManagedBotAccessSettings: null result in response"
+	const ugi = "galigo: getUniqueGift: empty gift_id in response" // B-65 65i
 	leaves := []struct {
 		method string
 		steps  []step
@@ -426,6 +427,12 @@ func TestB32_NoBreakerTrip(t *testing.T) {
 		{"getManagedBotAccessSettings", []step{{b32Body(`null`), acc}, {b32Body(`{"is_access_restricted":true}`), ""},
 			{b32Body(`null`), acc}}, func(c *sender.Client) (bool, error) {
 			got, err := b32Access(c)
+			return got == nil, err
+		}},
+		// B-65 65i (S-ug-breaker): getUniqueGift's empty-gift_id error is made outside the breaker
+		{"getUniqueGift", []step{{b32Body(`null`), ugi}, {b32Body(`{}`), ugi}, {b32Body(`{"gift_id":""}`), ugi},
+			{b32Body(`{"gift_id":"g-B32"}`), ""}, {b32Body(`null`), ugi}}, func(c *sender.Client) (bool, error) {
+			got, err := c.GetUniqueGift(context.Background(), "PlushPepe-1")
 			return got == nil, err
 		}},
 	}

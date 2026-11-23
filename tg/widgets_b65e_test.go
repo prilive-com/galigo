@@ -102,7 +102,8 @@ func TestB65E_ERIWidget(t *testing.T) {
 		Widget: &tg.Widget{HTML: "h", Width: 10}}, e)
 }
 
-// The full wallet card of T-qtype (1), as the encoder writes it (struct order; no gift_id).
+// The full wallet card of T-qtype (1); the encoder writes gift_id first (struct order, B-65 65i), so 01_full_card's
+// out puts it before this head, while its input sends it last.
 const (
 	b65eSticker1 = `{"file_id":"f1","file_unique_id":"u1","type":"custom_emoji","width":100,"height":101,"is_animated":true,"is_video":false}`
 	b65eSticker2 = `{"file_id":"f2","file_unique_id":"u2","type":"regular","width":102,"height":103,"is_animated":false,"is_video":true}`
@@ -129,7 +130,7 @@ func b65ePositionV() tg.AreaPosition {
 }
 
 func b65eCardV() *tg.TonWalletCard {
-	gift := &tg.UniqueGift{BaseName: "bn", Name: "gn", Number: 11,
+	gift := &tg.UniqueGift{GiftID: "g99", BaseName: "bn", Name: "gn", Number: 11,
 		Model: tg.UniqueGiftModel{Name: "mn", Sticker: tg.Sticker{FileID: "f1", FileUniqueID: "u1", Type: "custom_emoji",
 			Width: 100, Height: 101, IsAnimated: true}, RarityPerMille: 0, Rarity: "rare"},
 		Symbol: tg.UniqueGiftSymbol{Name: "sn", Sticker: tg.Sticker{FileID: "f2", FileUniqueID: "u2", Type: "regular",
@@ -165,7 +166,7 @@ func TestB65E_QueryType(t *testing.T) {
 	}{
 		{name: "01_full_card", in: `{"type":"data","wallet_card":` + b65eCard(b65eGiftHead+`,"gift_id":"g99"}`) + `}`,
 			want: tg.WidgetQueryType{Type: "data", WalletCard: b65eCardV()},
-			out:  `{"type":"data","wallet_card":` + b65eCard(b65eGiftHead+`}`) + `}`},
+			out:  `{"type":"data","wallet_card":` + b65eCard(`{"gift_id":"g99",`+b65eGiftHead[1:]+`}`) + `}`},
 		{name: "01b_min_nft", in: `{"type":"data","wallet_card":` + minCard + `}`,
 			want: tg.WidgetQueryType{Type: "data", WalletCard: &tg.TonWalletCard{Address: "EQfake1", Amount: "1",
 				Stickers: []tg.TonWalletCardSticker{{Position: b65ePositionV(),

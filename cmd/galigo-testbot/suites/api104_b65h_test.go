@@ -26,5 +26,5 @@ func TestB65H_API104Names(t *testing.T) {
 	for _, sc := range AllAPI104Scenarios() {
 		names = append(names, sc.Name())
 	}
-	assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"}, names)
+	assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops", "S79-UniqueGift"}, names) // B-65 65i
 }

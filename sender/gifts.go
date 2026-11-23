@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/prilive-com/galigo/tg"
 )
@@ -36,6 +37,13 @@ type UpgradeGiftRequest struct {
 
 // ConvertGiftToStarsRequest represents a convertGiftToStars request.
 type ConvertGiftToStarsRequest struct {
+	BusinessConnectionID string `json:"business_connection_id"`
+	OwnedGiftID          string `json:"owned_gift_id"`
+}
+
+// DeleteBusinessAccountGiftRequest represents a deleteBusinessAccountGift request (Bot API 10.4). Both ids are
+// required and sent as given.
+type DeleteBusinessAccountGiftRequest struct {
 	BusinessConnectionID string `json:"business_connection_id"`
 	OwnedGiftID          string `json:"owned_gift_id"`
 }
@@ -108,4 +116,36 @@ func (c *Client) ConvertGiftToStars(ctx context.Context, req ConvertGiftToStarsR
 
 	// NO RETRY — value operation
 	return c.callJSON(ctx, "convertGiftToStars", req, nil)
+}
+
+// GetUniqueGift returns a unique gift by its name (Bot API 10.4), for example "PlushPepe-1". The name is sent as
+// given. A result without a gift_id (null, {} or an empty gift_id) is an error. Not retried.
+func (c *Client) GetUniqueGift(ctx context.Context, name string) (*tg.UniqueGift, error) {
+	if name == "" {
+		return nil, tg.NewValidationError("name", "required")
+	}
+	var result tg.UniqueGift
+	if err := c.callJSON(ctx, "getUniqueGift", struct {
+		Name string `json:"name"`
+	}{name}, &result); err != nil {
+		return nil, err
+	}
+	if result.GiftID == "" {
+		return nil, fmt.Errorf("galigo: getUniqueGift: empty gift_id in response")
+	}
+	return &result, nil
+}
+
+// DeleteBusinessAccountGift deletes a gift from a managed business account (Bot API 10.4). It needs the business
+// bot right can_convert_gifts_to_stars, and only a gift that is not limited and not refunded can be deleted.
+// NO RETRY — value operation: after a lost answer the gift may already be gone.
+func (c *Client) DeleteBusinessAccountGift(ctx context.Context, req DeleteBusinessAccountGiftRequest) error {
+	if req.BusinessConnectionID == "" {
+		return tg.NewValidationError("business_connection_id", "required")
+	}
+	if req.OwnedGiftID == "" {
+		return tg.NewValidationError("owned_gift_id", "required")
+	}
+	// NO RETRY — value operation
+	return c.callJSON(ctx, "deleteBusinessAccountGift", req, nil)
 }

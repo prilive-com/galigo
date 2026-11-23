@@ -13,6 +13,7 @@ type Gift struct {
 	UpgradeStarCount int     `json:"upgrade_star_count,omitempty"`
 	TotalCount       int     `json:"total_count,omitempty"`
 	RemainingCount   int     `json:"remaining_count,omitempty"`
+	PublisherChat    *Chat   `json:"publisher_chat,omitempty"` // 10.4: the chat that published the gift
 }
 
 // OwnedGifts represents a list of gifts owned by a user.
@@ -103,16 +104,23 @@ type UniqueGiftColors struct {
 }
 
 // UniqueGift represents a gift upgraded to a unique one.
-// Added in Bot API 9.0, updated in 9.3 and 9.4.
+// Added in Bot API 9.0, updated in 9.3, 9.4 and 10.4. The field order is not the spec's (Colors stays before
+// IsBurned); JSON key order is not a contract.
 type UniqueGift struct {
-	BaseName string             `json:"base_name"`
-	Name     string             `json:"name"`
-	Number   int                `json:"number"`
-	Model    UniqueGiftModel    `json:"model"`
-	Symbol   UniqueGiftSymbol   `json:"symbol"`
-	Backdrop UniqueGiftBackdrop `json:"backdrop"`
-	Colors   *UniqueGiftColors  `json:"colors,omitempty"`    // 9.3 — optional
-	IsBurned bool               `json:"is_burned,omitempty"` // 9.4
+	// GiftID is the identifier of the regular gift this unique gift was upgraded from (10.4, required; not an
+	// owned_gift_id). Encode always writes it.
+	GiftID           string             `json:"gift_id"`
+	BaseName         string             `json:"base_name"`
+	Name             string             `json:"name"`
+	Number           int                `json:"number"`
+	Model            UniqueGiftModel    `json:"model"`
+	Symbol           UniqueGiftSymbol   `json:"symbol"`
+	Backdrop         UniqueGiftBackdrop `json:"backdrop"`
+	IsPremium        bool               `json:"is_premium,omitempty"`         // 10.4: only Telegram Premium users can buy it
+	Colors           *UniqueGiftColors  `json:"colors,omitempty"`             // 9.3 — optional
+	IsBurned         bool               `json:"is_burned,omitempty"`          // 9.4
+	IsFromBlockchain bool               `json:"is_from_blockchain,omitempty"` // 10.4: assigned from the TON blockchain
+	PublisherChat    *Chat              `json:"publisher_chat,omitempty"`     // 10.4: the chat that published the gift
 }
 
 // UniqueGiftModel rarity constants (added in Bot API 9.4).

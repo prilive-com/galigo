@@ -485,6 +485,23 @@ func (a *SenderAdapter) GetAvailableGifts(ctx context.Context) (*tg.Gifts, error
 	return a.client.GetAvailableGifts(ctx)
 }
 
+// ================= Extended: Gifts (Bot API 10.4) =================
+
+// GetUniqueGift returns a unique gift by its name.
+func (a *SenderAdapter) GetUniqueGift(ctx context.Context, name string) (*tg.UniqueGift, error) {
+	return a.client.GetUniqueGift(ctx, name)
+}
+
+// GetBusinessConnection returns a business connection (S79's guard before the delete).
+func (a *SenderAdapter) GetBusinessConnection(ctx context.Context, businessConnectionID string) (*tg.BusinessConnection, error) {
+	return a.client.GetBusinessConnection(ctx, businessConnectionID)
+}
+
+// DeleteBusinessAccountGift deletes a gift from a business account.
+func (a *SenderAdapter) DeleteBusinessAccountGift(ctx context.Context, req sender.DeleteBusinessAccountGiftRequest) error {
+	return a.client.DeleteBusinessAccountGift(ctx, req)
+}
+
 // ================= Extended: Checklists =================
 
 // SendChecklist sends a checklist message.

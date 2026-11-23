@@ -18,7 +18,7 @@ import (
 const (
 	b65hT1 = `{"transaction_id":"tx-fake-1","peer_address":"EQfakePeer1","amount":"-1500000000","comment":"hi"}`
 	b65hE1 = `{"type":"emoji","emojis":[{"type":"emoji","emoji":"🙂"},{"type":"custom_emoji","custom_emoji_id":"5368fake"}],"background_backdrop_id":0}`
-	b65hG1 = `{"type":"unique_gift","gift":{"base_name":"bn","name":"gn","number":11,` +
+	b65hG1 = `{"type":"unique_gift","gift":{"gift_id":"g-fake-1","base_name":"bn","name":"gn","number":11,` + // B-65 65i: gift_id
 		`"model":{"name":"","sticker":{"file_id":"","file_unique_id":"","type":"","width":0,"height":0,"is_animated":false,"is_video":false},"rarity_per_mille":0},` +
 		`"symbol":{"name":"","sticker":{"file_id":"","file_unique_id":"","type":"","width":0,"height":0,"is_animated":false,"is_video":false},"rarity_per_mille":0},` +
 		`"backdrop":{"name":"","colors":{"center_color":0,"edge_color":0,"symbol_color":0,"text_color":0},"rarity_per_mille":0}}}`
@@ -41,7 +41,7 @@ func b65hE1Value() *tg.ChatShareTheme {
 }
 
 func b65hG1Value() *tg.ChatShareTheme {
-	return &tg.ChatShareTheme{Type: "unique_gift", Gift: &tg.UniqueGift{BaseName: "bn", Name: "gn", Number: 11}}
+	return &tg.ChatShareTheme{Type: "unique_gift", Gift: &tg.UniqueGift{GiftID: "g-fake-1", BaseName: "bn", Name: "gn", Number: 11}}
 }
 
 func b65hC1Value() *tg.TonWalletCard {

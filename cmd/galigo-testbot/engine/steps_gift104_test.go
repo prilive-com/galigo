@@ -250,6 +250,7 @@ func TestB65I_DeleteGuardOther(t *testing.T) {
 		err          error
 	}{
 		{"suffix", "guard", b65iAPI(400, b65iMT+" check is unavailable")},
+		{"no_prefix", "guard", b65iAPI(400, "business connection not found")}, // change round c3 (A-C3-02)
 		{"other_text", "guard", b65iAPI(400, "Bad Request: x")},
 		{"code_403", "guard", b65iAPI(403, b65iMT)},
 		{"not_api", "guard", errors.New(b65iMT)},
@@ -363,6 +364,26 @@ func TestB65I_DeleteGuardFoundHTTP(t *testing.T) {
 	assert.False(t, res.Success)
 	assert.Contains(t, res.Error, b65iGuardErr)
 	assert.NotContains(t, res.Error, "bc-seen-9191")
+	require.Equal(t, 1, server.CaptureCount(), "only the lookup is sent")
+	assert.True(t, strings.HasSuffix(server.CaptureAt(0).Path, "/getBusinessConnection"))
+}
+
+// E-guard-other-http (change round c3, O-C3-01): through the real adapter and a mock server, a guard 400 whose text is
+// not exactly the measured refusal stops the step, and only the lookup is sent (no delete).
+func TestB65I_DeleteGuardOtherHTTP(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getBusinessConnection", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyBadRequest(w, "business connection not found: guard check unavailable")
+	})
+	server.On("/bot"+testutil.TestToken+"/deleteBusinessAccountGift", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyBadRequest(w, "business connection not found")
+	})
+	rt := NewRuntime(NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), testutil.TestChatID, 0)
+	runner := NewRunner(rt, RunnerConfig{RetryOn429: true, Max429Retries: 1, MaxMessages: 10}, slog.New(slog.DiscardHandler))
+	res := runner.Run(context.Background(), &BaseScenario{ScenarioName: "b65i", ScenarioSteps: []Step{&DeleteBusinessAccountGiftStep{}},
+		ScenarioTimeout: 10 * time.Second})
+	assert.False(t, res.Success)
+	assert.Contains(t, res.Error, "guard")
 	require.Equal(t, 1, server.CaptureCount(), "only the lookup is sent")
 	assert.True(t, strings.HasSuffix(server.CaptureAt(0).Path, "/getBusinessConnection"))
 }

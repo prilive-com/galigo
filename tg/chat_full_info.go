@@ -58,7 +58,7 @@ type ChatFullInfo struct {
 	GuardBot                           *User             `json:"guard_bot,omitempty"`               // 10.1: chat administrators only
 	Community                          *Community        `json:"community,omitempty"`               // 10.2
 	TonWalletCard                      *TonWalletCard    `json:"ton_wallet_card,omitempty"`         // 10.4: private chats
-	ShareTheme                         *ChatShareTheme   `json:"share_theme,omitempty"`             // 10.4
+	ShareTheme                         *ChatShareTheme   `json:"share_theme,omitempty"`             // 10.4: private chats, supergroups and channels; omitted for the default theme
 }
 
 // ChatLocation represents a location to which a chat is connected.

@@ -48,7 +48,8 @@ type AreaPosition struct {
 	CornerRadiusPercentage float64 `json:"corner_radius_percentage"`
 }
 
-// TonWalletTransfer is a service message about a TON transfer (Bot API 10.4).
+// TonWalletTransfer is a service message about a TON transfer (Bot API 10.4). Telegram omits comment when the comment is
+// encrypted, so an empty Comment means no comment or an encrypted one.
 type TonWalletTransfer struct {
 	TransactionID string `json:"transaction_id"` // empty if the transaction was not sent yet
 	PeerAddress   string `json:"peer_address"`

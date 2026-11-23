@@ -14,7 +14,8 @@ type EmojiType struct {
 type ChatShareTheme struct {
 	Type   string      `json:"type"`
 	Emojis []EmojiType `json:"emojis,omitzero"` // omitzero: an empty list is sent, a nil list is not
-	// BackgroundBackdropID is a ChatShareThemeBackdrop.ID; a pointer, because 0 is a real backdrop.
+	// BackgroundBackdropID is a ChatShareThemeBackdrop.ID; a pointer, because 0 is a real backdrop. Nil in an "emoji"
+	// theme: the default background. A "unique_gift" theme has no backdrop id.
 	BackgroundBackdropID *int        `json:"background_backdrop_id,omitempty"`
 	Gift                 *UniqueGift `json:"gift,omitempty"`
 }

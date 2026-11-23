@@ -100,6 +100,8 @@ type Message struct {
 	SuggestedPostDeclined       *SuggestedPostDeclined       `json:"suggested_post_declined,omitempty"`
 	SuggestedPostPaid           *SuggestedPostPaid           `json:"suggested_post_paid,omitempty"`
 	SuggestedPostRefunded       *SuggestedPostRefunded       `json:"suggested_post_refunded,omitempty"`
+
+	TonWalletTransfer *TonWalletTransfer `json:"ton_wallet_transfer,omitempty"` // 10.4: a TON transfer (service message)
 }
 
 // MessageSig implements Editable.

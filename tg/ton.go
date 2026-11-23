@@ -1,6 +1,7 @@
 package tg
 
-// Bot API 10.4 TON types used by widget queries (WidgetQueryType.WalletCard).
+// Bot API 10.4 TON types: the wallet card (WidgetQueryType.WalletCard, ChatFullInfo.TonWalletCard) and the TON
+// transfer service message (Message.TonWalletTransfer).
 
 // TonWalletCard is a TON wallet card, shown on a user's profile page to everyone (Bot API 10.4).
 type TonWalletCard struct {
@@ -45,4 +46,13 @@ type AreaPosition struct {
 	HeightPercentage       float64 `json:"height_percentage"`
 	RotationAngle          float64 `json:"rotation_angle"` // clockwise, in degrees, 0-360
 	CornerRadiusPercentage float64 `json:"corner_radius_percentage"`
+}
+
+// TonWalletTransfer is a service message about a TON transfer (Bot API 10.4). Telegram omits comment when the comment is
+// encrypted, so an empty Comment means no comment or an encrypted one.
+type TonWalletTransfer struct {
+	TransactionID string `json:"transaction_id"` // empty if the transaction was not sent yet
+	PeerAddress   string `json:"peer_address"`
+	Amount        string `json:"amount"` // in the smallest units, as a decimal number; negative for an outgoing transfer
+	Comment       string `json:"comment,omitempty"`
 }

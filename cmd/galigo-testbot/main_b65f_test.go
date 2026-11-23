@@ -27,17 +27,17 @@ import (
 
 // B-65 65f: the 10.4 routes, lists and the bot /run of S76 (TEST-PLAN §2.6, M4, M5).
 
-// T-routes: the 10.4 labels select exactly S76 and S77 (B-65 65g), in that order, and all holds each once; the names
+// T-routes: the 10.4 labels select exactly S76, S77 (B-65 65g) and S78 (B-65 65h), in that order, and all holds each once; the names
 // are written out here.
 func TestB65F_SuiteRoutesAPI104(t *testing.T) {
 	for _, in := range []string{"api104", "api-104", "10.4"} {
 		got, ok := suiteScenarios(in)
 		require.True(t, ok, in)
-		assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote"}, b49Names(got), in)
+		assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"}, b49Names(got), in)
 	}
 	got, ok := suiteScenarios("all")
 	require.True(t, ok)
-	for _, name := range []string{"S76-Widgets", "S77-RichQuote"} {
+	for _, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"} {
 		n := 0
 		for _, g := range b49Names(got) {
 			if g == name {
@@ -161,6 +161,9 @@ func newB65FBot(t *testing.T) *b65fBot {
 			"quote": map[string]any{"text": "", "rich_texts": rp["quote_rich_texts"], "position": pos, "is_manual": true}})
 	})
 	on("deleteMessage", func(w http.ResponseWriter, _ map[string]any) { testutil.ReplyBool(w, true) })
+	on("getChatShareThemeBackdrops", func(w http.ResponseWriter, _ map[string]any) { // B-65 65h: S78
+		testutil.ReplyOK(w, json.RawMessage(`{"backdrops":[{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":3}},{"id":9,"name":"n","colors":{"center_color":4,"edge_color":5,"symbol_color":6,"text_color":7}}]}`))
+	})
 	for m, text := range refusal {
 		on(m, func(w http.ResponseWriter, _ map[string]any) { testutil.ReplyBadRequest(w, text) })
 	}
@@ -180,7 +183,7 @@ func newB65FBot(t *testing.T) *b65fBot {
 // b65fRunBot runs the bot's /run api104 from chat (budget 50, config chat the group) and returns the saved report.
 func b65fRunBot(t *testing.T, b *b65fBot, chat int64) map[string]any {
 	t.Helper()
-	require.Len(t, suites.AllAPI104Scenarios(), 2, "AllAPI104Scenarios")
+	require.Len(t, suites.AllAPI104Scenarios(), 3, "AllAPI104Scenarios")
 	client := testutil.NewTestClient(t, b.server.BaseURL(), sender.WithRateLimit(1000, 100),
 		sender.WithGroupRateLimit(1000, 100), sender.WithPerChatRateLimit(1000, 100))
 	cfg := &config.Config{Admins: []int64{1}, StorageDir: t.TempDir(), MaxMessagesPerRun: 50, ChatID: b65fGroup}
@@ -203,24 +206,32 @@ func TestB65F_BotRunPrivate(t *testing.T) {
 	b := newB65FBot(t)
 	report := b65fRunBot(t, b, 77)
 	require.Equal(t, []string{"sendMessage", "getChat", "getMe", "getChatMember", "sendRichMessage", "sendMessage", "sendMessage",
-		"sendMessage", "sendMessage", "deleteMessage", "deleteMessage", "deleteMessage", "deleteMessage", "sendMessage"}, b.methods)
+		"sendMessage", "sendMessage", "deleteMessage", "deleteMessage", "deleteMessage", "deleteMessage", "getChatShareThemeBackdrops", "sendMessage"}, b.methods)
 	require.Len(t, b.bodies, len(b.methods))
 	assert.Equal(t, float64(77), b.bodies[0]["chat_id"])
-	assert.Equal(t, "Running 2 scenario(s)...", b.bodies[0]["text"])
+	assert.Equal(t, "Running 3 scenario(s)...", b.bodies[0]["text"])
 	assert.Equal(t, float64(77), b.bodies[1]["chat_id"])
 	for i := 4; i < len(b.bodies); i++ {
+		if b.methods[i] == "getChatShareThemeBackdrops" { // B-65 65h: S78 has no chat
+			assert.Equal(t, map[string]any{}, b.bodies[i], "S78 sends an empty body")
+			continue
+		}
 		assert.Equal(t, float64(77), b.bodies[i]["chat_id"], "call %d (%s) in the private chat", i, b.methods[i])
 	}
 	b65gCheckS77(t, b, 77)
-	assert.Contains(t, b.bodies[13]["text"], "Scenarios: 2/2 passed")
+	assert.Contains(t, b.bodies[14]["text"], "Scenarios: 3/3 passed")
 	scs, _ := report["scenarios"].([]any)
-	require.Len(t, scs, 2)
+	require.Len(t, scs, 3)
 	sc := scs[0].(map[string]any)
 	assert.Equal(t, "S76-Widgets", sc["scenario_name"])
 	assert.Equal(t, true, sc["skipped"])
 	assert.Contains(t, sc["skip_reason"], "group")
 	sc = scs[1].(map[string]any)
 	assert.Equal(t, "S77-RichQuote", sc["scenario_name"])
+	assert.Nil(t, sc["skipped"])
+	assert.Equal(t, true, sc["success"])
+	sc = scs[2].(map[string]any) // B-65 65h
+	assert.Equal(t, "S78-ShareThemeBackdrops", sc["scenario_name"])
 	assert.Nil(t, sc["skipped"])
 	assert.Equal(t, true, sc["success"])
 }
@@ -239,8 +250,8 @@ func TestB65F_BotRunGroup(t *testing.T) {
 	assert.Equal(t, 7, n, "seven widget calls")
 	assert.Equal(t, true, report["success"])
 	scs, _ := report["scenarios"].([]any)
-	require.Len(t, scs, 2)
-	for i, name := range []string{"S76-Widgets", "S77-RichQuote"} {
+	require.Len(t, scs, 3)
+	for i, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"} {
 		sc := scs[i].(map[string]any)
 		assert.Equal(t, name, sc["scenario_name"])
 		assert.Nil(t, sc["skipped"], name)
@@ -253,6 +264,10 @@ func TestB65F_BotRunGroup(t *testing.T) {
 	}
 	assert.Equal(t, 1, count["sendRichMessage"], "S77's rich message")
 	assert.Equal(t, 5, count["deleteMessage"], "S76's target and S77's four messages")
+	assert.Equal(t, 1, count["getChatShareThemeBackdrops"], "S78's one call") // B-65 65h
+	if k := slices.Index(b.methods, "getChatShareThemeBackdrops"); assert.GreaterOrEqual(t, k, 0) {
+		assert.Equal(t, map[string]any{}, b.bodies[k], "S78 sends an empty body")
+	}
 	k := b65gCheckS77(t, b, b65fGroup)
 	var s76 []map[string]any
 	for i, m := range b.methods[:k] {

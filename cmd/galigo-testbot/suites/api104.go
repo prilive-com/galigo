@@ -7,11 +7,12 @@ import (
 	"github.com/prilive-com/galigo/tg"
 )
 
-// AllAPI104Scenarios returns the Bot API 10.4 scenarios: S76 widget methods, refusal only (B-65 65f), and S77 rich
-// quotes (B-65 65g). The 10.4 widget read side is decode-only (B-65 65e). S76's rows run only in a group or
-// supergroup; S77 runs in an ordinary chat (private, group, supergroup), not in a channel direct messages chat.
+// AllAPI104Scenarios returns the Bot API 10.4 scenarios: S76 widget methods, refusal only (B-65 65f), S77 rich
+// quotes (B-65 65g) and S78 share theme backdrops (B-65 65h, read only). The 10.4 widget read side is decode-only
+// (B-65 65e). S76's rows run only in a group or supergroup; S77 runs in an ordinary chat (private, group, supergroup),
+// not in a channel direct messages chat; S78 runs in any chat (the method has no chat id).
 func AllAPI104Scenarios() []engine.Scenario {
-	return []engine.Scenario{S76_Widgets(), S77_RichQuote()}
+	return []engine.Scenario{S76_Widgets(), S77_RichQuote(), S78_ShareThemeBackdrops()}
 }
 
 // s77QuoteInvalid is the refusal of a quote that is not in the message (measured 2026-11-22 in the test group).
@@ -67,5 +68,16 @@ func S76_Widgets() engine.Scenario {
 			&engine.WidgetRefusalStep{Method: "editSharedWidgetData", WantError: engine.WidgetIDInvalid},
 			&engine.CleanupStep{},
 		},
+	}
+}
+
+// S78_ShareThemeBackdrops gets the chat share theme backdrops (Bot API 10.4). Read only: no message, no cleanup.
+func S78_ShareThemeBackdrops() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S78-ShareThemeBackdrops",
+		ScenarioDescription: "Get the chat share theme backdrops (Bot API 10.4, read only)",
+		CoveredMethods:      []string{"getChatShareThemeBackdrops"},
+		ScenarioSteps:       []engine.Step{&engine.GetChatShareThemeBackdropsStep{}},
+		ScenarioTimeout:     30 * time.Second,
 	}
 }

@@ -471,6 +471,13 @@ func (a *SenderAdapter) SendInvoice(ctx context.Context, chatID int64, title, de
 	})
 }
 
+// ================= Extended: Chat share themes (Bot API 10.4) =================
+
+// GetChatShareThemeBackdrops returns the chat share theme backdrops (Bot API 10.4).
+func (a *SenderAdapter) GetChatShareThemeBackdrops(ctx context.Context) (*tg.ChatShareThemeBackdrops, error) {
+	return a.client.GetChatShareThemeBackdrops(ctx)
+}
+
 // ================= Extended: Gifts =================
 
 // GetAvailableGifts returns available gifts.

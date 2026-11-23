@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/sony/gobreaker/v2"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +19,10 @@ import (
 // B-65 65h: getChatShareThemeBackdrops and the new ChatFullInfo holders on the sender path (TEST-PLAN section 3).
 // Ids and addresses are fake.
 
-// The ids are out of order (79 before 0), so a getter that sorts the list fails S-call (O-C1-03).
+// The ids are in neither order (79, 0, 4), so a getter that sorts the list either way fails S-call (O-C1-03, O-C2-04).
 const b65hBackdropsWire = `{"backdrops":[{"id":79,"name":"","colors":{"center_color":16777215,"edge_color":3,"symbol_color":4,"text_color":5}},` +
-	`{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}}]}`
+	`{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}},` +
+	`{"id":4,"name":"Blue","colors":{"center_color":6,"edge_color":7,"symbol_color":8,"text_color":9}}]}`
 
 const b65hPath = "/bot" + testutil.TestToken + "/getChatShareThemeBackdrops"
 
@@ -35,6 +35,7 @@ func TestB65H_GetChatShareThemeBackdrops(t *testing.T) {
 	assert.Equal(t, &tg.ChatShareThemeBackdrops{Backdrops: []tg.ChatShareThemeBackdrop{
 		{ID: 79, Name: "", Colors: tg.UniqueGiftBackdropColors{CenterColor: 16777215, EdgeColor: 3, SymbolColor: 4, TextColor: 5}},
 		{ID: 0, Name: "Black", Colors: tg.UniqueGiftBackdropColors{CenterColor: 1, EdgeColor: 2, SymbolColor: 0, TextColor: 16772551}},
+		{ID: 4, Name: "Blue", Colors: tg.UniqueGiftBackdropColors{CenterColor: 6, EdgeColor: 7, SymbolColor: 8, TextColor: 9}},
 	}}, got)
 	require.Equal(t, 1, server.CaptureCount())
 	c := server.LastCapture()
@@ -130,16 +131,15 @@ func TestB65H_BackdropsRateLimited(t *testing.T) {
 	assert.Equal(t, 0, server.CaptureCount(), "the refused call sends nothing")
 }
 
-// S-nochat: the call has no chat id, so a spent per-chat limiter does not stop it (PLAN section 4, A-T3-04).
+// S-nochat: the call has no chat id, so per-chat and group limiters that refuse every call (burst 0) do not stop it
+// (PLAN section 4, A-T3-04; no deadline, O-C2-03).
 func TestB65H_BackdropsNoChatLimit(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On(b65hPath, func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, json.RawMessage(b65hBackdropsWire)) })
 	client := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(1000, 100),
-		sender.WithPerChatRateLimit(0.001, 1), sender.WithGroupRateLimit(0.001, 1))
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+		sender.WithPerChatRateLimit(1, 0), sender.WithGroupRateLimit(1, 0))
 	for i := range 2 {
-		_, err := client.GetChatShareThemeBackdrops(ctx)
+		_, err := client.GetChatShareThemeBackdrops(context.Background())
 		require.NoError(t, err, "call %d", i+1)
 	}
 	assert.Equal(t, 2, server.CaptureCount())

@@ -75,6 +75,9 @@ func TestB65H_StepEmpty(t *testing.T) {
 		{"empty_name", b65hList(b65hBackdrop(3, ""), b65hBackdrop(4, "x"), b65hBackdrop(6, "")), map[string]any{"count": 3, "min_id": 3, "max_id": 6, "empty_names": 2}},
 		{"single", b65hList(b65hBackdrop(9, "a")), map[string]any{"count": 1, "min_id": 9, "max_id": 9, "empty_names": 0}}, // O-T3-05
 		{"negative_ids", b65hList(b65hBackdrop(-5, "a"), b65hBackdrop(-2, "b"), b65hBackdrop(-9, "c")), map[string]any{"count": 3, "min_id": -9, "max_id": -2, "empty_names": 0}},
+		// A-C2-01: id 0, as in the real reply, inside and first (a step that takes 0 as "not set yet").
+		{"zero_inside", b65hList(b65hBackdrop(5, "a"), b65hBackdrop(0, "b"), b65hBackdrop(3, "c")), map[string]any{"count": 3, "min_id": 0, "max_id": 5, "empty_names": 0}},
+		{"zero_first", b65hList(b65hBackdrop(0, "a"), b65hBackdrop(49, "b"), b65hBackdrop(1, "c")), map[string]any{"count": 3, "min_id": 0, "max_id": 49, "empty_names": 0}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := b65hRun(t, &b65hFake{res: tc.res})
@@ -87,21 +90,27 @@ func TestB65H_StepEmpty(t *testing.T) {
 
 // E-dup: a duplicate id that is not next to its twin: once the first id (a step that does not record it), once a later id
 // (a step that checks only the first id; O-T2-05, O-T3-04), once id 0 with empty names, as in the real reply (a step
-// that skips id 0 or a backdrop with no name; A-C1-01).
+// that skips id 0 or a backdrop with no name; A-C1-01). In first and later every backdrop has its own name, so the twins
+// differ by name (a step keyed on id and name, O-C2-05).
 func TestB65H_StepDuplicate(t *testing.T) {
 	for _, tc := range []struct {
-		name, label string
-		ids         []int
-		want        string
+		name  string
+		named bool
+		ids   []int
+		want  string
 	}{
-		{"first", "a", []int{3, 5, 3}, "duplicate backdrop id 3"},
-		{"later", "a", []int{7, 3, 5, 3}, "duplicate backdrop id 3"},
-		{"zero", "", []int{0, 4, 0}, "duplicate backdrop id 0"},
+		{"first", true, []int{3, 5, 3}, "duplicate backdrop id 3"},
+		{"later", true, []int{7, 3, 5, 3}, "duplicate backdrop id 3"},
+		{"zero", false, []int{0, 4, 0}, "duplicate backdrop id 0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var bs []tg.ChatShareThemeBackdrop
-			for _, id := range tc.ids {
-				bs = append(bs, b65hBackdrop(id, tc.label))
+			for i, id := range tc.ids {
+				label := ""
+				if tc.named {
+					label = fmt.Sprintf("n%d", i)
+				}
+				bs = append(bs, b65hBackdrop(id, label))
 			}
 			_, err := b65hRun(t, &b65hFake{res: b65hList(bs...)})
 			require.Error(t, err)
@@ -111,7 +120,8 @@ func TestB65H_StepDuplicate(t *testing.T) {
 }
 
 // E-color and E-color-edge: each of the four colors alone out of 0..0xFFFFFF on both sides, the bad backdrop last
-// (too high) or first (too low) and with an empty name (A-C1-01); the edges pass in both of two backdrops.
+// (too high) or first (too low), once with an empty name (A-C1-01) and once named (O-C2-02); the edges pass in both of
+// two backdrops.
 func TestB65H_StepColors(t *testing.T) {
 	fields := []struct {
 		name string
@@ -124,17 +134,23 @@ func TestB65H_StepColors(t *testing.T) {
 	}
 	for _, fl := range fields {
 		for _, v := range []int{0x1000000, -1} {
-			t.Run(fmt.Sprintf("%s_%d", fl.name, v), func(t *testing.T) {
-				b := b65hBackdrop(7, "")
-				fl.set(&b.Colors, v)
-				list := b65hList(b65hBackdrop(6, "z"), b) // too high: the bad backdrop last
-				if v < 0 {
-					list = b65hList(b, b65hBackdrop(6, "z")) // too low: the bad backdrop first (A-T2-03)
+			for _, label := range []string{"", "a"} {
+				leaf := fmt.Sprintf("%s_%d", fl.name, v)
+				if label != "" {
+					leaf += "_named"
 				}
-				_, err := b65hRun(t, &b65hFake{res: list})
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), fmt.Sprintf("backdrop 7: %s %d", fl.name, v))
-			})
+				t.Run(leaf, func(t *testing.T) {
+					b := b65hBackdrop(7, label)
+					fl.set(&b.Colors, v)
+					list := b65hList(b65hBackdrop(6, "z"), b) // too high: the bad backdrop last
+					if v < 0 {
+						list = b65hList(b, b65hBackdrop(6, "z")) // too low: the bad backdrop first (A-T2-03)
+					}
+					_, err := b65hRun(t, &b65hFake{res: list})
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), fmt.Sprintf("backdrop 7: %s %d", fl.name, v))
+				})
+			}
 		}
 	}
 	for _, v := range []int{0, 0xFFFFFF} {

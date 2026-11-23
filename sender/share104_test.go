@@ -20,20 +20,21 @@ import (
 // B-65 65h: getChatShareThemeBackdrops and the new ChatFullInfo holders on the sender path (TEST-PLAN section 3).
 // Ids and addresses are fake.
 
-const b65hBackdropsWire = `{"backdrops":[{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}},` +
-	`{"id":79,"name":"","colors":{"center_color":16777215,"edge_color":3,"symbol_color":4,"text_color":5}}]}`
+// The ids are out of order (79 before 0), so a getter that sorts the list fails S-call (O-C1-03).
+const b65hBackdropsWire = `{"backdrops":[{"id":79,"name":"","colors":{"center_color":16777215,"edge_color":3,"symbol_color":4,"text_color":5}},` +
+	`{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}}]}`
 
 const b65hPath = "/bot" + testutil.TestToken + "/getChatShareThemeBackdrops"
 
-// S-call: one POST with the body {}, and every id, name and color of the literal wire JSON decoded.
+// S-call: one POST with the body {}, and every id, name and color of the literal wire JSON decoded, in the wire order.
 func TestB65H_GetChatShareThemeBackdrops(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On(b65hPath, func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, json.RawMessage(b65hBackdropsWire)) })
 	got, err := testutil.NewTestClient(t, server.BaseURL()).GetChatShareThemeBackdrops(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, &tg.ChatShareThemeBackdrops{Backdrops: []tg.ChatShareThemeBackdrop{
-		{ID: 0, Name: "Black", Colors: tg.UniqueGiftBackdropColors{CenterColor: 1, EdgeColor: 2, SymbolColor: 0, TextColor: 16772551}},
 		{ID: 79, Name: "", Colors: tg.UniqueGiftBackdropColors{CenterColor: 16777215, EdgeColor: 3, SymbolColor: 4, TextColor: 5}},
+		{ID: 0, Name: "Black", Colors: tg.UniqueGiftBackdropColors{CenterColor: 1, EdgeColor: 2, SymbolColor: 0, TextColor: 16772551}},
 	}}, got)
 	require.Equal(t, 1, server.CaptureCount())
 	c := server.LastCapture()
@@ -118,36 +119,15 @@ func TestB65H_BackdropsCanceled(t *testing.T) {
 	assert.Equal(t, 0, server.CaptureCount())
 }
 
-// S-ratelimit: the getter goes through the global limiter: one token, the next in 1000 s, so the second call is refused
-// before a request (O-T2-06; as sender/ratelimit_b51_test.go).
+// S-ratelimit: the getter goes through the global limiter: with burst 0 the limiter refuses the call at once, before a
+// request (O-C1-01: B-51's R6 pattern in sender/ratelimit_b51_test.go, no deadline and no goroutine).
 func TestB65H_BackdropsRateLimited(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On(b65hPath, func(w http.ResponseWriter, _ *http.Request) { testutil.ReplyOK(w, json.RawMessage(b65hBackdropsWire)) })
-	client := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(0.001, 1))
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_, err := client.GetChatShareThemeBackdrops(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 1, server.CaptureCount())
-	// The limiter refuses at once, because the next token comes after ctx's deadline. A getter that does not pass ctx
-	// would wait 1000 s, so the call runs in a goroutine and the test fails after 5 s instead of hanging.
-	type answer struct {
-		got *tg.ChatShareThemeBackdrops
-		err error
-	}
-	done := make(chan answer, 1)
-	go func() {
-		got, err := client.GetChatShareThemeBackdrops(ctx)
-		done <- answer{got, err}
-	}()
-	select {
-	case a := <-done:
-		assert.Nil(t, a.got)
-		assert.EqualError(t, a.err, b51Refused) // A-T3-03
-	case <-time.After(5 * time.Second):
-		t.Fatal("the second call did not return: the getter does not pass its context to the limiter")
-	}
-	assert.Equal(t, 1, server.CaptureCount(), "the second call sends nothing")
+	got, err := testutil.NewTestClient(t, server.BaseURL(), sender.WithRateLimit(0, 0)).GetChatShareThemeBackdrops(context.Background())
+	assert.Nil(t, got)
+	assert.EqualError(t, err, b51Burst0)
+	assert.Equal(t, 0, server.CaptureCount(), "the refused call sends nothing")
 }
 
 // S-nochat: the call has no chat id, so a spent per-chat limiter does not stop it (PLAN section 4, A-T3-04).

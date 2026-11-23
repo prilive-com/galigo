@@ -86,23 +86,32 @@ func TestB65H_StepEmpty(t *testing.T) {
 }
 
 // E-dup: a duplicate id that is not next to its twin: once the first id (a step that does not record it), once a later id
-// (a step that checks only the first id; O-T2-05, O-T3-04).
+// (a step that checks only the first id; O-T2-05, O-T3-04), once id 0 with empty names, as in the real reply (a step
+// that skips id 0 or a backdrop with no name; A-C1-01).
 func TestB65H_StepDuplicate(t *testing.T) {
-	for name, ids := range map[string][]int{"first": {3, 5, 3}, "later": {7, 3, 5, 3}} {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, label string
+		ids         []int
+		want        string
+	}{
+		{"first", "a", []int{3, 5, 3}, "duplicate backdrop id 3"},
+		{"later", "a", []int{7, 3, 5, 3}, "duplicate backdrop id 3"},
+		{"zero", "", []int{0, 4, 0}, "duplicate backdrop id 0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			var bs []tg.ChatShareThemeBackdrop
-			for _, id := range ids {
-				bs = append(bs, b65hBackdrop(id, "a"))
+			for _, id := range tc.ids {
+				bs = append(bs, b65hBackdrop(id, tc.label))
 			}
 			_, err := b65hRun(t, &b65hFake{res: b65hList(bs...)})
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "duplicate backdrop id 3")
+			assert.Contains(t, err.Error(), tc.want)
 		})
 	}
 }
 
 // E-color and E-color-edge: each of the four colors alone out of 0..0xFFFFFF on both sides, the bad backdrop last
-// (too high) or first (too low); the edges pass in both of two backdrops.
+// (too high) or first (too low) and with an empty name (A-C1-01); the edges pass in both of two backdrops.
 func TestB65H_StepColors(t *testing.T) {
 	fields := []struct {
 		name string
@@ -116,7 +125,7 @@ func TestB65H_StepColors(t *testing.T) {
 	for _, fl := range fields {
 		for _, v := range []int{0x1000000, -1} {
 			t.Run(fmt.Sprintf("%s_%d", fl.name, v), func(t *testing.T) {
-				b := b65hBackdrop(7, "a")
+				b := b65hBackdrop(7, "")
 				fl.set(&b.Colors, v)
 				list := b65hList(b65hBackdrop(6, "z"), b) // too high: the bad backdrop last
 				if v < 0 {

@@ -1,5 +1,7 @@
 package tg
 
+import "encoding/json"
+
 // Gifts represents a list of available gifts.
 type Gifts struct {
 	Gifts []Gift `json:"gifts"`
@@ -16,36 +18,94 @@ type Gift struct {
 	PublisherChat    *Chat   `json:"publisher_chat,omitempty"` // 9.2: the chat that published the gift
 }
 
-// OwnedGifts represents a list of gifts owned by a user.
+// OwnedGifts is a list of gifts owned by a user or a chat (the result of getUserGifts, getChatGifts and
+// getBusinessAccountGifts).
 type OwnedGifts struct {
 	TotalCount int         `json:"total_count"`
 	Gifts      []OwnedGift `json:"gifts"`
 	NextOffset string      `json:"next_offset,omitempty"`
 }
 
-// OwnedGift represents a gift owned by a user.
+// OwnedGift is a gift owned by a user or a chat. It is one of the spec's OwnedGiftRegular ("regular") and
+// OwnedGiftUnique ("unique"); Type says which. The spec's "gift" key is decoded into Gift for a regular gift and into
+// UniqueGift for a unique gift; for any other Type its body is dropped and both stay nil. Encode writes "gift" from
+// UniqueGift when Type is "unique", else from Gift.
 type OwnedGift struct {
-	Type        string `json:"type"` // "regular" or "unique"
-	Gift        *Gift  `json:"gift,omitempty"`
-	OwnedGiftID string `json:"owned_gift_id,omitempty"`
+	Type       string      `json:"type"` // "regular" or "unique"
+	Gift       *Gift       `json:"gift,omitempty"`
+	UniqueGift *UniqueGift `json:"-"` // unique: the gift (the spec's "gift" key, filled by the codec)
 
-	// Sender info
+	OwnedGiftID string `json:"owned_gift_id,omitempty"` // both
+
+	// Sender info (both)
 	SenderUser *User `json:"sender_user,omitempty"`
 	SendDate   int64 `json:"send_date"`
 
-	// Message
+	// Message (regular)
 	Text         string          `json:"text,omitempty"`
-	TextEntities []MessageEntity `json:"text_entities,omitempty"`
+	TextEntities []MessageEntity `json:"entities,omitempty"` // the spec's "entities"
 
 	// State flags
-	IsSaved       bool `json:"is_saved,omitempty"`
-	CanBeUpgraded bool `json:"can_be_upgraded,omitempty"`
-	WasRefunded   bool `json:"was_refunded,omitempty"`
+	IsPrivate     bool `json:"is_private,omitempty"`      // regular
+	IsSaved       bool `json:"is_saved,omitempty"`        // both
+	CanBeUpgraded bool `json:"can_be_upgraded,omitempty"` // regular
+	WasRefunded   bool `json:"was_refunded,omitempty"`    // regular
 
 	// Star values
-	ConvertStarCount        int `json:"convert_star_count,omitempty"`
-	PrepaidUpgradeStarCount int `json:"prepaid_upgrade_star_count,omitempty"`
-	TransferStarCount       int `json:"transfer_star_count,omitempty"`
+	ConvertStarCount        int   `json:"convert_star_count,omitempty"`         // regular
+	PrepaidUpgradeStarCount int   `json:"prepaid_upgrade_star_count,omitempty"` // regular
+	IsUpgradeSeparate       bool  `json:"is_upgrade_separate,omitempty"`        // regular
+	UniqueGiftNumber        int   `json:"unique_gift_number,omitempty"`         // regular
+	CanBeTransferred        bool  `json:"can_be_transferred,omitempty"`         // unique
+	TransferStarCount       int   `json:"transfer_star_count,omitempty"`        // unique
+	NextTransferDate        int64 `json:"next_transfer_date,omitempty"`         // unique: Unix time
+}
+
+// UnmarshalJSON decodes an OwnedGift. JSON null changes nothing. Otherwise Gift and UniqueGift are cleared, the other
+// keys merge into g, and "gift" is routed by the Type after this decode.
+func (g *OwnedGift) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	type plain OwnedGift
+	aux := struct {
+		*plain
+		Gift json.RawMessage `json:"gift"`
+	}{plain: (*plain)(g)}
+	g.Gift, g.UniqueGift = nil, nil
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Gift) == 0 || string(aux.Gift) == "null" {
+		return nil
+	}
+	switch g.Type {
+	case "regular":
+		g.Gift = new(Gift)
+		return json.Unmarshal(aux.Gift, g.Gift)
+	case "unique":
+		g.UniqueGift = new(UniqueGift)
+		return json.Unmarshal(aux.Gift, g.UniqueGift)
+	}
+	return nil
+}
+
+// MarshalJSON encodes an OwnedGift with "gift" taken from UniqueGift when Type is "unique", else from Gift.
+func (g OwnedGift) MarshalJSON() ([]byte, error) {
+	type plain OwnedGift
+	aux := struct {
+		Type string `json:"type"`
+		Gift any    `json:"gift,omitempty"`
+		plain
+	}{Type: g.Type, plain: plain(g)}
+	if g.Type == "unique" {
+		if g.UniqueGift != nil {
+			aux.Gift = g.UniqueGift
+		}
+	} else if g.Gift != nil {
+		aux.Gift = g.Gift
+	}
+	return json.Marshal(aux)
 }
 
 // AcceptedGiftTypes describes which gift types are accepted.

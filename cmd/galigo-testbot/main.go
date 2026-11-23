@@ -707,7 +707,7 @@ Extended:
   paid-media        - Send paid media: photo, video, live photo (S70)
   suggested-posts   - Suggested post parameters, approve and decline reach the server (S71, S72)
   ephemeral         - Ephemeral messages to the admin, sent and deleted (S73; bot must be admin)
-  gifts             - Gift catalog (S23)
+  gifts             - Gift catalog (S23), owned gift lists (S80: getUserGifts, getChatGifts; getBusinessAccountGifts refusal only)
   checklists        - Checklist lifecycle (S24)
 
 Bot API 9.4 (S38-S42):

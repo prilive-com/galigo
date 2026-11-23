@@ -608,7 +608,7 @@ go run ./cmd/galigo-testbot --run keyboards   # Phase C: keyboards (S10)
 go run ./cmd/galigo-testbot --run chat-admin  # Phase D: chat administration (S15-S19)
 go run ./cmd/galigo-testbot --run stickers    # Phase E: sticker lifecycle (S20)
 go run ./cmd/galigo-testbot --run stars       # Phase E: star balance + transactions (S21-S22), paid media (S70)
-go run ./cmd/galigo-testbot --run gifts       # Phase E: gift catalog (S23)
+go run ./cmd/galigo-testbot --run gifts       # Phase E: gift catalog (S23), owned gift lists (S80)
 go run ./cmd/galigo-testbot --run checklists  # Phase E: checklist lifecycle (S24, requires Premium)
 go run ./cmd/galigo-testbot --run bot-config  # Phase G: bot identity (S33-S35)
 
@@ -759,6 +759,7 @@ Requires a supergroup chat. S16 uses `isNotModifiedErr` to handle idempotent "no
 | S21-StarBalance | getMyStarBalance, getStarTransactions | Star balance and transactions |
 | S22-Invoice | sendInvoice | Send a star invoice |
 | S23-Gifts | getAvailableGifts | Gift catalog |
+| S80-OwnedGifts | getBusinessAccountGifts, getUserGifts, getChatGifts | No message. `GetBusinessAccountGiftsStep` is refusal only (the test bot has no business connection): the fake id `zzNoSuchConnection` must be refused with exactly 400 `Bad Request: business connection not found` (evidence: the code and the description). `GetUserGiftsStep` reads one page (`limit` 1) of the first admin's gifts; skipped with no admin; its error texts write `[user]` for the user id. `GetChatGiftsStep` reads one page (`limit` 1) of the test chat's gifts, only in a group or a supergroup (the type comes from the chat context, else from one `getChat`), else skipped. A read page must be a list of at most one gift, each with a type, and `total_count` must not be below the gifts returned (evidence: `total_count`, `gifts_returned`, `next_offset_nonempty`). A skip ends the scenario, so the business row runs first. Not live-proved (mock tests only): a non-empty list, both `OwnedGift` variants (`regular`, `unique`), a successful business call, the behaviour in a private chat |
 | S24-Checklists | sendChecklist, editMessageChecklist | Checklist lifecycle (requires Premium) |
 | S70-PaidMedia | sendPaidMedia | Paid media (photo, video, live photo) for 1 Star; checks the reply's price, kinds and caption, then deletes the message |
 
@@ -899,9 +900,9 @@ Webhook scenarios are excluded from `--run all` to avoid disrupting production w
 
 ### Method Coverage
 
-Current registry: **109 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
+Current registry: **112 target methods** across 4 categories (messaging, chat-admin, extended, legacy).
 
-`--status` reports 100 covered methods and 10 missing. 99 of the 109 registry methods have a scenario (the five widget methods of S76 and `deleteBusinessAccountGift` of S79 are refusal-only); the 100th covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
+`--status` reports 103 covered methods and 10 missing. 102 of the 112 registry methods have a scenario (the five widget methods of S76, `deleteBusinessAccountGift` of S79 and `getBusinessAccountGifts` of S80 are refusal-only); the 103rd covered method, `getUserProfileAudios` (S39), is not in the registry. The 10 missing methods have no live scenario, and mock tests cover them: `getManagedBotToken`, `replaceManagedBotToken`, `getManagedBotAccessSettings` and `setManagedBotAccessSettings` need a managed bot (`sender/managed_bots_test.go`); `answerGuestQuery` needs a guest summon (`sender/guest_test.go`); `getUserPersonalChatMessages` needs a user with a personal channel (`sender/methods_test.go`); `answerChatJoinRequestQuery` and `sendChatJoinRequestWebApp` need a join request query, which only a chat's guard bot receives (`sender/joinreq101b_test.go`); `approveChatJoinRequest` and `declineChatJoinRequest` need a pending join request, which needs a second user account (`sender/joinreq_b50_test.go`). Checklists (S24) require Premium and are excluded from `--run all` but available via `--run checklists`.
 
 ### Test Fixtures
 
@@ -996,6 +997,7 @@ cmd/galigo-testbot/
 │   ├── steps_quote104.go  # Bot API 10.4 rich quote reply step (ReplyRichQuoteStep; S77)
 │   ├── steps_share104.go  # Bot API 10.4 share theme backdrops step (GetChatShareThemeBackdropsStep; S78)
 │   ├── steps_gift104.go   # Bot API 10.4 unique gift steps (GetUniqueGiftStep, DeleteBusinessAccountGiftStep; S79)
+│   ├── steps_owned_gifts.go # Owned gift list steps (GetBusinessAccountGiftsStep, GetUserGiftsStep, GetChatGiftsStep; S80)
 │   ├── errors.go        # SkipError for graceful prerequisite handling
 │   ├── require.go       # RequireAdmin, RequireCanChangeInfo, RequireCanRestrict, etc.
 │   ├── fixtures.go      # MinimalPNG inline fixture for chat photo tests
@@ -1008,7 +1010,7 @@ cmd/galigo-testbot/
 │   ├── chat_admin.go  # Phase D scenarios (S15-S19)
 │   ├── stickers.go    # Phase E: Sticker lifecycle (S20)
 │   ├── stars.go       # Phase E: Stars + Invoice (S21-S22), Paid media (S70)
-│   ├── gifts.go       # Phase E: Gifts (S23)
+│   ├── gifts.go       # Phase E: Gifts (S23, S80)
 │   ├── checklists.go  # Phase E: Checklists (S24, Premium)
 │   ├── extras.go      # Phase F: Extras (S25-S32: geo, bulk, reactions, user info, chat settings)
 │   ├── bot_config.go  # Phase G: Bot identity (S33-S35: commands, profile, admin defaults)
@@ -1029,7 +1031,7 @@ cmd/galigo-testbot/
 │   ├── photo.jpg, animation.gif, sticker.png, audio.mp3, voice.ogg
 ├── config/         # Environment variable loading + .env parser
 ├── evidence/       # JSON report generation and formatting
-├── registry/       # Target method list and coverage checking (109 methods)
+├── registry/       # Target method list and coverage checking (112 methods)
 └── cleanup/        # Message cleanup utilities
 ```
 

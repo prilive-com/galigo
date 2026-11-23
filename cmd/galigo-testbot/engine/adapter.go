@@ -502,6 +502,21 @@ func (a *SenderAdapter) DeleteBusinessAccountGift(ctx context.Context, req sende
 	return a.client.DeleteBusinessAccountGift(ctx, req)
 }
 
+// GetUserGifts returns the gifts owned by a user.
+func (a *SenderAdapter) GetUserGifts(ctx context.Context, req sender.GetUserGiftsRequest) (*tg.OwnedGifts, error) {
+	return a.client.GetUserGifts(ctx, req)
+}
+
+// GetChatGifts returns the gifts owned by a chat.
+func (a *SenderAdapter) GetChatGifts(ctx context.Context, req sender.GetChatGiftsRequest) (*tg.OwnedGifts, error) {
+	return a.client.GetChatGifts(ctx, req)
+}
+
+// GetBusinessAccountGifts returns the gifts of a managed business account.
+func (a *SenderAdapter) GetBusinessAccountGifts(ctx context.Context, req sender.GetBusinessAccountGiftsRequest) (*tg.OwnedGifts, error) {
+	return a.client.GetBusinessAccountGifts(ctx, req)
+}
+
 // ================= Extended: Checklists =================
 
 // SendChecklist sends a checklist message.

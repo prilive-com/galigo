@@ -330,6 +330,11 @@ type SenderClient interface {
 	GetBusinessConnection(ctx context.Context, businessConnectionID string) (*tg.BusinessConnection, error)
 	DeleteBusinessAccountGift(ctx context.Context, req sender.DeleteBusinessAccountGiftRequest) error
 
+	// Extended: Owned gift lists (B-145)
+	GetUserGifts(ctx context.Context, req sender.GetUserGiftsRequest) (*tg.OwnedGifts, error)
+	GetChatGifts(ctx context.Context, req sender.GetChatGiftsRequest) (*tg.OwnedGifts, error)
+	GetBusinessAccountGifts(ctx context.Context, req sender.GetBusinessAccountGiftsRequest) (*tg.OwnedGifts, error)
+
 	// Extended: Chat share themes
 	GetChatShareThemeBackdrops(ctx context.Context) (*tg.ChatShareThemeBackdrops, error) // Bot API 10.4
 

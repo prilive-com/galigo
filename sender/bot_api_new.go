@@ -45,7 +45,9 @@ type EditChatSubscriptionInviteLinkRequest struct {
 	Name       string    `json:"name,omitempty"`
 }
 
-// GetOwnedGiftsRequest represents a getOwnedGifts request.
+// GetOwnedGiftsRequest represents a request for GetOwnedGifts.
+//
+// Deprecated: use GetUserGiftsRequest with GetUserGifts; getOwnedGifts is not a Bot API method.
 type GetOwnedGiftsRequest struct {
 	UserID int64  `json:"user_id"`
 	Offset string `json:"offset,omitempty"`
@@ -160,15 +162,9 @@ func (c *Client) SendMessageDraft(ctx context.Context, req SendMessageDraftReque
 	return c.callJSON(ctx, "sendMessageDraft", req, nil, extractChatID(req.ChatID))
 }
 
-// GetOwnedGifts returns the gifts owned by the specified user.
+// GetOwnedGifts returns the gifts owned by a user. It calls GetUserGifts with UserID, Offset and Limit.
+//
+// Deprecated: use GetUserGifts; getOwnedGifts is not a Bot API method.
 func (c *Client) GetOwnedGifts(ctx context.Context, req GetOwnedGiftsRequest) (*tg.OwnedGifts, error) {
-	if req.UserID <= 0 {
-		return nil, tg.NewValidationError("user_id", "must be positive")
-	}
-
-	var result tg.OwnedGifts
-	if err := c.callJSON(ctx, "getOwnedGifts", req, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
+	return c.GetUserGifts(ctx, GetUserGiftsRequest{UserID: req.UserID, Offset: req.Offset, Limit: req.Limit})
 }

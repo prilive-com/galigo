@@ -150,3 +150,102 @@ func (c *Client) DeleteBusinessAccountGift(ctx context.Context, req DeleteBusine
 	// NO RETRY — value operation
 	return c.callJSON(ctx, "deleteBusinessAccountGift", req, nil)
 }
+
+// GetUserGiftsRequest represents a getUserGifts request (Bot API 9.3).
+type GetUserGiftsRequest struct {
+	UserID                      int64  `json:"user_id"`
+	ExcludeUnlimited            bool   `json:"exclude_unlimited,omitempty"`
+	ExcludeLimitedUpgradable    bool   `json:"exclude_limited_upgradable,omitempty"`
+	ExcludeLimitedNonUpgradable bool   `json:"exclude_limited_non_upgradable,omitempty"`
+	ExcludeFromBlockchain       bool   `json:"exclude_from_blockchain,omitempty"`
+	ExcludeUnique               bool   `json:"exclude_unique,omitempty"`
+	SortByPrice                 bool   `json:"sort_by_price,omitempty"`
+	Offset                      string `json:"offset,omitempty"`
+	Limit                       int    `json:"limit,omitempty"` // 1-100; 0 is not sent (the server default, 100)
+}
+
+// GetChatGiftsRequest represents a getChatGifts request (Bot API 9.3).
+type GetChatGiftsRequest struct {
+	ChatID                      tg.ChatID `json:"chat_id"`
+	ExcludeUnsaved              bool      `json:"exclude_unsaved,omitempty"`
+	ExcludeSaved                bool      `json:"exclude_saved,omitempty"`
+	ExcludeUnlimited            bool      `json:"exclude_unlimited,omitempty"`
+	ExcludeLimitedUpgradable    bool      `json:"exclude_limited_upgradable,omitempty"`
+	ExcludeLimitedNonUpgradable bool      `json:"exclude_limited_non_upgradable,omitempty"`
+	ExcludeFromBlockchain       bool      `json:"exclude_from_blockchain,omitempty"`
+	ExcludeUnique               bool      `json:"exclude_unique,omitempty"`
+	SortByPrice                 bool      `json:"sort_by_price,omitempty"`
+	Offset                      string    `json:"offset,omitempty"`
+	Limit                       int       `json:"limit,omitempty"` // 1-100; 0 is not sent (the server default, 100)
+}
+
+// GetBusinessAccountGiftsRequest represents a getBusinessAccountGifts request (Bot API 9.0).
+type GetBusinessAccountGiftsRequest struct {
+	BusinessConnectionID        string `json:"business_connection_id"`
+	ExcludeUnsaved              bool   `json:"exclude_unsaved,omitempty"`
+	ExcludeSaved                bool   `json:"exclude_saved,omitempty"`
+	ExcludeUnlimited            bool   `json:"exclude_unlimited,omitempty"`
+	ExcludeLimitedUpgradable    bool   `json:"exclude_limited_upgradable,omitempty"`
+	ExcludeLimitedNonUpgradable bool   `json:"exclude_limited_non_upgradable,omitempty"`
+	ExcludeUnique               bool   `json:"exclude_unique,omitempty"`
+	ExcludeFromBlockchain       bool   `json:"exclude_from_blockchain,omitempty"`
+	SortByPrice                 bool   `json:"sort_by_price,omitempty"`
+	Offset                      string `json:"offset,omitempty"`
+	Limit                       int    `json:"limit,omitempty"` // 1-100; 0 is not sent (the server default, 100)
+}
+
+// validateGiftsLimit allows 0 (not sent) or 1-100.
+func validateGiftsLimit(limit int) error {
+	if limit < 0 || limit > 100 {
+		return tg.NewValidationError("limit", "must be 1-100")
+	}
+	return nil
+}
+
+// GetUserGifts returns the gifts owned and hosted by a user (Bot API 9.3). Not retried.
+func (c *Client) GetUserGifts(ctx context.Context, req GetUserGiftsRequest) (*tg.OwnedGifts, error) {
+	if req.UserID <= 0 {
+		return nil, tg.NewValidationError("user_id", "must be positive")
+	}
+	if err := validateGiftsLimit(req.Limit); err != nil {
+		return nil, err
+	}
+	var result tg.OwnedGifts
+	if err := c.callJSON(ctx, "getUserGifts", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetChatGifts returns the gifts owned by a chat (Bot API 9.3). Not retried; it uses the chat's rate limiter. In a
+// channel, exclude_unsaved is always true and exclude_saved always false unless the bot has the can_post_messages
+// administrator right there (the spec's rule; not checked locally).
+func (c *Client) GetChatGifts(ctx context.Context, req GetChatGiftsRequest) (*tg.OwnedGifts, error) {
+	if err := validateChatID(req.ChatID); err != nil {
+		return nil, err
+	}
+	if err := validateGiftsLimit(req.Limit); err != nil {
+		return nil, err
+	}
+	var result tg.OwnedGifts
+	if err := c.callJSON(ctx, "getChatGifts", req, &result, extractChatID(req.ChatID)); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetBusinessAccountGifts returns the gifts received and owned by a managed business account (Bot API 9.0). The bot
+// needs the can_view_gifts_and_stars business bot right (not checked locally). Not retried.
+func (c *Client) GetBusinessAccountGifts(ctx context.Context, req GetBusinessAccountGiftsRequest) (*tg.OwnedGifts, error) {
+	if req.BusinessConnectionID == "" {
+		return nil, tg.NewValidationError("business_connection_id", "required")
+	}
+	if err := validateGiftsLimit(req.Limit); err != nil {
+		return nil, err
+	}
+	var result tg.OwnedGifts
+	if err := c.callJSON(ctx, "getBusinessAccountGifts", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

@@ -17,7 +17,7 @@ func TestB48B2_Registry(t *testing.T) {
 	if got[0].Category != CategoryMessaging {
 		t.Errorf("sendPaidMedia category %q, want %q", got[0].Category, CategoryMessaging)
 	}
-	if len(AllMethods) != 109 {
-		t.Errorf("AllMethods has %d entries, want 109 (98 before B-48b2, 99 before B-48c2, 101 before B-65 65f, 106 before B-65 65h, 107 before B-65 65i)", len(AllMethods))
+	if len(AllMethods) != 112 {
+		t.Errorf("AllMethods has %d entries, want 112 (98 before B-48b2, 99 before B-48c2, 101 before B-65 65f, 106 before B-65 65h, 107 before B-65 65i, 109 before B-145)", len(AllMethods))
 	}
 }

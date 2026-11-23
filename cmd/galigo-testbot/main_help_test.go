@@ -82,6 +82,15 @@ func TestHandleHelp_Text(t *testing.T) {
 	require.Greater(t, len(lines), h104+1)
 	assert.Equal(t, api104[0], lines[h104+1], "the api104 line is under its heading")
 
+	// B-145 C3: the gifts line names S80 and its three methods (the business one refusal only).
+	var giftsLine []string
+	for _, l := range lines {
+		if strings.HasPrefix(l, "  gifts ") {
+			giftsLine = append(giftsLine, l)
+		}
+	}
+	assert.Equal(t, []string{"  gifts             - Gift catalog (S23), owned gift lists (S80: getUserGifts, getChatGifts; getBusinessAccountGifts refusal only)"}, giftsLine)
+
 	// B-48b2 T-help: the stars and paid-media lines.
 	assert.Contains(t, lines, "  stars             - Star balance + transactions, invoice, paid media (S21, S22, S70)")
 	assert.Contains(t, lines, "  paid-media        - Send paid media: photo, video, live photo (S70)")

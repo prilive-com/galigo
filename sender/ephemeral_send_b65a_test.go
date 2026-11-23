@@ -178,12 +178,13 @@ var (
 	}
 )
 
-// b65fChatTags are the chat_id tags of the request types B-65 65f added after 8d762ce (a named addition: the 77-name
-// list above stays the historical one).
+// b65fChatTags are the chat_id tags of the request types B-65 65f and later slices added after 8d762ce (a named
+// addition: the 77-name list above stays the historical one).
 var b65fChatTags = map[string]string{
 	"SendWidgetRequest":            "chat_id",
 	"SendSharedWidgetRequest":      "chat_id",
 	"EditMessageWidgetDataRequest": "chat_id,omitempty",
+	"GetChatGiftsRequest":          "chat_id", // B-145 (getChatGifts, required chat_id)
 }
 
 // T-census: in the sender package source, ephemeral_message_parameters is carried by exactly the 14 request types

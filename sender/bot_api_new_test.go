@@ -207,29 +207,38 @@ func TestEditChatSubscriptionInviteLink_Validation(t *testing.T) {
 
 // ==================== GetOwnedGifts ====================
 
+// B-145: GetOwnedGifts (deprecated) sends getUserGifts; getOwnedGifts is not a Bot API method and gets no request. The
+// whole returned page is checked: both gift variants, the count and the next offset (TEST-PLAN S8, O-T3-08).
 func TestGetOwnedGifts(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/getOwnedGifts", func(w http.ResponseWriter, r *http.Request) {
-		testutil.ReplyOK(w, map[string]any{
-			"total_count": 1,
-			"gifts": []map[string]any{
-				{"type": "regular", "send_date": 1700000000},
-			},
-		})
+		t.Error("getOwnedGifts was called")
+		testutil.ReplyNotFound(w, "Not Found")
+	})
+	server.On("/bot"+testutil.TestToken+"/getUserGifts", func(w http.ResponseWriter, r *http.Request) {
+		api96ReplyRaw(w, b32Body(b145Page))
 	})
 
 	client := testutil.NewTestClient(t, server.BaseURL())
-	gifts, err := client.GetOwnedGifts(context.Background(), sender.GetOwnedGiftsRequest{UserID: 456})
+	gifts, err := client.GetOwnedGifts(context.Background(), sender.GetOwnedGiftsRequest{UserID: 456}) //nolint:staticcheck // deprecated, under test
 	require.NoError(t, err)
-	assert.Equal(t, 1, gifts.TotalCount)
-	require.Len(t, gifts.Gifts, 1)
+	assert.Equal(t, 1, server.CaptureCount())
+	assert.Equal(t, 7, gifts.TotalCount)
+	assert.Equal(t, "n", gifts.NextOffset)
+	require.Len(t, gifts.Gifts, 2)
+	require.NotNil(t, gifts.Gifts[0].Gift)
+	assert.Equal(t, "g-1", gifts.Gifts[0].Gift.ID)
+	assert.Nil(t, gifts.Gifts[0].UniqueGift)
+	require.NotNil(t, gifts.Gifts[1].UniqueGift)
+	assert.Equal(t, 9, gifts.Gifts[1].UniqueGift.Number)
+	assert.Nil(t, gifts.Gifts[1].Gift)
 }
 
 func TestGetOwnedGifts_Validation(t *testing.T) {
 	server := testutil.NewMockServer(t)
 	client := testutil.NewTestClient(t, server.BaseURL())
 
-	_, err := client.GetOwnedGifts(context.Background(), sender.GetOwnedGiftsRequest{})
+	_, err := client.GetOwnedGifts(context.Background(), sender.GetOwnedGiftsRequest{}) //nolint:staticcheck // deprecated, under test
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "user_id")
 }

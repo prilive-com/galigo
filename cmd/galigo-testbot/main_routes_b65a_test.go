@@ -153,8 +153,12 @@ func TestB65A_StatusOutput(t *testing.T) {
 		}
 		assert.Contains(t, lines, "  + getChatShareThemeBackdrops") // B-65 65h: covered by S78
 		assert.NotContains(t, lines, "  - getChatShareThemeBackdrops")
-		assert.Equal(t, "100", b65aCount(t, lines, "Covered: ", " methods"))       // B-65 65b: 92; B-65 65f: the five widget methods; B-65 65h: 98; B-65 65i: 100
+		assert.Equal(t, "103", b65aCount(t, lines, "Covered: ", " methods"))       // B-65 65b: 92; B-65 65f: the five widget methods; B-65 65h: 98; B-65 65i: 100; B-145: 103
 		for _, m := range []string{"getUniqueGift", "deleteBusinessAccountGift"} { // B-65 65i: covered by S79
+			assert.Contains(t, lines, "  + "+m)
+			assert.NotContains(t, lines, "  - "+m)
+		}
+		for _, m := range []string{"getUserGifts", "getChatGifts", "getBusinessAccountGifts"} { // B-145: covered by S80
 			assert.Contains(t, lines, "  + "+m)
 			assert.NotContains(t, lines, "  - "+m)
 		}
@@ -179,6 +183,9 @@ func TestB65A_StatusOutput(t *testing.T) {
 		assert.Contains(t, lines, "Missing: "+b65aCount(t, cli, "Missing: ", " methods"))
 		assert.NotContains(t, lines, "  - deleteEphemeralMessage")
 		for _, m := range b65aEdits { // B-65 65b: covered by S73
+			assert.NotContains(t, lines, "  - "+m)
+		}
+		for _, m := range []string{"getUserGifts", "getChatGifts", "getBusinessAccountGifts"} { // B-145
 			assert.NotContains(t, lines, "  - "+m)
 		}
 		assert.Contains(t, lines, "Missing methods:")       // the list the edits would be in

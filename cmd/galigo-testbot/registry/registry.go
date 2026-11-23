@@ -132,6 +132,8 @@ var AllMethods = []Method{
 
 	// === Extended: Gifts ===
 	{Name: "getAvailableGifts", Category: CategoryExtended},
+	{Name: "getUniqueGift", Category: CategoryExtended},                                                                    // Bot API 10.4
+	{Name: "deleteBusinessAccountGift", Category: CategoryExtended, Notes: "S79: refusal only (fake business connection)"}, // Bot API 10.4
 
 	// === Extended: Chat share themes (Bot API 10.4) ===
 	{Name: "getChatShareThemeBackdrops", Category: CategoryExtended},

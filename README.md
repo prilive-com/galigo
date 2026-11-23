@@ -15,7 +15,7 @@ galigo is designed for high-load environments where reliability matters. Unlike 
 - **Resilient** — Circuit breaker prevents cascading failures; only trips on 5xx/network errors, not user errors
 - **Respectful** — Smart rate limiting with per-chat and global limits; auto-handles 429 Retry-After
 - **Secure** — fmt and slog redact the bot token, the webhook secret and the client and config types that hold them, and fmt and slog's text handler redact the payment `ProviderToken` of the invoice requests (JSON still sends it); errors from `http.NewRequestWithContext` and `http.Client.Do` are scrubbed of the token (some paths still print a secret: see [SECURITY.md](.github/SECURITY.md)); TLS 1.2+ enforced
-- **Complete** — Full Telegram Bot API coverage including Stars, Gifts, Business, and Forum Topics
+- **Broad** — most of the Telegram Bot API up to 10.4, including Stars, Gifts, Business, and Forum Topics
 - **Flexible** — Use the unified Bot type or import only `sender/` or `receiver/` packages
 - **Modern** — Built for Go 1.27+ with generics, iterators, and structured logging
 
@@ -97,7 +97,7 @@ func main() {
 | Component | Version | Notes |
 |-----------|---------|-------|
 | **Go** | 1.27+ | Uses generics, iter.Seq, log/slog |
-| **Telegram Bot API** | 8.0–10.2 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming, Managed Bots, Live Photos, Poll Media, Rich Messages, Ephemeral Messages, Communities |
+| **Telegram Bot API** | 8.0–10.4 | Stars, Gifts, Business, Checklists, Member Tags, Message Streaming, Managed Bots, Live Photos, Poll Media, Rich Messages, Ephemeral Messages, Communities, Widgets, TON Wallet, Share Themes |
 | **Platforms** | Linux, macOS, Windows | Pure Go, no CGO |
 
 ### Supported API Methods
@@ -113,6 +113,8 @@ galigo implements **150+ methods** covering:
 - Guest mode, reaction deletion, live photos and polls with media (Bot API 10.0)
 - Rich messages, poll option links and join request queries (Bot API 10.1)
 - Rich message blocks and media, ephemeral messages and communities (Bot API 10.2)
+- Rich message buttons, tables and quotations, disabled buttons and ephemeral message edits (Bot API 10.3)
+- Widgets, rich quotes, TON transfers and wallet cards, share themes and unique gifts (Bot API 10.4)
 - Forum topics and permissions
 - Stickers and custom emoji
 - Payments, Stars, and Gifts

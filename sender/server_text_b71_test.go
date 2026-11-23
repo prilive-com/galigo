@@ -323,6 +323,15 @@ func TestResultDecodeScrubbed(t *testing.T) {
 			return err
 		}, "getChatShareThemeBackdrops", "galigo: getChatShareThemeBackdrops: failed to parse response: " + num("ChatShareThemeBackdrops.backdrops.0.id of type int"),
 			num("ChatShareThemeBackdrops.backdrops.0.id of type int"), true, chainNum, label71Token},
+		// B-65 65i (S-scrub): the getter's result decode error goes through callJSON's scrub, and no gift is returned
+		{"callJSON getUniqueGift, one pass", `{"gift_id":"x","number":` + b71Big + `}`, func(c *sender.Client) error {
+			got, err := c.GetUniqueGift(ctx, "PlushPepe-1")
+			if got != nil {
+				return fmt.Errorf("gift returned with the error %w", err)
+			}
+			return err
+		}, "getUniqueGift", "galigo: getUniqueGift: failed to parse response: " + num("UniqueGift.number of type int"),
+			num("UniqueGift.number of type int"), true, chainNum, label71Token},
 		{"copyMessage, one pass", `{"message_id":` + b71Big + `}`, func(c *sender.Client) error {
 			_, err := c.CopyMessage(ctx, sender.CopyMessageRequest{ChatID: chat, FromChatID: chat, MessageID: 1})
 			return err

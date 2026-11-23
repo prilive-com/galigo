@@ -325,6 +325,11 @@ type SenderClient interface {
 	// Extended: Gifts
 	GetAvailableGifts(ctx context.Context) (*tg.Gifts, error)
 
+	// Extended: Gifts (Bot API 10.4)
+	GetUniqueGift(ctx context.Context, name string) (*tg.UniqueGift, error)
+	GetBusinessConnection(ctx context.Context, businessConnectionID string) (*tg.BusinessConnection, error)
+	DeleteBusinessAccountGift(ctx context.Context, req sender.DeleteBusinessAccountGiftRequest) error
+
 	// Extended: Chat share themes
 	GetChatShareThemeBackdrops(ctx context.Context) (*tg.ChatShareThemeBackdrops, error) // Bot API 10.4
 

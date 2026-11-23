@@ -8,11 +8,12 @@ import (
 )
 
 // AllAPI104Scenarios returns the Bot API 10.4 scenarios: S76 widget methods, refusal only (B-65 65f), S77 rich
-// quotes (B-65 65g) and S78 share theme backdrops (B-65 65h, read only). The 10.4 widget read side is decode-only
-// (B-65 65e). S76's rows run only in a group or supergroup; S77 runs in an ordinary chat (private, group, supergroup),
-// not in a channel direct messages chat; S78 runs in any chat (the method has no chat id).
+// quotes (B-65 65g), S78 share theme backdrops (B-65 65h, read only) and S79 unique gifts (B-65 65i; the delete is
+// refusal only). The 10.4 widget read side is decode-only (B-65 65e). S76's rows run only in a group or supergroup;
+// S77 runs in an ordinary chat (private, group, supergroup), not in a channel direct messages chat; S78 and S79 run in
+// any chat (the methods have no chat id).
 func AllAPI104Scenarios() []engine.Scenario {
-	return []engine.Scenario{S76_Widgets(), S77_RichQuote(), S78_ShareThemeBackdrops()}
+	return []engine.Scenario{S76_Widgets(), S77_RichQuote(), S78_ShareThemeBackdrops(), S79_UniqueGift()}
 }
 
 // s77QuoteInvalid is the refusal of a quote that is not in the message (measured 2026-11-22 in the test group).
@@ -79,5 +80,22 @@ func S78_ShareThemeBackdrops() engine.Scenario {
 		CoveredMethods:      []string{"getChatShareThemeBackdrops"},
 		ScenarioSteps:       []engine.Step{&engine.GetChatShareThemeBackdropsStep{}},
 		ScenarioTimeout:     30 * time.Second,
+	}
+}
+
+// S79_UniqueGift gets a unique gift by its name and checks the "gift not found" refusal (Bot API 10.4), then sends
+// deleteBusinessAccountGift with fake ids, which the server must refuse (refusal only: a guard first checks that the
+// fake business connection does not exist; the guard call is not a covered method). Runs in any chat; no message.
+func S79_UniqueGift() engine.Scenario {
+	return &engine.BaseScenario{
+		ScenarioName:        "S79-UniqueGift",
+		ScenarioDescription: "Get a unique gift by name; deleteBusinessAccountGift refused on a fake business connection (Bot API 10.4)",
+		CoveredMethods:      []string{"getUniqueGift", "deleteBusinessAccountGift"},
+		ScenarioSteps: []engine.Step{
+			&engine.GetUniqueGiftStep{GiftName: "PlushPepe-1"},
+			&engine.GetUniqueGiftStep{GiftName: "zzNoSuchGift-1", WantError: "gift not found"},
+			&engine.DeleteBusinessAccountGiftStep{},
+		},
+		ScenarioTimeout: 30 * time.Second,
 	}
 }

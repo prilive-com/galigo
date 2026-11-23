@@ -33,11 +33,11 @@ func TestB65F_SuiteRoutesAPI104(t *testing.T) {
 	for _, in := range []string{"api104", "api-104", "10.4"} {
 		got, ok := suiteScenarios(in)
 		require.True(t, ok, in)
-		assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"}, b49Names(got), in)
+		assert.Equal(t, []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops", "S79-UniqueGift"}, b49Names(got), in) // B-65 65i: S79
 	}
 	got, ok := suiteScenarios("all")
 	require.True(t, ok)
-	for _, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"} {
+	for _, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops", "S79-UniqueGift"} {
 		n := 0
 		for _, g := range b49Names(got) {
 			if g == name {
@@ -164,6 +164,18 @@ func newB65FBot(t *testing.T) *b65fBot {
 	on("getChatShareThemeBackdrops", func(w http.ResponseWriter, _ map[string]any) { // B-65 65h: S78
 		testutil.ReplyOK(w, json.RawMessage(`{"backdrops":[{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":3}},{"id":9,"name":"n","colors":{"center_color":4,"edge_color":5,"symbol_color":6,"text_color":7}}]}`))
 	})
+	on("getUniqueGift", func(w http.ResponseWriter, body map[string]any) { // B-65 65i: S79
+		if body["name"] != "PlushPepe-1" {
+			testutil.ReplyBadRequest(w, "gift not found")
+			return
+		}
+		testutil.ReplyOK(w, json.RawMessage(b65iGiftUF))
+	})
+	for _, m := range []string{"getBusinessConnection", "deleteBusinessAccountGift"} { // B-65 65i: S79's guard and delete
+		on(m, func(w http.ResponseWriter, _ map[string]any) {
+			testutil.ReplyBadRequest(w, "business connection not found")
+		})
+	}
 	for m, text := range refusal {
 		on(m, func(w http.ResponseWriter, _ map[string]any) { testutil.ReplyBadRequest(w, text) })
 	}
@@ -183,7 +195,7 @@ func newB65FBot(t *testing.T) *b65fBot {
 // b65fRunBot runs the bot's /run api104 from chat (budget 50, config chat the group) and returns the saved report.
 func b65fRunBot(t *testing.T, b *b65fBot, chat int64) map[string]any {
 	t.Helper()
-	require.Len(t, suites.AllAPI104Scenarios(), 3, "AllAPI104Scenarios")
+	require.Len(t, suites.AllAPI104Scenarios(), 4, "AllAPI104Scenarios") // B-65 65i: S79
 	client := testutil.NewTestClient(t, b.server.BaseURL(), sender.WithRateLimit(1000, 100),
 		sender.WithGroupRateLimit(1000, 100), sender.WithPerChatRateLimit(1000, 100))
 	cfg := &config.Config{Admins: []int64{1}, StorageDir: t.TempDir(), MaxMessagesPerRun: 50, ChatID: b65fGroup}
@@ -206,22 +218,28 @@ func TestB65F_BotRunPrivate(t *testing.T) {
 	b := newB65FBot(t)
 	report := b65fRunBot(t, b, 77)
 	require.Equal(t, []string{"sendMessage", "getChat", "getMe", "getChatMember", "sendRichMessage", "sendMessage", "sendMessage",
-		"sendMessage", "sendMessage", "deleteMessage", "deleteMessage", "deleteMessage", "deleteMessage", "getChatShareThemeBackdrops", "sendMessage"}, b.methods)
+		"sendMessage", "sendMessage", "deleteMessage", "deleteMessage", "deleteMessage", "deleteMessage", "getChatShareThemeBackdrops",
+		"getUniqueGift", "getUniqueGift", "getBusinessConnection", "deleteBusinessAccountGift", "sendMessage"}, b.methods) // B-65 65i: S79
 	require.Len(t, b.bodies, len(b.methods))
 	assert.Equal(t, float64(77), b.bodies[0]["chat_id"])
-	assert.Equal(t, "Running 3 scenario(s)...", b.bodies[0]["text"])
+	assert.Equal(t, "Running 4 scenario(s)...", b.bodies[0]["text"])
 	assert.Equal(t, float64(77), b.bodies[1]["chat_id"])
 	for i := 4; i < len(b.bodies); i++ {
 		if b.methods[i] == "getChatShareThemeBackdrops" { // B-65 65h: S78 has no chat
 			assert.Equal(t, map[string]any{}, b.bodies[i], "S78 sends an empty body")
 			continue
 		}
+		if i >= 14 && i <= 17 { // B-65 65i: S79's four calls have no chat
+			continue
+		}
 		assert.Equal(t, float64(77), b.bodies[i]["chat_id"], "call %d (%s) in the private chat", i, b.methods[i])
 	}
+	assert.Equal(t, b65iS79Bodies, b.bodies[14:18], "S79's four bodies, in order") // B-65 65i (O-P3-02)
 	b65gCheckS77(t, b, 77)
-	assert.Contains(t, b.bodies[14]["text"], "Scenarios: 3/3 passed")
+	assert.Contains(t, b.bodies[18]["text"], "Scenarios: 4/4 passed")
+	b65iCheckCovered(t, report)
 	scs, _ := report["scenarios"].([]any)
-	require.Len(t, scs, 3)
+	require.Len(t, scs, 4)
 	sc := scs[0].(map[string]any)
 	assert.Equal(t, "S76-Widgets", sc["scenario_name"])
 	assert.Equal(t, true, sc["skipped"])
@@ -232,6 +250,10 @@ func TestB65F_BotRunPrivate(t *testing.T) {
 	assert.Equal(t, true, sc["success"])
 	sc = scs[2].(map[string]any) // B-65 65h
 	assert.Equal(t, "S78-ShareThemeBackdrops", sc["scenario_name"])
+	assert.Nil(t, sc["skipped"])
+	assert.Equal(t, true, sc["success"])
+	sc = scs[3].(map[string]any) // B-65 65i
+	assert.Equal(t, "S79-UniqueGift", sc["scenario_name"])
 	assert.Nil(t, sc["skipped"])
 	assert.Equal(t, true, sc["success"])
 }
@@ -250,8 +272,8 @@ func TestB65F_BotRunGroup(t *testing.T) {
 	assert.Equal(t, 7, n, "seven widget calls")
 	assert.Equal(t, true, report["success"])
 	scs, _ := report["scenarios"].([]any)
-	require.Len(t, scs, 3)
-	for i, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops"} {
+	require.Len(t, scs, 4)
+	for i, name := range []string{"S76-Widgets", "S77-RichQuote", "S78-ShareThemeBackdrops", "S79-UniqueGift"} {
 		sc := scs[i].(map[string]any)
 		assert.Equal(t, name, sc["scenario_name"])
 		assert.Nil(t, sc["skipped"], name)
@@ -268,6 +290,15 @@ func TestB65F_BotRunGroup(t *testing.T) {
 	if k := slices.Index(b.methods, "getChatShareThemeBackdrops"); assert.GreaterOrEqual(t, k, 0) {
 		assert.Equal(t, map[string]any{}, b.bodies[k], "S78 sends an empty body")
 	}
+	// B-65 65i: S79's four calls once, in order (getUniqueGift twice), and the run-wide covered methods.
+	assert.Equal(t, 2, count["getUniqueGift"], "S79's two lookups")
+	assert.Equal(t, 1, count["getBusinessConnection"], "S79's guard")
+	assert.Equal(t, 1, count["deleteBusinessAccountGift"], "S79's delete")
+	if k := slices.Index(b.methods, "getUniqueGift"); assert.GreaterOrEqual(t, k, 0) && assert.LessOrEqual(t, k+4, len(b.methods)) {
+		assert.Equal(t, []string{"getUniqueGift", "getUniqueGift", "getBusinessConnection", "deleteBusinessAccountGift"}, b.methods[k:k+4])
+		assert.Equal(t, b65iS79Bodies, b.bodies[k:k+4], "S79's four bodies, in order")
+	}
+	b65iCheckCovered(t, report)
 	k := b65gCheckS77(t, b, b65fGroup)
 	var s76 []map[string]any
 	for i, m := range b.methods[:k] {
@@ -312,4 +343,37 @@ func b65gCheckS77(t *testing.T, b *b65fBot, chat int64) int {
 		assert.Equal(t, map[string]any{"chat_id": float64(chat), "message_id": id}, b.bodies[k+5+i], "S77's cleanup")
 	}
 	return k
+}
+
+// B-65 65i: S79's mock reply and expected request bodies, and the run-wide covered methods (TEST-PLAN §1).
+
+// b65iGiftUF is the full unique gift the mock answers for PlushPepe-1 (the test plan's UF, fake values).
+const b65iGiftUF = `{"gift_id":"5936013938331222567","base_name":"Plush Pepe","name":"PlushPepe-1","number":1,` +
+	`"model":{"name":"m","sticker":{"file_id":"f1","file_unique_id":"u1","type":"custom_emoji","width":1,"height":1,"is_animated":false,"is_video":false},"rarity_per_mille":1},` +
+	`"symbol":{"name":"s","sticker":{"file_id":"f2","file_unique_id":"u2","type":"custom_emoji","width":1,"height":1,"is_animated":false,"is_video":false},"rarity_per_mille":2},` +
+	`"backdrop":{"name":"b","colors":{"center_color":1,"edge_color":2,"symbol_color":3,"text_color":4},"rarity_per_mille":3},` +
+	`"is_premium":true,"is_burned":true,"publisher_chat":{"id":-100777,"type":"channel","title":"pub"}}`
+
+var b65iS79Bodies = []map[string]any{
+	{"name": "PlushPepe-1"},
+	{"name": "zzNoSuchGift-1"},
+	{"business_connection_id": "zzNoSuchConnection"},
+	{"business_connection_id": "zzNoSuchConnection", "owned_gift_id": "zzNoSuchGift"},
+}
+
+// b65iCheckCovered checks the report's run-wide methods_covered as a set (the report fills it from a map): 65h's
+// eight names plus S79's two, never the guard (PLAN §15 A4).
+func b65iCheckCovered(t *testing.T, report map[string]any) {
+	t.Helper()
+	summary, _ := report["summary"].(map[string]any)
+	raw, _ := summary["methods_covered"].([]any)
+	var got []string
+	for _, m := range raw {
+		s, _ := m.(string)
+		got = append(got, s)
+	}
+	assert.ElementsMatch(t, []string{"sendWidget", "sendSharedWidget", "answerWidgetQuery", "editMessageWidgetData",
+		"editSharedWidgetData", "sendRichMessage", "sendMessage", "getChatShareThemeBackdrops",
+		"getUniqueGift", "deleteBusinessAccountGift"}, got)
+	assert.NotContains(t, got, "getBusinessConnection")
 }

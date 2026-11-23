@@ -153,7 +153,13 @@ func TestB65A_StatusOutput(t *testing.T) {
 		}
 		assert.Contains(t, lines, "  + getChatShareThemeBackdrops") // B-65 65h: covered by S78
 		assert.NotContains(t, lines, "  - getChatShareThemeBackdrops")
-		assert.Equal(t, "98", b65aCount(t, lines, "Covered: ", " methods")) // B-65 65b: 92; B-65 65f: the five widget methods; B-65 65h: 98
+		assert.Equal(t, "100", b65aCount(t, lines, "Covered: ", " methods"))       // B-65 65b: 92; B-65 65f: the five widget methods; B-65 65h: 98; B-65 65i: 100
+		for _, m := range []string{"getUniqueGift", "deleteBusinessAccountGift"} { // B-65 65i: covered by S79
+			assert.Contains(t, lines, "  + "+m)
+			assert.NotContains(t, lines, "  - "+m)
+		}
+		assert.NotContains(t, lines, "  + getBusinessConnection", "S79's guard is not counted") // B-65 65i (A-P3-01)
+		assert.NotContains(t, lines, "  - getBusinessConnection")
 		assert.Equal(t, "10", b65aCount(t, lines, "Missing: ", " methods"))
 	})
 	t.Run("bot", func(t *testing.T) {

@@ -25,8 +25,7 @@ type TonNFT struct {
 	Name              string            `json:"name"`
 	Description       string            `json:"description"`
 	Attributes        []TonNFTAttribute `json:"attributes,omitempty"`
-	// Gift is the unique gift that corresponds to the NFT. tg.UniqueGift does not have every spec field yet
-	// (gift_id, is_premium, is_from_blockchain, publisher_chat).
+	// Gift is the unique gift that corresponds to the NFT.
 	Gift *UniqueGift `json:"gift,omitempty"`
 }
 

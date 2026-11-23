@@ -300,8 +300,8 @@ func TestB145_Validation(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, want.Error(), err.Error(), "chat id %#v", id)
 	}
-	_, err := client.GetBusinessAccountGifts(ctx, sender.GetBusinessAccountGiftsRequest{})
-	field(t, err, "business_connection_id")
+	_, bcErr := client.GetBusinessAccountGifts(ctx, sender.GetBusinessAccountGiftsRequest{})
+	field(t, bcErr, "business_connection_id")
 	limits := []struct {
 		name string
 		call func(limit int) error
@@ -338,7 +338,7 @@ func TestB145_Validation(t *testing.T) {
 	}
 	assert.Equal(t, 8, server.CaptureCount(), "limits 1 and 100 are sent")
 	server.ResetCaptures()
-	_, err = client.GetUserGifts(ctx, sender.GetUserGiftsRequest{Limit: 101})
+	_, err := client.GetUserGifts(ctx, sender.GetUserGiftsRequest{Limit: 101})
 	field(t, err, "user_id")
 	_, err = client.GetChatGifts(ctx, sender.GetChatGiftsRequest{Limit: 101})
 	assert.NotContains(t, err.Error(), "limit", "the chat id is checked first")

@@ -11,7 +11,8 @@ import (
 )
 
 // Fixed inputs and the measured refusal of S79's delete row (Bot API 10.4; probes 2026-11-23): getBusinessConnection
-// and deleteBusinessAccountGift both answer 400 giftConnectionNotFound for a connection id the bot does not have.
+// and deleteBusinessAccountGift both answer 400 "Bad Request: business connection not found" for a connection id the
+// bot does not have.
 const (
 	giftFakeConnection     = "zzNoSuchConnection"
 	giftFakeOwnedGift      = "zzNoSuchGift"
@@ -69,8 +70,8 @@ func (s *GetUniqueGiftStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 
 // DeleteBusinessAccountGiftStep sends deleteBusinessAccountGift (Bot API 10.4) with fixed fake ids and must get the
 // measured refusal (refusal only: the bot has no business connection; a successful delete is proved by mock tests).
-// Guard first: getBusinessConnection for the fake connection id must be refused with exactly 400
-// giftConnectionNotFound, else the delete is not sent; a found connection gives a fixed error that names no id.
+// Guard first: getBusinessConnection for the fake connection id must be refused with exactly 400 "Bad Request:
+// business connection not found", else the delete is not sent; a found connection gives a fixed error that names no id.
 // The delete must then be refused with exactly that 400. Both errors are kept with %w, so the runner repeats a 429
 // (the whole step again, guard first). The guard call is not a covered method.
 type DeleteBusinessAccountGiftStep struct{}

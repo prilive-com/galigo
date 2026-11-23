@@ -346,6 +346,27 @@ func TestB65I_Adapter(t *testing.T) {
 	assert.Equal(t, 3, server.CaptureCount(), "the canceled calls send nothing")
 }
 
+// E-guard-found-http (change round c2, O-C2-01): through the real adapter and a mock server, a found connection stops
+// the step with the fixed guard error, and only the lookup is sent (no delete).
+func TestB65I_DeleteGuardFoundHTTP(t *testing.T) {
+	server := testutil.NewMockServer(t)
+	server.On("/bot"+testutil.TestToken+"/getBusinessConnection", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyOK(w, json.RawMessage(`{"id":"bc-seen-9191","user":{"id":1,"is_bot":false,"first_name":"A"},"user_chat_id":1,"date":1,"rights":{},"is_enabled":true}`))
+	})
+	server.On("/bot"+testutil.TestToken+"/deleteBusinessAccountGift", func(w http.ResponseWriter, _ *http.Request) {
+		testutil.ReplyOK(w, true)
+	})
+	rt := NewRuntime(NewSenderAdapter(testutil.NewTestClient(t, server.BaseURL())), testutil.TestChatID, 0)
+	runner := NewRunner(rt, RunnerConfig{RetryOn429: true, Max429Retries: 1, MaxMessages: 10}, slog.New(slog.DiscardHandler))
+	res := runner.Run(context.Background(), &BaseScenario{ScenarioName: "b65i", ScenarioSteps: []Step{&DeleteBusinessAccountGiftStep{}},
+		ScenarioTimeout: 10 * time.Second})
+	assert.False(t, res.Success)
+	assert.Contains(t, res.Error, b65iGuardErr)
+	assert.NotContains(t, res.Error, "bc-seen-9191")
+	require.Equal(t, 1, server.CaptureCount(), "only the lookup is sent")
+	assert.True(t, strings.HasSuffix(server.CaptureAt(0).Path, "/getBusinessConnection"))
+}
+
 // E-names.
 func TestB65I_StepNames(t *testing.T) {
 	assert.Equal(t, "getUniqueGift", (&GetUniqueGiftStep{}).Name())

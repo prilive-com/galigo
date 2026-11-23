@@ -129,9 +129,24 @@ func TestB65H_BackdropsRateLimited(t *testing.T) {
 	_, err := client.GetChatShareThemeBackdrops(ctx)
 	require.NoError(t, err)
 	require.Equal(t, 1, server.CaptureCount())
-	got, err := client.GetChatShareThemeBackdrops(ctx)
-	assert.Nil(t, got)
-	assert.EqualError(t, err, b51Refused) // A-T3-03
+	// The limiter refuses at once, because the next token comes after ctx's deadline. A getter that does not pass ctx
+	// would wait 1000 s, so the call runs in a goroutine and the test fails after 5 s instead of hanging.
+	type answer struct {
+		got *tg.ChatShareThemeBackdrops
+		err error
+	}
+	done := make(chan answer, 1)
+	go func() {
+		got, err := client.GetChatShareThemeBackdrops(ctx)
+		done <- answer{got, err}
+	}()
+	select {
+	case a := <-done:
+		assert.Nil(t, a.got)
+		assert.EqualError(t, a.err, b51Refused) // A-T3-03
+	case <-time.After(5 * time.Second):
+		t.Fatal("the second call did not return: the getter does not pass its context to the limiter")
+	}
 	assert.Equal(t, 1, server.CaptureCount(), "the second call sends nothing")
 }
 

@@ -156,7 +156,8 @@ func TestB65H_ThemeEncode(t *testing.T) {
 	}
 }
 
-// T-emoji (decode): both EmojiType variants decode to the exact struct.
+// T-emoji (decode): both EmojiType variants decode to the exact struct, and an unknown type decodes with its Type and no
+// error (the upgrade note; mutation discovery d1: no test held this).
 func TestB65H_EmojiDecode(t *testing.T) {
 	for _, tc := range []struct {
 		body string
@@ -164,6 +165,7 @@ func TestB65H_EmojiDecode(t *testing.T) {
 	}{
 		{`{"type":"emoji","emoji":"🙂"}`, tg.EmojiType{Type: "emoji", Emoji: "🙂"}},
 		{`{"type":"custom_emoji","custom_emoji_id":"5368fake"}`, tg.EmojiType{Type: "custom_emoji", CustomEmojiID: "5368fake"}},
+		{`{"type":"z_future","k":1}`, tg.EmojiType{Type: "z_future"}},
 	} {
 		var got tg.EmojiType
 		require.NoError(t, json.Unmarshal([]byte(tc.body), &got))

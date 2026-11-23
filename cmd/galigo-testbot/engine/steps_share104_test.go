@@ -78,6 +78,8 @@ func TestB65H_StepEmpty(t *testing.T) {
 		// A-C2-01: id 0, as in the real reply, inside and first (a step that takes 0 as "not set yet").
 		{"zero_inside", b65hList(b65hBackdrop(5, "a"), b65hBackdrop(0, "b"), b65hBackdrop(3, "c")), map[string]any{"count": 3, "min_id": 0, "max_id": 5, "empty_names": 0}},
 		{"zero_first", b65hList(b65hBackdrop(0, "a"), b65hBackdrop(49, "b"), b65hBackdrop(1, "c")), map[string]any{"count": 3, "min_id": 0, "max_id": 49, "empty_names": 0}},
+		// O-C3-02 = A-C3-01: 0 as the maximum (a max that takes 0 as "not set yet").
+		{"zero_max", b65hList(b65hBackdrop(-4, "a"), b65hBackdrop(0, "b"), b65hBackdrop(-7, "c")), map[string]any{"count": 3, "min_id": -7, "max_id": 0, "empty_names": 0}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res, err := b65hRun(t, &b65hFake{res: tc.res})

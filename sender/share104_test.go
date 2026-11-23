@@ -19,10 +19,11 @@ import (
 // B-65 65h: getChatShareThemeBackdrops and the new ChatFullInfo holders on the sender path (TEST-PLAN section 3).
 // Ids and addresses are fake.
 
-// The ids are in neither order (79, 0, 4), so a getter that sorts the list either way fails S-call (O-C1-03, O-C2-04).
+// The ids (79, 0, 4) and the names ("", "Zulu", "Amber") are each in neither order, so a getter that sorts the list by
+// id or by name, either way, fails S-call (O-C1-03, O-C2-04, O-C3-03).
 const b65hBackdropsWire = `{"backdrops":[{"id":79,"name":"","colors":{"center_color":16777215,"edge_color":3,"symbol_color":4,"text_color":5}},` +
-	`{"id":0,"name":"Black","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}},` +
-	`{"id":4,"name":"Blue","colors":{"center_color":6,"edge_color":7,"symbol_color":8,"text_color":9}}]}`
+	`{"id":0,"name":"Zulu","colors":{"center_color":1,"edge_color":2,"symbol_color":0,"text_color":16772551}},` +
+	`{"id":4,"name":"Amber","colors":{"center_color":6,"edge_color":7,"symbol_color":8,"text_color":9}}]}`
 
 const b65hPath = "/bot" + testutil.TestToken + "/getChatShareThemeBackdrops"
 
@@ -34,8 +35,8 @@ func TestB65H_GetChatShareThemeBackdrops(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &tg.ChatShareThemeBackdrops{Backdrops: []tg.ChatShareThemeBackdrop{
 		{ID: 79, Name: "", Colors: tg.UniqueGiftBackdropColors{CenterColor: 16777215, EdgeColor: 3, SymbolColor: 4, TextColor: 5}},
-		{ID: 0, Name: "Black", Colors: tg.UniqueGiftBackdropColors{CenterColor: 1, EdgeColor: 2, SymbolColor: 0, TextColor: 16772551}},
-		{ID: 4, Name: "Blue", Colors: tg.UniqueGiftBackdropColors{CenterColor: 6, EdgeColor: 7, SymbolColor: 8, TextColor: 9}},
+		{ID: 0, Name: "Zulu", Colors: tg.UniqueGiftBackdropColors{CenterColor: 1, EdgeColor: 2, SymbolColor: 0, TextColor: 16772551}},
+		{ID: 4, Name: "Amber", Colors: tg.UniqueGiftBackdropColors{CenterColor: 6, EdgeColor: 7, SymbolColor: 8, TextColor: 9}},
 	}}, got)
 	require.Equal(t, 1, server.CaptureCount())
 	c := server.LastCapture()

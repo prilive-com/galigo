@@ -210,6 +210,14 @@ func TestB145_DecodeReuse(t *testing.T) {
 		b145Decode(t, `{"type":"regular","gift":{"id":"g-4","star_count":5},"gift":{"id":"g-5"}}`, &g)
 		assert.Equal(t, &tg.Gift{ID: "g-5"}, g.Gift)
 	})
+	for _, start := range []tg.OwnedGift{b145WantReg(), b145WantUni()} {
+		t.Run("j failed decode still clears "+start.Type, func(t *testing.T) {
+			g := start
+			require.Error(t, json.Unmarshal([]byte(`{"type":"regular","send_date":"bad"}`), &g))
+			assert.Nil(t, g.Gift)
+			assert.Nil(t, g.UniqueGift)
+		})
+	}
 }
 
 func b145Marshal(t *testing.T, g tg.OwnedGift) string {

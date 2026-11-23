@@ -137,7 +137,8 @@ func (c *Client) GetUniqueGift(ctx context.Context, name string) (*tg.UniqueGift
 }
 
 // DeleteBusinessAccountGift deletes a gift from a managed business account (Bot API 10.4). It needs the business
-// bot right can_convert_gifts_to_stars, and only a gift that is not limited and not refunded can be deleted.
+// bot right can_convert_gifts_to_stars. Only a regular gift that is not limited and not refunded can be deleted;
+// the deletion gives no Telegram Stars.
 // NO RETRY — value operation: after a lost answer the gift may already be gone.
 func (c *Client) DeleteBusinessAccountGift(ctx context.Context, req DeleteBusinessAccountGiftRequest) error {
 	if req.BusinessConnectionID == "" {

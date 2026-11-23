@@ -11,11 +11,11 @@ import (
 )
 
 // Fixed inputs and the measured refusal of S79's delete row (Bot API 10.4; probes 2026-11-23): getBusinessConnection
-// and deleteBusinessAccountGift both answer 400 BusinessConnectionNotFound for a connection id the bot does not have.
+// and deleteBusinessAccountGift both answer 400 giftConnectionNotFound for a connection id the bot does not have.
 const (
-	giftFakeConnection         = "zzNoSuchConnection"
-	giftFakeOwnedGift          = "zzNoSuchGift"
-	BusinessConnectionNotFound = "Bad Request: business connection not found"
+	giftFakeConnection     = "zzNoSuchConnection"
+	giftFakeOwnedGift      = "zzNoSuchGift"
+	giftConnectionNotFound = "Bad Request: business connection not found"
 )
 
 // GetUniqueGiftStep gets a unique gift by its name (Bot API 10.4). With an empty WantError the gift must have the
@@ -70,7 +70,7 @@ func (s *GetUniqueGiftStep) Execute(ctx context.Context, rt *Runtime) (*StepResu
 // DeleteBusinessAccountGiftStep sends deleteBusinessAccountGift (Bot API 10.4) with fixed fake ids and must get the
 // measured refusal (refusal only: the bot has no business connection; a successful delete is proved by mock tests).
 // Guard first: getBusinessConnection for the fake connection id must be refused with exactly 400
-// BusinessConnectionNotFound, else the delete is not sent; a found connection gives a fixed error that names no id.
+// giftConnectionNotFound, else the delete is not sent; a found connection gives a fixed error that names no id.
 // The delete must then be refused with exactly that 400. Both errors are kept with %w, so the runner repeats a 429
 // (the whole step again, guard first). The guard call is not a covered method.
 type DeleteBusinessAccountGiftStep struct{}
@@ -80,7 +80,7 @@ func (s *DeleteBusinessAccountGiftStep) Name() string { return "deleteBusinessAc
 // giftRefused returns the API error when err is exactly the measured 400 refusal.
 func giftRefused(err error) (*tg.APIError, bool) {
 	var apiErr *tg.APIError
-	if !errors.As(err, &apiErr) || apiErr.Code != 400 || apiErr.Description != BusinessConnectionNotFound {
+	if !errors.As(err, &apiErr) || apiErr.Code != 400 || apiErr.Description != giftConnectionNotFound {
 		return nil, false
 	}
 	return apiErr, true
@@ -93,15 +93,15 @@ func (s *DeleteBusinessAccountGiftStep) Execute(ctx context.Context, rt *Runtime
 	}
 	guard, ok := giftRefused(err)
 	if !ok {
-		return nil, fmt.Errorf("deleteBusinessAccountGift: guard: want getBusinessConnection refused with 400 %q; the delete is not sent: %w", BusinessConnectionNotFound, err)
+		return nil, fmt.Errorf("deleteBusinessAccountGift: guard: want getBusinessConnection refused with 400 %q; the delete is not sent: %w", giftConnectionNotFound, err)
 	}
 	err = rt.Sender.DeleteBusinessAccountGift(ctx, sender.DeleteBusinessAccountGiftRequest{BusinessConnectionID: giftFakeConnection, OwnedGiftID: giftFakeOwnedGift})
 	if err == nil {
-		return nil, fmt.Errorf("deleteBusinessAccountGift: the server took the call; want a 400 %q", BusinessConnectionNotFound)
+		return nil, fmt.Errorf("deleteBusinessAccountGift: the server took the call; want a 400 %q", giftConnectionNotFound)
 	}
 	del, ok := giftRefused(err)
 	if !ok {
-		return nil, fmt.Errorf("deleteBusinessAccountGift: want the refusal 400 %q, got: %w", BusinessConnectionNotFound, err)
+		return nil, fmt.Errorf("deleteBusinessAccountGift: want the refusal 400 %q, got: %w", giftConnectionNotFound, err)
 	}
 	return &StepResult{StepName: s.Name(), Method: "deleteBusinessAccountGift", Evidence: map[string]any{
 		"guard_error_code": guard.Code, "guard_description": guard.Description,

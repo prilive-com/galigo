@@ -402,7 +402,7 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 // A stop (ctx first, then the stop channel) before a drop returns without it.
 func (c *PollingClient) deliverUpdates(ctx context.Context, batch pollBatch) error {
 	for i, update := range batch.updates {
-		if batch.errs == nil || batch.errs[i] == nil {
+		if i >= len(batch.errs) || batch.errs[i] == nil {
 			if err := c.deliverUpdate(ctx, update); err != nil {
 				return err
 			}

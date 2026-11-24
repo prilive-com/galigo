@@ -222,16 +222,14 @@ func b135OneWarn(t *testing.T, recs []b135Entry, id int64) {
 // b135WarnIDs checks that the decode Warn records are exactly one per id, in order, each with only update_id.
 func b135WarnIDs(t *testing.T, recs []b135Entry, ids []int64) {
 	t.Helper()
-	ws := b135Warns(recs)
-	require.Len(t, ws, len(ids), "one decode Warn per drop")
-	for i, w := range ws {
+	var got []int64
+	for i, w := range b135Warns(recs) {
 		require.Len(t, w.attrs, 1, "Warn %d: one attribute", i)
 		assert.Equal(t, "update_id", w.attrs[0].Key)
-		assert.Equal(t, slog.KindInt64, w.attrs[0].Value.Kind())
-		if w.attrs[0].Value.Kind() == slog.KindInt64 {
-			assert.Equal(t, ids[i], w.attrs[0].Value.Int64())
-		}
+		require.Equal(t, slog.KindInt64, w.attrs[0].Value.Kind())
+		got = append(got, w.attrs[0].Value.Int64())
 	}
+	assert.Equal(t, ids, got, "one decode Warn per drop, in order")
 }
 
 // b135NoText checks that no record and no callback argument holds any of needles.

@@ -51,10 +51,10 @@ func (s *nilClientStub) RoundTrip(req *http.Request) (*http.Response, error) {
 	rec.deadline, rec.hasDeadline = req.Context().Deadline()
 	if req.Body != nil {
 		b, err := io.ReadAll(req.Body)
+		_ = req.Body.Close()
 		if err != nil {
 			return nil, err
 		}
-		_ = req.Body.Close()
 		rec.body = b
 	}
 	s.mu.Lock()

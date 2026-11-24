@@ -24,8 +24,11 @@ var errScrubBoom = errors.New("boom")
 
 type scrubCountingTransport struct{ calls atomic.Int32 }
 
-func (c *scrubCountingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (c *scrubCountingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	c.calls.Add(1)
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
 	return nil, errScrubBoom
 }
 

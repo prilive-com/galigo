@@ -615,8 +615,11 @@ func (api101dTimeout) Temporary() bool { return true }
 
 type api101dFailTransport struct{ n atomic.Int32 }
 
-func (rt *api101dFailTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (rt *api101dFailTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.n.Add(1)
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
 	return nil, api101dTimeout{}
 }
 

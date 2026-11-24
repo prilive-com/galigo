@@ -22,9 +22,8 @@ import (
 )
 
 var (
-	runSuite        = flag.String("run", "", "Run a test suite: "+availableSuites)
-	skipInteractive = flag.Bool("skip-interactive", false, "Skip interactive scenarios")
-	showStatus      = flag.Bool("status", false, "Show method coverage status")
+	runSuite   = flag.String("run", "", "Run a test suite: "+availableSuites)
+	showStatus = flag.Bool("status", false, "Show method coverage status")
 )
 
 func main() {
@@ -72,7 +71,7 @@ func main() {
 	defer senderClient.Close()
 
 	if *runSuite != "" {
-		runSuiteCommand(cfg, senderClient, logger, *runSuite, *skipInteractive)
+		runSuiteCommand(cfg, senderClient, logger, *runSuite)
 		return
 	}
 
@@ -311,7 +310,7 @@ func suiteScenarios(suite string) ([]engine.Scenario, bool) {
 	return scenarios, true
 }
 
-func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string, skipInteractive bool) {
+func runSuiteCommand(cfg *config.Config, senderClient *sender.Client, logger *slog.Logger, suite string) {
 	adapter := engine.NewSenderAdapter(senderClient).WithToken(cfg.Token)
 	rt := engine.NewRuntime(adapter, cfg.ChatID, cfg.Admins[0])
 	runner := engine.NewRunner(rt, engine.RunnerConfig{

@@ -422,7 +422,7 @@ func TestB49_CLIRun(t *testing.T) {
 			return nil, errors.New("b49: no network in the CLI child")
 		}}
 		cfg := &config.Config{Admins: []int64{1}, StorageDir: dir, MaxMessagesPerRun: 0}
-		runSuiteCommand(cfg, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)), suite, false)
+		runSuiteCommand(cfg, nil, slog.New(slog.NewTextHandler(os.Stderr, nil)), suite)
 		os.Exit(0)
 	}
 	run := func(suite string) (int, string, string, string) {

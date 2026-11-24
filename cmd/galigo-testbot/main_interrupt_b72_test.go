@@ -79,7 +79,7 @@ func b72Child(t *testing.T) {
 	})
 	client := testutil.NewTestClient(t, server.BaseURL())
 	cfg := &config.Config{Admins: []int64{1}, ChatID: testutil.TestChatID, StorageDir: dir, MaxMessagesPerRun: 100}
-	runSuiteCommand(cfg, client, slog.New(slog.NewTextHandler(os.Stderr, nil)), suite, false)
+	runSuiteCommand(cfg, client, slog.New(slog.NewTextHandler(os.Stderr, nil)), suite)
 	os.Exit(0)
 }
 

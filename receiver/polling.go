@@ -400,10 +400,10 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 // deliverUpdates delivers the decoded updates using the configured delivery policy, in order. An update that did
 // not decode is dropped at its place: a Warn record, the callback with "decode_error", and the offset moves past it.
 // A stop (ctx first, then the stop channel) before a drop returns without it.
-func (c *PollingClient) deliverUpdates(ctx context.Context, items []pollUpdate) error {
-	for _, item := range items {
-		if item.err == nil {
-			if err := c.deliverUpdate(ctx, item.update); err != nil {
+func (c *PollingClient) deliverUpdates(ctx context.Context, batch pollBatch) error {
+	for i, update := range batch.updates {
+		if batch.errs == nil || batch.errs[i] == nil {
+			if err := c.deliverUpdate(ctx, update); err != nil {
 				return err
 			}
 			continue
@@ -417,11 +417,11 @@ func (c *PollingClient) deliverUpdates(ctx context.Context, items []pollUpdate) 
 		default:
 		}
 		// The record holds only the id: the decode error can quote values from the update.
-		c.logger.Warn("update decode failed, dropping", "update_id", item.id)
+		c.logger.Warn("update decode failed, dropping", "update_id", update.UpdateID)
 		if c.onUpdateDropped != nil {
-			c.onUpdateDropped(item.id, "decode_error")
+			c.onUpdateDropped(update.UpdateID, "decode_error")
 		}
-		c.advanceOffset(item.id)
+		c.advanceOffset(update.UpdateID)
 	}
 	return nil
 }
@@ -554,7 +554,7 @@ type getUpdatesResponse struct {
 	Description string      `json:"description,omitempty"`
 }
 
-func (c *PollingClient) fetchUpdates(ctx context.Context) ([]pollUpdate, error) {
+func (c *PollingClient) fetchUpdates(ctx context.Context) (pollBatch, error) {
 	// P0.2 FIX: Use url.Values for proper URL encoding
 	params := url.Values{}
 	params.Set("timeout", strconv.Itoa(c.timeout))
@@ -576,7 +576,7 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]pollUpdate, error) 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, &APIError{Description: "failed to create request", Err: scrub.TokenFromError(err, c.token)}
+		return pollBatch{}, &APIError{Description: "failed to create request", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	respBody, err := c.breaker.Execute(func() ([]byte, error) {
@@ -608,30 +608,26 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]pollUpdate, error) 
 	})
 
 	if err != nil {
-		return nil, &APIError{Description: "request failed", Err: err}
+		return pollBatch{}, &APIError{Description: "request failed", Err: err}
 	}
 
 	var response getUpdatesResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
 		// One update that does not decode is dropped, not the whole batch (B-135), when splitUpdates can confirm it.
-		if items, ok := splitUpdates(respBody); ok {
-			return items, nil
+		if batch, ok := splitUpdates(respBody); ok {
+			return batch, nil
 		}
-		return nil, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
+		return pollBatch{}, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	if !response.OK {
-		return nil, &APIError{
+		return pollBatch{}, &APIError{
 			Code:        response.ErrorCode,
 			Description: scrub.TokenFromText(response.Description, c.token),
 		}
 	}
 
-	items := make([]pollUpdate, len(response.Result))
-	for i, u := range response.Result {
-		items[i] = pollUpdate{update: u}
-	}
-	return items, nil
+	return pollBatch{updates: response.Result}, nil
 }
 
 func (c *PollingClient) calculateBackoff(attempt int32) time.Duration {

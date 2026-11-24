@@ -216,11 +216,11 @@ func TestFetchUpdatesSuccessfulValueReturnedAsSent(t *testing.T) {
 	c := NewPollingClient(tg.SecretToken(b71Token), make(chan tg.Update, 1), nil, cfg,
 		WithPollingHTTPClient(&http.Client{Transport: rt}))
 
-	items, err := c.fetchUpdates(context.Background())
+	b, err := c.fetchUpdates(context.Background())
 	require.NoError(t, err)
-	require.Len(t, items, 1)
-	require.NoError(t, items[0].err)
-	require.NotNil(t, items[0].update.Message)
-	assert.Equal(t, b71Token, items[0].update.Message.Text)
+	require.Len(t, b.updates, 1)
+	assert.Nil(t, b.errs)
+	require.NotNil(t, b.updates[0].Message)
+	assert.Equal(t, b71Token, b.updates[0].Message.Text)
 	require.Equal(t, []string{"/bot" + b71Token + "/getUpdates"}, rt.paths())
 }

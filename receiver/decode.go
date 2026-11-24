@@ -66,42 +66,44 @@ func decodeUpdate(raw []byte) (u tg.Update, id int, ok bool, err error) {
 	return tg.Update{}, int(n), true, err
 }
 
-// pollUpdate is one element of a getUpdates result: a decoded update (err == nil), or the id of an element that
-// did not decode and its error.
-type pollUpdate struct {
-	update tg.Update
-	id     int
-	err    error
+// pollBatch is one getUpdates result. errs is nil when every update decoded (the common case: updates is the
+// decoded result, not a copy). Otherwise errs has one entry per update: errs[i] != nil marks an element that did not
+// decode, and updates[i] then holds only its UpdateID.
+type pollBatch struct {
+	updates []tg.Update
+	errs    []error
 }
 
 // splitUpdates is the fallback when the whole getUpdates body does not decode. It returns the elements, with the
 // ones that fail as drop items, only when the envelope is valid (ok is true, exactly one "result" member), at least
 // one element fails, every failing element has a usable update_id and every decoded update_id is below
 // math.MaxInt64. Otherwise it returns false, and the caller returns its own decode error.
-func splitUpdates(body []byte) ([]pollUpdate, bool) {
+func splitUpdates(body []byte) (pollBatch, bool) {
 	var raw apiResponse // the same envelope fields as getUpdatesResponse
 	if err := json.Unmarshal(body, &raw); err != nil || !raw.OK {
-		return nil, false
+		return pollBatch{}, false
 	}
 	if _, ok := oneMember(body, "result"); !ok {
-		return nil, false
+		return pollBatch{}, false
 	}
 	var elems []json.RawMessage
 	if err := json.Unmarshal(raw.Result, &elems); err != nil {
-		return nil, false
+		return pollBatch{}, false
 	}
-	items := make([]pollUpdate, 0, len(elems))
+	batch := pollBatch{updates: make([]tg.Update, 0, len(elems)), errs: make([]error, 0, len(elems))}
 	failed := false
 	for _, elem := range elems {
 		u, id, ok, err := decodeUpdate(elem)
 		if !ok || (err == nil && int64(u.UpdateID) == math.MaxInt64) {
-			return nil, false
+			return pollBatch{}, false
 		}
 		failed = failed || err != nil
-		items = append(items, pollUpdate{update: u, id: id, err: err})
+		u.UpdateID = id // the same id for a decoded update; the only field set for one that failed
+		batch.updates = append(batch.updates, u)
+		batch.errs = append(batch.errs, err)
 	}
 	if !failed {
-		return nil, false
+		return pollBatch{}, false
 	}
-	return items, true
+	return batch, true
 }

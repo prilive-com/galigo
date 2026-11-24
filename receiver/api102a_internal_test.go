@@ -86,7 +86,7 @@ func TestAPI102A_PollingSubscription(t *testing.T) {
 	c := NewPollingClient(tg.SecretToken("123:abc"), make(chan tg.Update, 1), nil, cfg)
 	got, err := c.fetchUpdates(context.Background())
 	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.NoError(t, got[0].err)
-	api102aCheckSub(t, got[0].update, body, "active")
+	require.Len(t, got.updates, 1)
+	assert.Nil(t, got.errs)
+	api102aCheckSub(t, got.updates[0], body, "active")
 }

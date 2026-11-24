@@ -216,13 +216,21 @@ func b135Warns(recs []b135Entry) []b135Entry {
 // b135OneWarn checks one decode Warn with exactly one attribute, update_id, of kind Int64.
 func b135OneWarn(t *testing.T, recs []b135Entry, id int64) {
 	t.Helper()
+	b135WarnIDs(t, recs, []int64{id})
+}
+
+// b135WarnIDs checks that the decode Warn records are exactly one per id, in order, each with only update_id.
+func b135WarnIDs(t *testing.T, recs []b135Entry, ids []int64) {
+	t.Helper()
 	ws := b135Warns(recs)
-	require.Len(t, ws, 1, "one decode Warn")
-	require.Len(t, ws[0].attrs, 1, "one attribute")
-	assert.Equal(t, "update_id", ws[0].attrs[0].Key)
-	assert.Equal(t, slog.KindInt64, ws[0].attrs[0].Value.Kind())
-	if ws[0].attrs[0].Value.Kind() == slog.KindInt64 {
-		assert.Equal(t, id, ws[0].attrs[0].Value.Int64())
+	require.Len(t, ws, len(ids), "one decode Warn per drop")
+	for i, w := range ws {
+		require.Len(t, w.attrs, 1, "Warn %d: one attribute", i)
+		assert.Equal(t, "update_id", w.attrs[0].Key)
+		assert.Equal(t, slog.KindInt64, w.attrs[0].Value.Kind())
+		if w.attrs[0].Value.Kind() == slog.KindInt64 {
+			assert.Equal(t, ids[i], w.attrs[0].Value.Int64())
+		}
 	}
 }
 
@@ -353,7 +361,10 @@ func b135Poll(t *testing.T, o b135PollOpts) b135Snap {
 			srv.Close()
 		case <-time.After(5 * time.Second):
 			t.Errorf("%s: the polling loop did not exit within 5s", t.Name())
+			// No Stop: the loop is still running. Every handler returns (release is closed, and a closed
+			// connection ends its request context), so Close does not wait for long; it also closes the listener.
 			srv.CloseClientConnections()
+			srv.Close()
 		}
 	})
 
@@ -516,11 +527,30 @@ func TestB135DecodeUpdate(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, int64(math.MaxInt64-1), int64(id))
 	})
+	// D27 (c1, C1-02): the math.MaxInt guard matters only where int has 32 bits; the gate row test-386-d27 runs
+	// these two leaves with GOARCH=386.
+	t.Run("D27a id 2147483647", func(t *testing.T) {
+		_, id, ok, err := decodeUpdate([]byte(b135Bad("2147483647")))
+		require.Error(t, err)
+		require.True(t, ok, "math.MaxInt32 is usable on every arch")
+		assert.Equal(t, int64(2147483647), int64(id))
+	})
+	t.Run("D27b id 2147483648", func(t *testing.T) {
+		_, id, ok, err := decodeUpdate([]byte(b135Bad("2147483648")))
+		require.Error(t, err)
+		if strconv.IntSize == 32 {
+			assert.False(t, ok, "above math.MaxInt on a 32-bit int")
+			assert.Equal(t, 0, id)
+			return
+		}
+		require.True(t, ok)
+		assert.Equal(t, int64(2147483648), int64(id))
+	})
 }
 
 // ---------- F: fetchUpdates ----------
 
-func b135Fetch(t *testing.T, body string) ([]pollUpdate, error) {
+func b135Fetch(t *testing.T, body string) (pollBatch, error) {
 	t.Helper()
 	cfg := DefaultConfig()
 	cfg.BaseURL = "http://b135.example.test/bot"
@@ -564,8 +594,9 @@ func TestB135FetchUpdates(t *testing.T) {
 			if r.skip32 && strconv.IntSize == 32 {
 				t.Skip("needs a 64-bit int")
 			}
-			items, err := b135Fetch(t, r.body)
-			assert.Nil(t, items, "no items with the error")
+			b, err := b135Fetch(t, r.body)
+			assert.Nil(t, b.updates, "no updates with the error")
+			assert.Nil(t, b.errs, "no errs with the error")
 			require.EqualError(t, err, prefix+r.cause)
 			apiErr, ok := err.(*APIError) //nolint:errorlint // the exact type is the point
 			require.True(t, ok, "want *APIError, got %T", err)
@@ -581,47 +612,41 @@ func TestB135FetchUpdates(t *testing.T) {
 
 	t.Run("F1 three good", func(t *testing.T) {
 		body := b135Batch(b135Good("1"), b135Good("2"), b135Good("3"))
-		items, err := b135Fetch(t, body)
+		b, err := b135Fetch(t, body)
 		require.NoError(t, err)
-		base := b135Baseline(t, body)
-		require.Len(t, items, 3)
-		for i := range items {
-			assert.NoError(t, items[i].err)
-			assert.Equal(t, base[i], items[i].update)
-		}
+		assert.Equal(t, b135Baseline(t, body), b.updates)
+		assert.Nil(t, b.errs, "a clean batch has no errs")
 	})
 	t.Run("F2 one droppable", func(t *testing.T) {
-		items, err := b135Fetch(t, b135Batch(b135Good("1"), b135Bad("2"), b135Good("3")))
+		b, err := b135Fetch(t, b135Batch(b135Good("1"), b135Bad("2"), b135Good("3")))
 		require.NoError(t, err)
 		base := b135Baseline(t, b135Batch(b135Good("1"), b135Good("3")))
-		require.Len(t, items, 3)
-		assert.NoError(t, items[0].err)
-		assert.Equal(t, base[0], items[0].update)
-		assert.Error(t, items[1].err)
-		assert.Equal(t, 2, items[1].id)
-		assert.True(t, items[1].update == tg.Update{}, "zero update")
-		assert.NoError(t, items[2].err)
-		assert.Equal(t, base[1], items[2].update)
+		require.Len(t, b.updates, 3)
+		require.Len(t, b.errs, 3)
+		assert.NoError(t, b.errs[0])
+		assert.Equal(t, base[0], b.updates[0])
+		assert.Error(t, b.errs[1])
+		assert.True(t, b.updates[1] == tg.Update{UpdateID: 2}, "only the id")
+		assert.NoError(t, b.errs[2])
+		assert.Equal(t, base[1], b.updates[2])
 	})
 	for _, body := range []string{`{"ok":true,"result":null}`, `{"ok":true}`} {
 		t.Run("F11 "+body, func(t *testing.T) {
-			items, err := b135Fetch(t, body)
+			b, err := b135Fetch(t, body)
 			require.NoError(t, err)
-			assert.Empty(t, items)
+			assert.Empty(t, b.updates)
+			assert.Nil(t, b.errs)
 		})
 	}
 	t.Run("F13 two results that decode", func(t *testing.T) {
 		body := `{"ok":true,"result":[` + b135Good("1") + `],"result":[{"update_id":1}]}`
-		items, err := b135Fetch(t, body)
+		b, err := b135Fetch(t, body)
 		require.NoError(t, err)
-		base := b135Baseline(t, body)
-		require.Len(t, items, len(base))
-		for i := range items {
-			assert.NoError(t, items[i].err)
-			assert.Equal(t, base[i], items[i].update)
-		}
-		require.NotNil(t, items[0].update.Message)
-		assert.Equal(t, "kept-1", items[0].update.Message.Text, "today's merge keeps the text")
+		assert.Equal(t, b135Baseline(t, body), b.updates)
+		assert.Nil(t, b.errs)
+		require.Len(t, b.updates, 1)
+		require.NotNil(t, b.updates[0].Message)
+		assert.Equal(t, "kept-1", b.updates[0].Message.Text, "today's merge keeps the text")
 	})
 }
 
@@ -681,6 +706,15 @@ func TestB135PollingTrace(t *testing.T) {
 					want, wantQ = r.per[pol.p], r.perQ[pol.p]
 				}
 				assert.Equal(t, want, s.trace, "trace")
+				var ids []int64 // C1-03: every decode Warn in full, not only its trace entry
+				for _, e := range want {
+					if v, ok := strings.CutPrefix(e, "warn:"); ok {
+						n, err := strconv.ParseInt(v, 10, 64)
+						require.NoError(t, err)
+						ids = append(ids, n)
+					}
+				}
+				b135WarnIDs(t, s.recs, ids)
 				assert.Equal(t, wantQ, b135Desc(s.queue), "queue")
 				assert.Equal(t, int32(0), s.ce, "ConsecutiveErrors")
 				assert.True(t, s.healthy, "IsHealthy")
@@ -743,13 +777,23 @@ func b135Ctx(t *testing.T) (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
+// b135Drops is a batch where every update failed to decode.
+func b135Drops(ids ...int) pollBatch {
+	var b pollBatch
+	for _, id := range ids {
+		b.updates = append(b.updates, tg.Update{UpdateID: id})
+		b.errs = append(b.errs, errB135)
+	}
+	return b
+}
+
 func TestB135StopGuard(t *testing.T) {
 	for _, pol := range b135Policies {
 		t.Run("S1 ctx cancelled/"+pol.name, func(t *testing.T) {
 			f := b135Direct(t, pol.p, 0, true, nil)
 			ctx, cancel := b135Ctx(t)
 			cancel()
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{id: 2, err: errB135}})
+			err := f.c.deliverUpdates(ctx, b135Drops(2))
 			assert.ErrorIs(t, err, context.Canceled)
 			tr, _, _, _ := f.rec.snapshot()
 			assert.Empty(t, tr, "no Warn, no callback")
@@ -759,7 +803,7 @@ func TestB135StopGuard(t *testing.T) {
 			f := b135Direct(t, pol.p, 0, true, nil)
 			ctx, _ := b135Ctx(t)
 			close(f.c.stopCh)
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{id: 2, err: errB135}})
+			err := f.c.deliverUpdates(ctx, b135Drops(2))
 			require.EqualError(t, err, "stop signal received")
 			tr, _, _, _ := f.rec.snapshot()
 			assert.Empty(t, tr, "no Warn, no callback")
@@ -773,7 +817,7 @@ func TestB135StopGuard(t *testing.T) {
 					cancel()
 				}
 			})
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{id: 1, err: errB135}, {id: 2, err: errB135}})
+			err := f.c.deliverUpdates(ctx, b135Drops(1, 2))
 			assert.ErrorIs(t, err, context.Canceled)
 			tr, _, _, _ := f.rec.snapshot()
 			assert.Equal(t, []string{"warn:1", "drop:1:decode_error:off=0"}, tr)
@@ -784,7 +828,7 @@ func TestB135StopGuard(t *testing.T) {
 			ctx, cancel := b135Ctx(t)
 			cancel()
 			close(f.c.stopCh)
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{id: 2, err: errB135}})
+			err := f.c.deliverUpdates(ctx, b135Drops(2))
 			assert.ErrorIs(t, err, context.Canceled, "ctx is checked first")
 		})
 		t.Run("S6 stop closed by the callback/"+pol.name, func(t *testing.T) {
@@ -795,7 +839,7 @@ func TestB135StopGuard(t *testing.T) {
 					close(f.c.stopCh)
 				}
 			})
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{id: 1, err: errB135}, {id: 2, err: errB135}})
+			err := f.c.deliverUpdates(ctx, b135Drops(1, 2))
 			require.EqualError(t, err, "stop signal received")
 			tr, _, _, _ := f.rec.snapshot()
 			assert.Equal(t, []string{"warn:1", "drop:1:decode_error:off=0"}, tr)
@@ -808,7 +852,7 @@ func TestB135StopGuard(t *testing.T) {
 			f := b135Direct(t, pol.p, 1, true, nil)
 			ctx, _ := b135Ctx(t)
 			close(f.c.stopCh)
-			err := f.c.deliverUpdates(ctx, []pollUpdate{{update: tg.Update{UpdateID: 5}, id: 5}})
+			err := f.c.deliverUpdates(ctx, pollBatch{updates: []tg.Update{{UpdateID: 5}}})
 			require.NoError(t, err)
 			assert.Equal(t, int64(6), f.c.Offset())
 			assert.Equal(t, []string{"5:-"}, b135Desc(b135Drain(f.ch)))
@@ -820,7 +864,7 @@ func TestB135NilCallbackPolling(t *testing.T) { // N1
 	f := b135Direct(t, DeliveryPolicyBlock, 0, false, nil)
 	ctx, _ := b135Ctx(t)
 	var err error
-	require.NotPanics(t, func() { err = f.c.deliverUpdates(ctx, []pollUpdate{{id: 2, err: errB135}}) })
+	require.NotPanics(t, func() { err = f.c.deliverUpdates(ctx, b135Drops(2)) })
 	require.NoError(t, err)
 	require.NoError(t, ctx.Err(), "no wait")
 	assert.Equal(t, int64(3), f.c.Offset())

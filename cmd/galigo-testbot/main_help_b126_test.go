@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
@@ -17,8 +18,10 @@ import (
 )
 
 // b126InteractiveNames reads the names isInteractiveSuite accepts from main.go. It knows only the form the function
-// has today, `s := strings.ToLower(suite)` then `return s == "a" || s == "b" ...`, and fails on any other form, so a
-// new form (a constant, a map, a switch) makes the test fail until the reader learns it (B-126, register O-P2-01).
+// has today, `func isInteractiveSuite(suite string) bool` with `s := strings.ToLower(suite)` (the standard library
+// "strings", imported without a name) then `return s == "a" || s == "b" ...`, and fails on any other form, so a new
+// form (a constant, a map, a switch, another strings package) makes the test fail until the reader learns it (B-126,
+// registers O-P2-01, O-C1-03).
 func b126InteractiveNames(t *testing.T) []string {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -32,11 +35,24 @@ func b126InteractiveNames(t *testing.T) []string {
 		}
 	}
 	require.NotNil(t, fd, "isInteractiveSuite not found in main.go")
+	var stringsImports []string
+	for _, im := range f.Imports {
+		path, err := strconv.Unquote(im.Path.Value)
+		require.NoError(t, err)
+		if path == "strings" || (im.Name != nil && im.Name.Name == "strings") {
+			stringsImports = append(stringsImports, im.Path.Value)
+			require.Nil(t, im.Name, "main.go imports %s with a name: update the reader", im.Path.Value)
+		}
+	}
+	require.Equal(t, []string{`"strings"`}, stringsImports, "main.go must import the standard library strings once")
 	// cannot is the failure message for a node this reader does not know: its type and position.
 	cannot := func(n ast.Node) string {
 		return fmt.Sprintf("isInteractiveSuite has a form this test cannot read (%T at %s): update the reader",
 			n, fset.Position(n.Pos()))
 	}
+	params := fd.Type.Params.List
+	require.True(t, len(params) == 1 && len(params[0].Names) == 1 && params[0].Names[0].Name == "suite",
+		cannot(fd.Type))
 	require.Len(t, fd.Body.List, 2, cannot(fd.Body))
 	as, ok := fd.Body.List[0].(*ast.AssignStmt)
 	require.True(t, ok && as.Tok == token.DEFINE && len(as.Lhs) == 1 && len(as.Rhs) == 1, cannot(fd.Body.List[0]))
@@ -86,7 +102,9 @@ func TestB126_AvailableSuitesIsEveryRoute(t *testing.T) {
 	var dups []string
 	for _, n := range listed {
 		require.NotEmpty(t, n, "empty name in availableSuites")
-		require.False(t, strings.ContainsAny(n, " ,"), "malformed name %q in availableSuites", n)
+		// the bot splits a /run message on any white space (strings.Fields), so a listed name may hold none
+		require.False(t, strings.ContainsRune(n, ',') || strings.IndexFunc(n, unicode.IsSpace) >= 0,
+			"malformed name %q in availableSuites", n)
 		if seen[n] {
 			dups = append(dups, n)
 		}

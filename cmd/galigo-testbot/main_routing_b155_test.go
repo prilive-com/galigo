@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -297,11 +298,15 @@ func TestB155_RunRouting(t *testing.T) {
 			}
 			assert.Empty(t, bad, "B155-SHADOW: %s defines names that hide others%s", row.fn, update)
 
-			// AC2b: (i) package-level names and (ii) import names the body uses. A selector's Sel names a field or a
-			// package member. A key names a field only in a literal of b155StructLit, the one struct type the four
-			// functions write as a literal; every other key (a map of any named or elided type) is a value.
+			// AC2b: (i) package-level names the signature and the body use, and (ii) import names the body uses. A
+			// selector's Sel names a field or a package member. A key names a field only in a literal of
+			// b155StructLit, the one struct type the four functions write as a literal; every other key counts.
 			notRef := map[*ast.Ident]bool{}
-			ast.Inspect(body, func(n ast.Node) bool {
+			inspect := func(n ast.Node, fn func(ast.Node) bool) {
+				ast.Inspect(f.decl.Type, fn)
+				ast.Inspect(n, fn)
+			}
+			inspect(body, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.SelectorExpr:
 					notRef[x.Sel] = true
@@ -320,13 +325,14 @@ func TestB155_RunRouting(t *testing.T) {
 				return true
 			})
 			refs, imps := map[string]bool{}, map[string]bool{}
+			inspect(body, func(n ast.Node) bool {
+				if x, ok := n.(*ast.Ident); ok && !notRef[x] && p.globals[x.Name] {
+					refs[x.Name] = true
+				}
+				return true
+			})
 			ast.Inspect(body, func(n ast.Node) bool {
-				switch x := n.(type) {
-				case *ast.Ident:
-					if !notRef[x] && p.globals[x.Name] {
-						refs[x.Name] = true
-					}
-				case *ast.SelectorExpr:
+				if x, ok := n.(*ast.SelectorExpr); ok {
 					if id, ok := x.X.(*ast.Ident); ok && f.imports[id.Name] {
 						imps[id.Name] = true
 					}
@@ -383,10 +389,10 @@ func TestB155_BotRunPrivateSuccess(t *testing.T) {
 
 // b155RunSuccess runs the bot's /run api104 through handleCommand from chat, with a message budget, the B-65F mock
 // and a config chat that is not the command chat. It checks every request the mock server received, also those the
-// B-65F handlers do not record: each body is a JSON object, there is one "Running" reply and one summary, no request
-// is ephemeral, each sendMessage has only chat_id, text and maybe reply_parameters, and every chat_id is the command
-// chat. The report check is last, so a wrong chat is reported
-// as B156-CHAT.
+// B-65F handlers do not record: each body is a JSON object (not null), there is one "Running" reply and one summary,
+// no request is ephemeral (no ephemeral method, no ephemeral_message_parameters, no receiver_user_id), each sendMessage
+// has only chat_id, text and maybe reply_parameters, and every chat_id is the command chat. The report check is last,
+// so a wrong chat is reported as B156-CHAT.
 func b155RunSuccess(t *testing.T, chat int64) {
 	t.Helper()
 	b := newB65FBot(t)
@@ -403,6 +409,7 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	for i, c := range captures {
 		require.NoError(t, json.Unmarshal(c.Body, &bodies[i]), "B156-CHAT: request %d (%s) has a JSON object body", i,
 			path.Base(c.Path))
+		require.NotNil(t, bodies[i], "B156-CHAT: request %d (%s) has a JSON object body, not null", i, path.Base(c.Path))
 	}
 	running, summaries := 0, 0
 	for i, c := range captures {
@@ -420,7 +427,8 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	assert.Equal(t, []int{1, 1}, []int{running, summaries}, "B156-COUNT: one Running reply and one summary")
 	for i, c := range captures {
 		keys := b155Sorted(bodies[i])
-		assert.NotContains(t, keys, "ephemeral_message_parameters", "B156-CHAT: request %d (%s) is not ephemeral", i,
+		assert.False(t, strings.Contains(path.Base(c.Path), "Ephemeral") || slices.Contains(keys, "receiver_user_id") ||
+			slices.Contains(keys, "ephemeral_message_parameters"), "B156-CHAT: request %d (%s) is not ephemeral", i,
 			path.Base(c.Path))
 		if path.Base(c.Path) == "sendMessage" {
 			assert.Contains(t, [][]string{{"chat_id", "text"}, {"chat_id", "reply_parameters", "text"}}, keys,

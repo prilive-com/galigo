@@ -121,6 +121,20 @@ cfg.OnUpdateDropped = func(updateID int, reason string) {
 }
 ```
 
+The reasons are listed in the doc of `Config.OnUpdateDropped`. An update that does not decode (for example, a field
+with a type galigo does not expect) can be dropped instead of failing the request. The drop needs a usable
+`update_id`: exactly one member whose name is `update_id` in any letter case, that member written `update_id`, and
+an integer from 1 to the largest `int`, not math.MaxInt64. Webhook: such an update is dropped with the reason
+`webhook_decode_error` and the handler answers 200; any other body that does not decode gets 400, as before. Long
+polling: such an update is dropped with the reason `decode_error` only when the rest of the response decodes too:
+`ok` is true, the other envelope fields (`error_code`, `description`) decode as usual, there is exactly one `result`
+member (the same letter-case rule as `update_id`) and it is an array, every update in it that does not decode has a
+usable `update_id`, and no update that decodes has the id math.MaxInt64. Otherwise the whole `getUpdates` call fails
+as before: it counts as a polling error, and the client retries until `PollingMaxErrors` is reached (0 = no
+limit). These rules apply only after a decode error: an update that decodes is delivered as before, also one with no
+`update_id` (for example `{}`). The `Warn` record of a drop holds only the `update_id`, with no error text and no
+value from the update.
+
 ## Single-Consumer Constraint (Polling Mode)
 
 **Critical:** Only ONE active consumer per bot token when using long polling.

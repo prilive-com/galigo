@@ -48,6 +48,12 @@ var (
 	errB71Dial      = errors.New("dial refused: /bot" + over71Token)
 )
 
+// b71ThenNoID adds a later element with no usable update_id (B-135), so a nested decode error still fails the
+// whole batch instead of being dropped.
+func b71ThenNoID(body string) string {
+	return strings.TrimSuffix(body, "]}") + `,{"message":{"text":7}}]}`
+}
+
 // b71RT answers every request in memory with one canned response, or with rtErr; it never dials.
 type b71RT struct {
 	status  int
@@ -111,10 +117,10 @@ func TestFetchUpdatesServerTextScrubbed(t *testing.T) {
 		{name: "decode piece", token: b71Token, rt: &b71RT{status: 200, body: b71Decode},
 			want: "telegram API error 0: failed to parse response: json: cannot unmarshal number [REDACTED]123 into Go struct field getUpdatesResponse.error_code of type int",
 			desc: "failed to parse response", cause: "json: cannot unmarshal number [REDACTED]123 into Go struct field getUpdatesResponse.error_code of type int", typed: true, chain: []string{"*scrub.scrubbedError", "*json.UnmarshalTypeError"}},
-		{name: "decode whole (nested chat member)", token: b71Token, rt: &b71RT{status: 200, body: b71Nested},
+		{name: "decode whole (nested chat member)", token: b71Token, rt: &b71RT{status: 200, body: b71ThenNoID(b71Nested)},
 			want: "telegram API error 0: failed to parse response: old_chat_member: unknown chat member status: \"/bot[REDACTED]/getUpdates\"",
 			desc: "failed to parse response", cause: "old_chat_member: unknown chat member status: \"/bot[REDACTED]/getUpdates\"", chain: []string{"*scrub.scrubbedError", "*fmt.wrapError", "*errors.errorString"}},
-		{name: "decode piece (nested chat member, valid status)", token: b71Token, rt: &b71RT{status: 200, body: b71NestedNum},
+		{name: "decode piece (nested chat member, valid status)", token: b71Token, rt: &b71RT{status: 200, body: b71ThenNoID(b71NestedNum)},
 			want:  "telegram API error 0: failed to parse response: old_chat_member: failed to unmarshal chat member (member): json: cannot unmarshal number [REDACTED]123 into Go struct field ChatMemberMember.user.id of type int64",
 			alt:   "telegram API error 0: failed to parse response: old_chat_member: failed to unmarshal chat member (member): json: cannot unmarshal number [REDACTED]123 into Go struct field User.chatMemberBase.user.id of type int64",
 			desc:  "failed to parse response",
@@ -210,10 +216,11 @@ func TestFetchUpdatesSuccessfulValueReturnedAsSent(t *testing.T) {
 	c := NewPollingClient(tg.SecretToken(b71Token), make(chan tg.Update, 1), nil, cfg,
 		WithPollingHTTPClient(&http.Client{Transport: rt}))
 
-	updates, err := c.fetchUpdates(context.Background())
+	b, err := c.fetchUpdates(context.Background())
 	require.NoError(t, err)
-	require.Len(t, updates, 1)
-	require.NotNil(t, updates[0].Message)
-	assert.Equal(t, b71Token, updates[0].Message.Text)
+	require.Len(t, b.updates, 1)
+	assert.Nil(t, b.errs)
+	require.NotNil(t, b.updates[0].Message)
+	assert.Equal(t, b71Token, b.updates[0].Message.Text)
 	require.Equal(t, []string{"/bot" + b71Token + "/getUpdates"}, rt.paths())
 }

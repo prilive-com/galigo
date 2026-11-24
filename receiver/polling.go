@@ -141,7 +141,11 @@ func WithDeliveryTimeout(timeout time.Duration) PollingOption {
 	}
 }
 
-// WithUpdateDroppedCallback sets the callback for dropped updates.
+// WithUpdateDroppedCallback sets the callback for dropped updates; it overrides Config.OnUpdateDropped. The
+// polling client passes delivery_timeout, channel_full_drop_newest, channel_full_drop_oldest or decode_error (the
+// update did not decode; the receiver keeps running). The webhook handler, which takes the callback only from
+// Config.OnUpdateDropped, passes webhook_delivery_timeout, webhook_channel_full_drop_newest,
+// webhook_channel_full_drop_oldest or webhook_decode_error.
 func WithUpdateDroppedCallback(fn func(updateID int, reason string)) PollingOption {
 	return func(c *PollingClient) {
 		c.onUpdateDropped = fn
@@ -393,12 +397,31 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 	}
 }
 
-// deliverUpdates delivers updates using the configured delivery policy.
-func (c *PollingClient) deliverUpdates(ctx context.Context, updates []tg.Update) error {
-	for _, update := range updates {
-		if err := c.deliverUpdate(ctx, update); err != nil {
+// deliverUpdates delivers the decoded updates using the configured delivery policy, in order. An update that did
+// not decode is dropped at its place: a Warn record, the callback with "decode_error", and the offset moves past it.
+// A stop (ctx first, then the stop channel) before a drop returns without it.
+func (c *PollingClient) deliverUpdates(ctx context.Context, batch pollBatch) error {
+	for i, update := range batch.updates {
+		if i >= len(batch.errs) || batch.errs[i] == nil {
+			if err := c.deliverUpdate(ctx, update); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
+		select {
+		case <-c.stopCh:
+			return errors.New("stop signal received")
+		default:
+		}
+		// The record holds only the id: the decode error can quote values from the update.
+		c.logger.Warn("update decode failed, dropping", "update_id", update.UpdateID)
+		if c.onUpdateDropped != nil {
+			c.onUpdateDropped(update.UpdateID, "decode_error")
+		}
+		c.advanceOffset(update.UpdateID)
 	}
 	return nil
 }
@@ -531,7 +554,7 @@ type getUpdatesResponse struct {
 	Description string      `json:"description,omitempty"`
 }
 
-func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
+func (c *PollingClient) fetchUpdates(ctx context.Context) (pollBatch, error) {
 	// P0.2 FIX: Use url.Values for proper URL encoding
 	params := url.Values{}
 	params.Set("timeout", strconv.Itoa(c.timeout))
@@ -553,7 +576,7 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return nil, &APIError{Description: "failed to create request", Err: scrub.TokenFromError(err, c.token)}
+		return pollBatch{}, &APIError{Description: "failed to create request", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	respBody, err := c.breaker.Execute(func() ([]byte, error) {
@@ -585,22 +608,26 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 	})
 
 	if err != nil {
-		return nil, &APIError{Description: "request failed", Err: err}
+		return pollBatch{}, &APIError{Description: "request failed", Err: err}
 	}
 
 	var response getUpdatesResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
+		// One update that does not decode is dropped, not the whole batch (B-135), when splitUpdates can confirm it.
+		if batch, ok := splitUpdates(respBody); ok {
+			return batch, nil
+		}
+		return pollBatch{}, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
 	}
 
 	if !response.OK {
-		return nil, &APIError{
+		return pollBatch{}, &APIError{
 			Code:        response.ErrorCode,
 			Description: scrub.TokenFromText(response.Description, c.token),
 		}
 	}
 
-	return response.Result, nil
+	return pollBatch{updates: response.Result}, nil
 }
 
 func (c *PollingClient) calculateBackoff(attempt int32) time.Duration {

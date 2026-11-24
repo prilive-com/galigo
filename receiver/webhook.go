@@ -3,7 +3,6 @@ package receiver
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -216,10 +215,18 @@ func (h *WebhookHandler) processUpdate(w http.ResponseWriter, r *http.Request) e
 	// Copy to buffer for potential reuse
 	n := copy(buffer, body)
 
-	// Parse update
-	var update tg.Update
-	if err := json.Unmarshal(buffer[:n], &update); err != nil {
+	// Parse update. An update with a usable update_id that does not decode is dropped with 200 (B-135).
+	update, id, ok, err := decodeUpdate(buffer[:n])
+	if !ok {
 		return &WebhookError{Code: http.StatusBadRequest, Message: "invalid JSON", Err: err}
+	}
+	if err != nil {
+		// The record holds only the id: the decode error can quote values from the update.
+		h.logger.Warn("update decode failed, dropping", "update_id", id)
+		if h.onUpdateDropped != nil {
+			h.onUpdateDropped(id, "webhook_decode_error")
+		}
+		return nil
 	}
 
 	// Deliver using configured policy.

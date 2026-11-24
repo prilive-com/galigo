@@ -141,7 +141,11 @@ func WithDeliveryTimeout(timeout time.Duration) PollingOption {
 	}
 }
 
-// WithUpdateDroppedCallback sets the callback for dropped updates.
+// WithUpdateDroppedCallback sets the callback for dropped updates; it overrides Config.OnUpdateDropped. The
+// polling client passes delivery_timeout, channel_full_drop_newest, channel_full_drop_oldest or decode_error (the
+// update did not decode; the receiver keeps running). The webhook handler, which takes the callback only from
+// Config.OnUpdateDropped, passes webhook_delivery_timeout, webhook_channel_full_drop_newest,
+// webhook_channel_full_drop_oldest or webhook_decode_error.
 func WithUpdateDroppedCallback(fn func(updateID int, reason string)) PollingOption {
 	return func(c *PollingClient) {
 		c.onUpdateDropped = fn
@@ -393,12 +397,31 @@ func (c *PollingClient) pollLoop(ctx context.Context) {
 	}
 }
 
-// deliverUpdates delivers updates using the configured delivery policy.
-func (c *PollingClient) deliverUpdates(ctx context.Context, updates []tg.Update) error {
-	for _, update := range updates {
-		if err := c.deliverUpdate(ctx, update); err != nil {
+// deliverUpdates delivers the decoded updates using the configured delivery policy, in order. An update that did
+// not decode is dropped at its place: a Warn record, the callback with "decode_error", and the offset moves past it.
+// A stop (ctx first, then the stop channel) before a drop returns without it.
+func (c *PollingClient) deliverUpdates(ctx context.Context, items []pollUpdate) error {
+	for _, item := range items {
+		if item.err == nil {
+			if err := c.deliverUpdate(ctx, item.update); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := ctx.Err(); err != nil {
 			return err
 		}
+		select {
+		case <-c.stopCh:
+			return errors.New("stop signal received")
+		default:
+		}
+		// The record holds only the id: the decode error can quote values from the update.
+		c.logger.Warn("update decode failed, dropping", "update_id", item.id)
+		if c.onUpdateDropped != nil {
+			c.onUpdateDropped(item.id, "decode_error")
+		}
+		c.advanceOffset(item.id)
 	}
 	return nil
 }
@@ -531,7 +554,7 @@ type getUpdatesResponse struct {
 	Description string      `json:"description,omitempty"`
 }
 
-func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
+func (c *PollingClient) fetchUpdates(ctx context.Context) ([]pollUpdate, error) {
 	// P0.2 FIX: Use url.Values for proper URL encoding
 	params := url.Values{}
 	params.Set("timeout", strconv.Itoa(c.timeout))
@@ -590,6 +613,10 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 
 	var response getUpdatesResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
+		// One update that does not decode is dropped, not the whole batch (B-135), when splitUpdates can confirm it.
+		if items, ok := splitUpdates(respBody); ok {
+			return items, nil
+		}
 		return nil, &APIError{Description: "failed to parse response", Err: scrub.TokenFromError(err, c.token)}
 	}
 
@@ -600,7 +627,11 @@ func (c *PollingClient) fetchUpdates(ctx context.Context) ([]tg.Update, error) {
 		}
 	}
 
-	return response.Result, nil
+	items := make([]pollUpdate, len(response.Result))
+	for i, u := range response.Result {
+		items[i] = pollUpdate{update: u}
+	}
+	return items, nil
 }
 
 func (c *PollingClient) calculateBackoff(attempt int32) time.Duration {

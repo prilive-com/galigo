@@ -121,6 +121,12 @@ cfg.OnUpdateDropped = func(updateID int, reason string) {
 }
 ```
 
+The reasons are listed in the doc of `Config.OnUpdateDropped`. An update that does not decode (for example, a field with
+a type galigo does not expect) is also dropped, with the reason `decode_error` (long polling) or
+`webhook_decode_error` (webhook, which still answers 200). The receiver keeps running. The `Warn` log record holds
+only the `update_id`, never a value from the update. When the update has no usable `update_id`, the whole
+`getUpdates` response fails as before, and the webhook answers 400.
+
 ## Single-Consumer Constraint (Polling Mode)
 
 **Critical:** Only ONE active consumer per bot token when using long polling.

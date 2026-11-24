@@ -81,7 +81,11 @@ type Config struct {
 	// Update delivery policy (for long polling)
 	UpdateDeliveryPolicy  UpdateDeliveryPolicy // Behavior when update channel is full
 	UpdateDeliveryTimeout time.Duration        // Max time to wait in Block mode (0 = block forever)
-	OnUpdateDropped       func(int, string)    // Callback when update is dropped (updateID, reason)
+	// OnUpdateDropped is called when an update is dropped, with its id and a reason. Long polling: delivery_timeout,
+	// channel_full_drop_newest, channel_full_drop_oldest, decode_error (the update did not decode; the receiver
+	// keeps running). Webhook: webhook_delivery_timeout, webhook_channel_full_drop_newest,
+	// webhook_channel_full_drop_oldest, webhook_decode_error.
+	OnUpdateDropped func(int, string)
 
 	// Circuit breaker
 	BreakerMaxRequests uint32

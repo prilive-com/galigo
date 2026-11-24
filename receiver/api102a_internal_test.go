@@ -87,5 +87,6 @@ func TestAPI102A_PollingSubscription(t *testing.T) {
 	got, err := c.fetchUpdates(context.Background())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	api102aCheckSub(t, got[0], body, "active")
+	require.NoError(t, got[0].err)
+	api102aCheckSub(t, got[0].update, body, "active")
 }

@@ -45,7 +45,7 @@ const (
 	b135NoID    = `{"message":{"text":7}}`
 	b135Secret  = "test-secret-token"
 	b135Mark    = "PRIVATE-MARK-135"
-	b135Token   = "135791:QzXjWvKqYpZbNmFgHdJcLrTsBwVx0011"
+	b135Token   = "135791:QzXjWvKqYpZbNmFgHdJcLrTsBwVx0011" // #nosec G101 -- a fake token for the test, not a credential
 	b135DropMsg = "update decode failed, dropping"
 )
 
@@ -929,14 +929,14 @@ func TestB135Webhook(t *testing.T) {
 	for _, pol := range b135Policies {
 		t.Run("W7 ten drops then a good update/"+pol.name, func(t *testing.T) {
 			f := b135Hook(t, pol.p, 0, nil, true)
-			for i := 0; i < 10; i++ {
+			for i := range 10 {
 				code, _ := f.post(t, w1)
 				assert.Equal(t, 200, code, "request %d", i+1)
 			}
 			code, _ := f.post(t, b135Good("5"))
 			assert.Equal(t, 200, code)
 			var want []string
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				want = append(want, "warn:2", "drop:2:webhook_decode_error:q=0")
 			}
 			want = append(want, "fwd:5")

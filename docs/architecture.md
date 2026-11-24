@@ -66,7 +66,20 @@ if err := bot.Close(); err != nil {
 }
 ```
 
-**Important:** Always call `Close()` to ensure graceful shutdown. The polling goroutine will finish its current request and drain pending updates.
+**Important:** Always call `Close()`, and make it the only way you stop the bot: do not call `Stop()` and `Close()`
+at the same time. In polling mode `Close()` stops the poller and waits for it to exit. It does not cancel a
+`getUpdates` request in flight: cancel the context you passed to `Start` to cancel that request. The default HTTP
+client timeout is the long-poll timeout plus 10 s; it limits the request, not `Close()`. While the poller stops, it can
+still send an update when the channel has space, with every policy, and the other policies can also drop updates then.
+With `DeliveryPolicyBlock` (the only policy `galigo.Bot` uses), when a stop or a cancelled `Start` context ends a wait
+for channel space, the poller does not deliver or drop that update or the rest of the batch, and does not move its
+offset for them (a delivery timeout that ends first still drops the update). Telegram confirms an update only when it
+receives a `getUpdates` request with a higher offset, so after a restart, unconfirmed updates that Telegram still holds
+can come again, also ones that galigo already delivered or dropped (Telegram keeps updates for at most 24 hours).
+Updates already in the channel stay readable: in polling mode `Close()` closes the channel, so a
+`for range bot.Updates()` loop reads them and then ends. In webhook mode, stop your HTTP server first, then call
+`Close()`. It does not close the channel, so a `for range` loop does not end by itself: stop it with your own signal or
+time limit.
 
 ## Channel-Based Delivery
 
@@ -85,8 +98,14 @@ updates := bot.Updates()  // <-chan tg.Update
 
 If your application consumes updates slower than they arrive, the channel will fill up. When full:
 
-- **Polling mode**: The polling goroutine blocks until space is available
-- **Webhook mode**: Returns 503 Service Unavailable (Telegram will retry)
+- **Polling mode**: the delivery policy decides (see [Delivery Policies](#delivery-policies)). With the default,
+  `DeliveryPolicyBlock`, the poller waits up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit) for space. If the
+  time runs out, it drops the update (reason `delivery_timeout`) and moves its local offset past it. Telegram confirms
+  the update only when it receives a `getUpdates` request with a higher offset.
+- **Webhook mode**: the same policies apply. When the handler drops an update, it writes 200; if Telegram receives
+  that response, it does not send the update again. With `DeliveryPolicyBlock`, the handler waits for space until the
+  timeout or until the request ends. If the end of the request ends the wait (for example, Telegram stops waiting), the
+  update is not delivered and no drop is reported; Telegram may send it again.
 
 ### Recommended Consumer Pattern
 
@@ -109,9 +128,12 @@ galigo supports three delivery policies when the update channel is full:
 
 | Policy | Behavior |
 |--------|----------|
-| `DeliveryPolicyBlock` | Block until space available (default) |
+| `DeliveryPolicyBlock` (default) | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop the update |
 | `DeliveryPolicyDropNewest` | Drop incoming update, continue |
 | `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new |
+
+These settings are in `receiver.Config`. `galigo.Bot` has no option for them: it always uses `DeliveryPolicyBlock`,
+the 5 s default and no drop callback. To choose them, use the `receiver` package directly:
 
 ```go
 cfg := receiver.DefaultConfig()
@@ -209,22 +231,28 @@ defer cancel()
 bot, _ := galigo.New(token, galigo.WithPolling(30, 100))
 bot.Start(ctx)
 
-// Handle updates until signal
+done := make(chan struct{})
 go func() {
+    defer close(done)
     for update := range bot.Updates() {
-        handleUpdate(ctx, update)
+        // A context the signal does not cancel, so updates left in the channel are still handled
+        handleUpdate(context.Background(), update)
     }
 }()
 
-<-ctx.Done()
+<-ctx.Done() // the signal cancels ctx, which also ends the getUpdates request in flight
+cancel()     // a second Ctrl-C now ends the program at once
 
-// Graceful shutdown with timeout
-shutdownCtx, shutdownCancel := context.WithTimeout(
-    context.Background(), 10*time.Second)
-defer shutdownCancel()
-
+// Close takes no context: it stops the poller and closes the updates channel
 if err := bot.Close(); err != nil {
     log.Error("shutdown error", "error", err)
+}
+
+// Wait for the loop to handle the updates left in the channel, but not forever
+select {
+case <-done:
+case <-time.After(10 * time.Second):
+    log.Warn("handlers did not finish in time")
 }
 ```
 

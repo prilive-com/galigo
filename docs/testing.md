@@ -618,12 +618,14 @@ go run ./cmd/galigo-testbot --run identity         # S1: Bot identity
 go run ./cmd/galigo-testbot --run messages         # S2: Send, edit, delete
 go run ./cmd/galigo-testbot --run forward          # S4: Forward and copy
 go run ./cmd/galigo-testbot --run actions          # S5: Chat actions
+go run ./cmd/galigo-testbot --run formatted        # S3: ParseMode in sendMessage (JSON)
 go run ./cmd/galigo-testbot --run link-preview     # S37: Link preview options
 go run ./cmd/galigo-testbot --run media-uploads    # S6: Photo, document, animation, audio, voice
 go run ./cmd/galigo-testbot --run media-groups     # S7: Albums
 go run ./cmd/galigo-testbot --run edit-media       # S8: Edit captions
 go run ./cmd/galigo-testbot --run get-file             # S9: File download info
 go run ./cmd/galigo-testbot --run edit-message-media   # S11: Edit message media
+go run ./cmd/galigo-testbot --run multipart-parsemode  # S36: ParseMode in file uploads (multipart)
 go run ./cmd/galigo-testbot --run media-file-id        # S55, S56: Album and edit by file_id
 go run ./cmd/galigo-testbot --run inline-keyboard      # S10: Inline keyboard + edit markup
 go run ./cmd/galigo-testbot --run chat-info            # S15: Chat info
@@ -1063,7 +1065,7 @@ cmd/galigo-testbot/
    }
    ```
 
-5. **Register suite** in `suiteScenarios` (`main.go`; both `--run` and `/run` use it), add its row to `b49Routes` in `main_suites_b49_test.go`, and, if it should be listed, add it to every help and usage text that lists suites (`availableSuites` and `b49SuiteList`, the `-run` flag help, the `/run` usage reply, `/help`)
+5. **Register suite** in `suiteScenarios` (`main.go`; both `--run` and `/run` use it), add its row to `b49Routes` in `main_suites_b49_test.go`, and add every new label (and every new name `isInteractiveSuite` accepts) to `availableSuites` and `b49SuiteList`: the `-run` flag help and the `/run` usage reply print `availableSuites`, and `TestB126_AvailableSuitesIsEveryRoute` fails if a name is missing. Add it to `/help` and to the run commands above, with a description, if operators should see it there
 
 6. **Add target method** in `registry/registry.go` if not already listed
 

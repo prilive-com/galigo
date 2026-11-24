@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	runSuite        = flag.String("run", "", "Run a test suite: smoke, messages, forward, actions, core, media, keyboards, all")
+	runSuite        = flag.String("run", "", "Run a test suite: "+availableSuites)
 	skipInteractive = flag.Bool("skip-interactive", false, "Skip interactive scenarios")
 	showStatus      = flag.Bool("status", false, "Show method coverage status")
 )
@@ -124,8 +124,10 @@ func showCoverageStatus(logger *slog.Logger) {
 	}
 }
 
-// availableSuites is the suite list the CLI prints for an unknown --run name.
-const availableSuites = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, api104, live-photos, all"
+// availableSuites lists every name --run and the bot's /run accept (the case labels of suiteScenarios and the names
+// isInteractiveSuite accepts), each once (B-126). The -run flag help, the CLI's unknown-name message and the bot's
+// /run usage reply print it.
+const availableSuites = "smoke, identity, messages, forward, actions, formatted, formatting, parse-mode, link-preview, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, multipart-parsemode, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, api-94, 9.4, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api-95, 9.5, api96, api-96, 9.6, api100, api-100, 10.0, api101, api-101, 10.1, api102, api-102, 10.2, api103, api-103, 10.3, api104, api-104, 10.4, live-photos, all"
 
 // isInteractiveSuite reports whether a suite name (any case) is interactive or callback, which each caller runs
 // itself (B-49).
@@ -565,7 +567,7 @@ func handleRun(ctx context.Context, cfg *config.Config, senderClient *sender.Cli
 	adapter *engine.SenderAdapter, logger *slog.Logger, chatID int64, suite string, updates <-chan tg.Update) {
 
 	if suite == "" {
-		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, live-photos, keyboards, inline-keyboard, interactive, webhook, get-updates, all")
+		sendMessage(ctx, adapter, chatID, "Usage: /run <suite>\nSuites: "+availableSuites)
 		return
 	}
 

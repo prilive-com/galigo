@@ -66,7 +66,13 @@ if err := bot.Close(); err != nil {
 }
 ```
 
-**Important:** Always call `Close()` to ensure graceful shutdown. The polling goroutine will finish its current request and drain pending updates.
+**Important:** Always call `Close()`. In polling mode it stops the poller and waits until the `getUpdates` request in
+flight returns (up to the long-poll timeout). Updates of a fetched batch that are not yet in the channel may not be
+delivered. They are not dropped: the offset stays before them. Telegram confirms an update only when the next
+`getUpdates` call asks for a higher offset, so after a restart the new client gets every update of the last batch
+again, delivered or not (Telegram keeps updates for up to 24 hours). Updates already in the channel stay readable:
+`Close()` closes the channel, so a `for range bot.Updates()` loop reads them and then ends. In webhook mode `Close()`
+does not close the channel: stop your HTTP server first.
 
 ## Channel-Based Delivery
 
@@ -85,8 +91,11 @@ updates := bot.Updates()  // <-chan tg.Update
 
 If your application consumes updates slower than they arrive, the channel will fill up. When full:
 
-- **Polling mode**: The polling goroutine blocks until space is available
-- **Webhook mode**: Returns 503 Service Unavailable (Telegram will retry)
+- **Polling mode**: the delivery policy decides (see [Delivery Policies](#delivery-policies)). With the default,
+  `DeliveryPolicyBlock`, the poller waits up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit) for space, then
+  drops the update (reason `delivery_timeout`) and moves the offset past it, so Telegram does not send it again.
+- **Webhook mode**: the same policies apply, and the handler answers 200 also when it drops the update, so Telegram
+  does not send it again. With `DeliveryPolicyBlock` and a timeout of 0, the handler waits until the request ends.
 
 ### Recommended Consumer Pattern
 
@@ -109,7 +118,7 @@ galigo supports three delivery policies when the update channel is full:
 
 | Policy | Behavior |
 |--------|----------|
-| `DeliveryPolicyBlock` | Block until space available (default) |
+| `DeliveryPolicyBlock` | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop (default) |
 | `DeliveryPolicyDropNewest` | Drop incoming update, continue |
 | `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new |
 
@@ -218,11 +227,7 @@ go func() {
 
 <-ctx.Done()
 
-// Graceful shutdown with timeout
-shutdownCtx, shutdownCancel := context.WithTimeout(
-    context.Background(), 10*time.Second)
-defer shutdownCancel()
-
+// Close takes no context: it waits for the getUpdates request in flight, then closes the updates channel
 if err := bot.Close(); err != nil {
     log.Error("shutdown error", "error", err)
 }

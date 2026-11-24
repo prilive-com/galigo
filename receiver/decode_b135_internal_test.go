@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -534,6 +535,7 @@ func TestB135DecodeUpdate(t *testing.T) {
 		assert.Equal(t, int64(2147483647), int64(id))
 	})
 	t.Run("D27b id 2147483648", func(t *testing.T) {
+		t.Logf("intsize=%d", strconv.IntSize) // the test-386-d27 gate row needs intsize=32
 		_, id, ok, err := decodeUpdate([]byte(b135Bad("2147483648")))
 		require.Error(t, err)
 		if strconv.IntSize == 32 {
@@ -646,6 +648,51 @@ func TestB135FetchUpdates(t *testing.T) {
 		require.NotNil(t, b.updates[0].Message)
 		assert.Equal(t, "kept-1", b.updates[0].Message.Text, "today's merge keeps the text")
 	})
+	t.Run("F14 a clean batch is not copied", func(t *testing.T) {
+		// c2 (C2-01): per clean update, fetchUpdates allocates only what decoding allocates. A copy of the result
+		// costs one more allocation for one update and none for an empty batch. Each count is the smallest over
+		// many single calls: noise only adds allocations (with -race, sync.Pool drops items at random).
+		empty, one := b135Batch(), b135Batch(b135Good("1"))
+		require.Less(t, len(one), 512, "both bodies fit the first io.ReadAll buffer")
+		fetch := func(body string) uint64 {
+			cfg := DefaultConfig()
+			cfg.BaseURL = "http://b135.example.test/bot"
+			c := NewPollingClient(tg.SecretToken("123:abc"), make(chan tg.Update, 1), nil, cfg,
+				WithPollingHTTPClient(&http.Client{Transport: b135RT{body: body}}))
+			return b135MinAllocs(func() { _, _ = c.fetchUpdates(context.Background()) })
+		}
+		decode := func(body string) uint64 {
+			raw := []byte(body)
+			return b135MinAllocs(func() {
+				var r getUpdatesResponse
+				_ = json.Unmarshal(raw, &r)
+			})
+		}
+		assert.Equal(t, decode(one)-decode(empty), fetch(one)-fetch(empty), "allocations for one clean update")
+	})
+}
+
+// b135MinAllocs returns the smallest number of heap allocations of one call of f, over 200 calls.
+func b135MinAllocs(f func()) uint64 {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	f() // warm up
+	var m runtime.MemStats
+	best := uint64(math.MaxUint64)
+	for range 200 {
+		runtime.ReadMemStats(&m)
+		before := m.Mallocs
+		f()
+		runtime.ReadMemStats(&m)
+		best = min(best, m.Mallocs-before)
+	}
+	return best
+}
+
+// b135RT serves body on every request and keeps no state, so F14 counts only fetchUpdates' own allocations.
+type b135RT struct{ body string }
+
+func (rt b135RT) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(rt.body)), Request: req}, nil
 }
 
 // ---------- P: polling trace ----------
@@ -982,8 +1029,9 @@ func TestB135Webhook(t *testing.T) {
 				want = append(want, "warn:2", "drop:2:webhook_decode_error:q=0")
 			}
 			want = append(want, "fwd:5")
-			tr, _, _, _ := f.rec.snapshot()
+			tr, recs, _, _ := f.rec.snapshot()
 			assert.Equal(t, want, tr)
+			b135WarnIDs(t, recs, []int64{2, 2, 2, 2, 2, 2, 2, 2, 2, 2}) // c2 (C2-02): every Warn in full
 			assert.Equal(t, []string{"5:kept-5"}, b135Desc(b135Drain(f.ch)))
 		})
 	}

@@ -139,9 +139,9 @@ var b49Routes = []struct {
 	}},
 }
 
-// b49SuiteList is the expected text after "Available suites: ", copied from the CLI's unknown-suite message at
-// 6d9160e (B-49) and kept apart from availableSuites so a changed list is seen; docs/testing.md step 5 updates both.
-const b49SuiteList = "smoke, identity, messages, forward, actions, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api96, api100, api101, api102, api103, api104, live-photos, all"
+// b49SuiteList is the expected text after "Available suites: " (B-126: every name the CLI and the bot accept), kept
+// apart from availableSuites so a changed list is seen; docs/testing.md step 5 updates both.
+const b49SuiteList = "smoke, identity, messages, forward, actions, formatted, formatting, parse-mode, link-preview, core, media, media-uploads, media-groups, edit-media, get-file, edit-message-media, multipart-parsemode, media-file-id, keyboards, inline-keyboard, chat-admin, chat-info, chat-settings, pin-messages, polls, forum-stickers, stickers, sticker-lifecycle, stars, star-balance, invoice, paid-media, suggested-posts, ephemeral, gifts, checklists, interactive, callback, webhook, webhook-lifecycle, get-updates, extras, geo, venue, contact-dice, bulk, reactions, user-info, chat-photo, chat-permissions, bot-config, bot-commands, bot-profile, bot-admin-defaults, api94, api-94, 9.4, styled-buttons, profile-audios, chat-info-94, video-qualities, api95, api-95, 9.5, api96, api-96, 9.6, api100, api-100, 10.0, api101, api-101, 10.1, api102, api-102, 10.2, api103, api-103, 10.3, api104, api-104, 10.4, live-photos, all"
 
 func b49Names(ss []engine.Scenario) []string {
 	names := make([]string, len(ss))

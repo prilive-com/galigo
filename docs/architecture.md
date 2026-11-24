@@ -66,13 +66,17 @@ if err := bot.Close(); err != nil {
 }
 ```
 
-**Important:** Always call `Close()`. In polling mode it stops the poller and waits until the `getUpdates` request in
-flight returns (up to the long-poll timeout). Updates of a fetched batch that are not yet in the channel may not be
-delivered. They are not dropped: the offset stays before them. Telegram confirms an update only when the next
-`getUpdates` call asks for a higher offset, so after a restart the new client gets every update of the last batch
-again, delivered or not (Telegram keeps updates for up to 24 hours). Updates already in the channel stay readable:
-`Close()` closes the channel, so a `for range bot.Updates()` loop reads them and then ends. In webhook mode `Close()`
-does not close the channel: stop your HTTP server first.
+**Important:** Always call `Close()`. In polling mode it stops the poller and waits for it to exit. It does not
+cancel a `getUpdates` request in flight: cancel the context you passed to `Start` to end that request at once (else
+the wait can last up to the HTTP client timeout, by default the long-poll timeout plus 10 s). With
+`DeliveryPolicyBlock` (the only policy `galigo.Bot` uses), a stop ends a wait for channel space: that update and the
+rest of the fetched batch are not delivered, and the poller does not move its offset for them. The other policies can
+still send or drop updates while the poller stops. Telegram confirms an update when it receives a `getUpdates` request
+with a higher offset, so after a restart, unconfirmed updates that Telegram still holds can come again, also ones that
+galigo already delivered or dropped (Telegram keeps updates for at most 24 hours). Updates already in the channel stay
+readable: in polling mode `Close()` closes the channel, so a `for range bot.Updates()` loop reads them and then ends.
+In webhook mode `Close()` does not close the channel, so such a loop does not end by itself: stop your HTTP server
+first, then stop the loop.
 
 ## Channel-Based Delivery
 
@@ -92,10 +96,13 @@ updates := bot.Updates()  // <-chan tg.Update
 If your application consumes updates slower than they arrive, the channel will fill up. When full:
 
 - **Polling mode**: the delivery policy decides (see [Delivery Policies](#delivery-policies)). With the default,
-  `DeliveryPolicyBlock`, the poller waits up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit) for space, then
-  drops the update (reason `delivery_timeout`) and moves the offset past it, so Telegram does not send it again.
-- **Webhook mode**: the same policies apply, and the handler answers 200 also when it drops the update, so Telegram
-  does not send it again. With `DeliveryPolicyBlock` and a timeout of 0, the handler waits until the request ends.
+  `DeliveryPolicyBlock`, the poller waits up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit) for space. If the
+  time runs out, it drops the update (reason `delivery_timeout`) and moves its local offset past it; the next
+  `getUpdates` request confirms the drop to Telegram.
+- **Webhook mode**: the same policies apply. When the handler drops an update, it answers 200, and Telegram does not
+  send it again. With `DeliveryPolicyBlock`, the handler waits for space until the timeout or until the request ends.
+  If the request ends first (for example, Telegram stops waiting), the update is not delivered and no drop is reported;
+  Telegram may send it again.
 
 ### Recommended Consumer Pattern
 
@@ -118,9 +125,12 @@ galigo supports three delivery policies when the update channel is full:
 
 | Policy | Behavior |
 |--------|----------|
-| `DeliveryPolicyBlock` | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop (default) |
+| `DeliveryPolicyBlock` (default) | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop the update |
 | `DeliveryPolicyDropNewest` | Drop incoming update, continue |
 | `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new |
+
+These settings are in `receiver.Config`. `galigo.Bot` has no option for them: it always uses `DeliveryPolicyBlock`,
+the 5 s default and no drop callback. To choose them, use the `receiver` package directly:
 
 ```go
 cfg := receiver.DefaultConfig()
@@ -218,19 +228,22 @@ defer cancel()
 bot, _ := galigo.New(token, galigo.WithPolling(30, 100))
 bot.Start(ctx)
 
-// Handle updates until signal
+done := make(chan struct{})
 go func() {
+    defer close(done)
     for update := range bot.Updates() {
-        handleUpdate(ctx, update)
+        // A context the signal does not cancel, so updates left in the channel are still handled
+        handleUpdate(context.Background(), update)
     }
 }()
 
-<-ctx.Done()
+<-ctx.Done() // the signal cancels ctx, which also ends the getUpdates request in flight
 
-// Close takes no context: it waits for the getUpdates request in flight, then closes the updates channel
+// Close takes no context: it stops the poller and closes the updates channel
 if err := bot.Close(); err != nil {
     log.Error("shutdown error", "error", err)
 }
+<-done // the loop has read the updates left in the channel
 ```
 
 ## Thread Safety Summary

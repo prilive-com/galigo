@@ -586,6 +586,7 @@ func TestB135FetchUpdates(t *testing.T) {
 		{"F8a two results, no id first", `{"ok":true,"result":[` + b135NoID + `],"result":[` + b135Good("9") + `]}`, typeErr("number", "result.0.message.text", "string"), "result.0.message.text", false},
 		{"F8b two results, droppable", `{"ok":true,"result":[` + b135Good("1") + `,` + b135Bad("2") + `],"result":[` + b135Good("1") + `,` + b135Bad("2") + `]}`, typeErr("number", "result.1.message.text", "string"), "result.1.message.text", false},
 		{"F9 RESULT only", `{"ok":true,"RESULT":[` + b135Bad("2") + `]}`, typeErr("number", "RESULT.0.message.text", "string"), "RESULT.0.message.text", false},
+		{"F15 result and RESULT", `{"ok":true,"result":[],"RESULT":[` + b135Bad("2") + `]}`, typeErr("number", "RESULT.0.message.text", "string"), "RESULT.0.message.text", false},
 		{"F10 good MaxInt64 and droppable", b135Batch(b135Good(maxS), b135Bad("2")), typeErr("number", "result.1.message.text", "string"), "result.1.message.text", true},
 		{"F12 result string", `{"ok":true,"result":"x"}`, typeErr("string", "result", "[]tg.Update"), "result", false},
 	}
@@ -614,7 +615,9 @@ func TestB135FetchUpdates(t *testing.T) {
 		body := b135Batch(b135Good("1"), b135Good("2"), b135Good("3"))
 		b, err := b135Fetch(t, body)
 		require.NoError(t, err)
-		assert.Equal(t, b135Baseline(t, body), b.updates)
+		base := b135Baseline(t, body)
+		assert.Equal(t, base, b.updates)
+		assert.Equal(t, cap(base), cap(b.updates), "the decoded slice, not a copy")
 		assert.Nil(t, b.errs, "a clean batch has no errs")
 	})
 	t.Run("F2 one droppable", func(t *testing.T) {
@@ -669,6 +672,11 @@ func TestB135FetchUpdates(t *testing.T) {
 			})
 		}
 		assert.Equal(t, decode(one)-decode(empty), fetch(one)-fetch(empty), "allocations for one clean update")
+		for _, body := range []string{empty, one} { // a copy with another capacity, even one that allocates for both
+			b, err := b135Fetch(t, body)
+			require.NoError(t, err)
+			assert.Equal(t, cap(b135Baseline(t, body)), cap(b.updates), "the decoded slice, not a copy")
+		}
 	})
 }
 

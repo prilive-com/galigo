@@ -343,11 +343,19 @@ func b49Inputs() []b49Input {
 	return rows
 }
 
-// b49RunBot runs handleRun against the mock server with a message budget of 0, so every scenario stops before its
-// first step: the only requests are the bot's own messages. It returns the report folder and the message texts. The
-// server and the client are closed when it returns, so the rows do not keep listeners and connections open (register
-// REGISTER-change.md O-C1-02; the t.Cleanup closes run again and do nothing).
+// b49RunBot runs /run <suite> from testutil.TestChatID with a message budget of 0, so every scenario stops before its
+// first step: the only requests are the bot's own messages. See b49RunBotFrom.
 func b49RunBot(t *testing.T, suite string) (string, []string) {
+	t.Helper()
+	return b49RunBotFrom(t, testutil.TestChatID, 0, suite)
+}
+
+// b49RunBotFrom runs /run <suite> through handleCommand from the given chat against the mock server, with the given
+// message budget (B-156). It returns the report folder and the message texts. The admin (1) and the config chat
+// (424242) differ from the command chat, and every reply must go to the command chat. The server and the client are
+// closed when it returns, so the rows do not keep listeners and connections open (register REGISTER-change.md
+// O-C1-02; the t.Cleanup closes run again and do nothing).
+func b49RunBotFrom(t *testing.T, chat int64, budget int, suite string) (string, []string) {
 	t.Helper()
 	server := testutil.NewMockServer(t)
 	server.On("/bot"+testutil.TestToken+"/sendMessage", func(w http.ResponseWriter, _ *http.Request) {
@@ -357,17 +365,19 @@ func b49RunBot(t *testing.T, suite string) (string, []string) {
 	client := testutil.NewTestClient(t, server.BaseURL())
 	defer func() { _ = client.Close() }()
 	adapter := engine.NewSenderAdapter(client)
-	cfg := &config.Config{Admins: []int64{1}, StorageDir: t.TempDir(), MaxMessagesPerRun: 0}
+	cfg := &config.Config{Admins: []int64{1}, ChatID: 424242, StorageDir: t.TempDir(), MaxMessagesPerRun: budget}
 	updates := make(chan tg.Update)
 	defer close(updates)
-	handleRun(context.Background(), cfg, client, adapter, b49Discard(), testutil.TestChatID, suite, updates)
+	handleCommand(context.Background(), cfg, client, adapter, nil, b49Discard(), chat, "run", suite, updates)
 	var texts []string
 	for _, c := range server.Captures() {
 		require.Equal(t, "/bot"+testutil.TestToken+"/sendMessage", c.Path)
 		var body struct {
-			Text string `json:"text"`
+			ChatID int64  `json:"chat_id"`
+			Text   string `json:"text"`
 		}
 		require.NoError(t, json.Unmarshal(c.Body, &body))
+		require.Equal(t, chat, body.ChatID, "B156-CHAT: the /run reply %q goes to the chat the command came from", body.Text)
 		texts = append(texts, body.Text)
 	}
 	return cfg.StorageDir, texts

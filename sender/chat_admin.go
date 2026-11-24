@@ -30,7 +30,8 @@ type PromoteChatMemberRequest struct {
 	CanManageTopics     *bool     `json:"can_manage_topics,omitempty"`
 	CanManageTags       *bool     `json:"can_manage_tags,omitempty"` // 9.5
 
-	// Bot API 9.2; for channels only (for a supergroup, see WithCanManageDirectMessages).
+	// Bot API 9.2; for channels only. In a supergroup, setting only this right may demote an administrator; see
+	// WithCanManageDirectMessages.
 	CanManageDirectMessages *bool `json:"can_manage_direct_messages,omitempty"`
 
 	// Bot API 10.3: manage the chat's welcome messages (a bot sends them directly).
@@ -247,8 +248,9 @@ func WithCanManageTopics(can bool) PromoteOption {
 
 // WithCanManageDirectMessages grants ability to manage the channel direct messages chat and decline suggested posts.
 // Added in Bot API 9.2; for channels only. In a supergroup the open-source Bot API server drops this right, so a
-// promote there that sets only this right (no other right and no is_anonymous) sets the user to a regular member: it
-// may demote an administrator or lift a restricted member's restrictions.
+// promote there that sets no other right and no is_anonymous asks for regular member status. If the bot has the
+// needed rights (can_promote_members, can_restrict_members), it may demote an administrator, lift a member's
+// restrictions, or lift a ban and then return an error (a bot cannot add a member).
 func WithCanManageDirectMessages(can bool) PromoteOption {
 	return func(r *PromoteChatMemberRequest) {
 		r.CanManageDirectMessages = &can

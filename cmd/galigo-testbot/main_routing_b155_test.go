@@ -40,29 +40,47 @@ type b155Pkg struct {
 	fset    *token.FileSet
 	globals map[string]bool // package-level functions (no receiver), vars, consts and types
 	funcs   map[string][]b155Func
-	dots    []string // each dot import, as "file: path"
+	dots    []string            // each dot import, as "file: path"
+	paths   map[string][]string // each file's imports, as the path, or "name path" for a named import
 }
 
-// b155Scan parses every non-test .go file of the package. Identifiers are resolved within each file (no
-// parser.SkipObjectResolution), which the qualifier check reads.
+// b155MainImports is main.go's import list at e234189. The four routing functions are in main.go, so a package they
+// use is one of these: a new import, or a new path under a name already used, changes this list.
+var b155MainImports = []string{
+	"context", "flag", "fmt", "log/slog", "os", "os/signal", "strings", "syscall",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/cleanup",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/config",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/engine",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/evidence",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/registry",
+	"github.com/prilive-com/galigo/cmd/galigo-testbot/suites",
+	"github.com/prilive-com/galigo/receiver",
+	"github.com/prilive-com/galigo/sender",
+	"github.com/prilive-com/galigo/tg",
+}
+
+// b155Scan parses every non-test .go file of the package.
 func b155Scan(t *testing.T) *b155Pkg {
 	t.Helper()
-	p := &b155Pkg{fset: token.NewFileSet(), globals: map[string]bool{}, funcs: map[string][]b155Func{}}
+	p := &b155Pkg{fset: token.NewFileSet(), globals: map[string]bool{}, funcs: map[string][]b155Func{},
+		paths: map[string][]string{}}
 	files, err := filepath.Glob("*.go")
 	require.NoError(t, err)
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		f, err := parser.ParseFile(p.fset, name, nil, 0)
+		f, err := parser.ParseFile(p.fset, name, nil, parser.SkipObjectResolution)
 		require.NoError(t, err)
 		imports := map[string]bool{}
 		for _, im := range f.Imports {
 			ipath, err := strconv.Unquote(im.Path.Value)
 			require.NoError(t, err)
 			n := path.Base(ipath)
+			p.paths[name] = append(p.paths[name], ipath)
 			if im.Name != nil {
 				n = im.Name.Name
+				p.paths[name][len(p.paths[name])-1] = n + " " + ipath
 			}
 			if n == "." {
 				p.dots = append(p.dots, name+": "+ipath)
@@ -151,7 +169,8 @@ func b155Names(fl *ast.FieldList) []string {
 }
 
 // b155Defs lists every name the body defines (AC2): := (also in type switches and select cases), var and const,
-// range :=, func-literal parameters and results, types and labels. The blank identifier is skipped.
+// range :=, func-literal parameters and results, types and labels. The blank identifier is skipped. Parameter names
+// inside a function type (var f func(x int)) declare nothing and are not listed.
 func b155Defs(body *ast.BlockStmt) []string {
 	var defs []string
 	ident := func(e ast.Expr) {
@@ -176,9 +195,9 @@ func b155Defs(body *ast.BlockStmt) []string {
 				ident(x.Key)
 				ident(x.Value)
 			}
-		case *ast.FuncType:
-			defs = append(defs, b155Names(x.Params)...)
-			defs = append(defs, b155Names(x.Results)...)
+		case *ast.FuncLit:
+			defs = append(defs, b155Names(x.Type.Params)...)
+			defs = append(defs, b155Names(x.Type.Results)...)
 		case *ast.TypeSpec:
 			ident(x.Name)
 		case *ast.LabeledStmt:
@@ -207,6 +226,7 @@ func TestB155_RunRouting(t *testing.T) {
 
 	t.Run("package", func(t *testing.T) {
 		assert.Empty(t, p.dots, "B155-DOTIMPORT: a dot import puts names in scope without a package qualifier")
+		assert.Equal(t, b155MainImports, p.paths["main.go"], "B155-IMPORTS: main.go imports"+update)
 	})
 
 	t.Run("sendMessage", func(t *testing.T) {
@@ -270,37 +290,44 @@ func TestB155_RunRouting(t *testing.T) {
 			}
 			assert.Empty(t, bad, "B155-SHADOW: %s defines names that hide others%s", row.fn, update)
 
-			// AC2b: (i) package-level names and (ii) import names the body uses; (iii) every qualifier is resolved.
-			sels := map[*ast.Ident]bool{}
+			// AC2b: (i) package-level names and (ii) import names the body uses. A selector's Sel and a key of a
+			// struct literal name a field, not a package-level name; a key of a map or array literal is a value.
+			notRef := map[*ast.Ident]bool{}
 			ast.Inspect(body, func(n ast.Node) bool {
-				if x, ok := n.(*ast.SelectorExpr); ok {
-					sels[x.Sel] = true
+				switch x := n.(type) {
+				case *ast.SelectorExpr:
+					notRef[x.Sel] = true
+				case *ast.CompositeLit:
+					switch x.Type.(type) {
+					case *ast.MapType, *ast.ArrayType:
+					default:
+						for _, e := range x.Elts {
+							if kv, ok := e.(*ast.KeyValueExpr); ok {
+								if id, ok := kv.Key.(*ast.Ident); ok {
+									notRef[id] = true
+								}
+							}
+						}
+					}
 				}
 				return true
 			})
-			refs, imps, unresolved := map[string]bool{}, map[string]bool{}, map[string]bool{}
+			refs, imps := map[string]bool{}, map[string]bool{}
 			ast.Inspect(body, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.Ident:
-					if !sels[x] && p.globals[x.Name] {
+					if !notRef[x] && p.globals[x.Name] {
 						refs[x.Name] = true
 					}
 				case *ast.SelectorExpr:
-					if id, ok := x.X.(*ast.Ident); ok {
-						if f.imports[id.Name] {
-							imps[id.Name] = true
-						}
-						if id.Obj == nil && !p.globals[id.Name] && !f.imports[id.Name] {
-							unresolved[id.Name] = true
-						}
+					if id, ok := x.X.(*ast.Ident); ok && f.imports[id.Name] {
+						imps[id.Name] = true
 					}
 				}
 				return true
 			})
 			assert.Equal(t, row.pkgRefs, b155Sorted(refs), "B155-PKGREFS: %s package-level names%s", row.fn, update)
 			assert.Equal(t, row.imports, b155Sorted(imps), "B155-IMPORTS: %s import names%s", row.fn, update)
-			assert.Empty(t, b155Sorted(unresolved), "B155-IMPORTS: %s qualifiers that are not a local, a package-level "+
-				"name or an import name of the file%s", row.fn, update)
 		})
 	}
 }
@@ -315,7 +342,13 @@ func TestB155_BotRunGroupChat(t *testing.T) {
 		{"empty", "", 50, 1, func(t *testing.T, texts []string) {
 			assert.True(t, strings.HasPrefix(texts[0], "Usage: /run <suite>\n"), texts[0])
 		}},
+		{"empty0", "", 0, 1, func(t *testing.T, texts []string) {
+			assert.True(t, strings.HasPrefix(texts[0], "Usage: /run <suite>\n"), texts[0])
+		}},
 		{"nosuch", "nosuch", 50, 1, func(t *testing.T, texts []string) {
+			assert.Equal(t, "Unknown suite: nosuch", texts[0])
+		}},
+		{"nosuch0", "nosuch", 0, 1, func(t *testing.T, texts []string) {
 			assert.Equal(t, "Unknown suite: nosuch", texts[0])
 		}},
 		{"smoke", "smoke", 0, 2, func(t *testing.T, texts []string) {
@@ -343,8 +376,9 @@ func TestB155_BotRunPrivateSuccess(t *testing.T) {
 
 // b155RunSuccess runs the bot's /run api104 through handleCommand from chat, with a message budget, the B-65F mock
 // and a config chat that is not the command chat. It checks every request the mock server received, also those the
-// B-65F handlers do not record: each body is a JSON object, there is one "Running" reply and one summary, and every
-// chat_id is the command chat. The report check is last, so a wrong chat is reported as B156-CHAT.
+// B-65F handlers do not record: each body is a JSON object, there is one "Running" reply and one summary, each with
+// only chat_id and text, and every chat_id is the command chat. The report check is last, so a wrong chat is reported
+// as B156-CHAT.
 func b155RunSuccess(t *testing.T, chat int64) {
 	t.Helper()
 	b := newB65FBot(t)
@@ -377,6 +411,11 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	}
 	assert.Equal(t, []int{1, 1}, []int{running, summaries}, "B156-COUNT: one Running reply and one summary")
 	for i, c := range captures {
+		if text, _ := bodies[i]["text"].(string); path.Base(c.Path) == "sendMessage" &&
+			(text == "Running 4 scenario(s)..." || strings.HasPrefix(text, "Test Run: ")) {
+			assert.ElementsMatch(t, []string{"chat_id", "text"}, b155Sorted(b155Keys(bodies[i])),
+				"B156-CHAT: the /run reply %d has only chat_id and text", i)
+		}
 		if id, ok := bodies[i]["chat_id"]; ok {
 			assert.Equal(t, float64(chat), id, "B156-CHAT: request %d (%s) goes to the chat the command came from", i,
 				path.Base(c.Path))
@@ -384,4 +423,13 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	}
 	rep := b72Report(t, cfg.StorageDir)
 	assert.True(t, *rep.Success, "the run is successful, so the success path is checked")
+}
+
+// b155Keys returns the keys of a JSON object as a set.
+func b155Keys(m map[string]any) map[string]bool {
+	keys := map[string]bool{}
+	for k := range m {
+		keys[k] = true
+	}
+	return keys
 }

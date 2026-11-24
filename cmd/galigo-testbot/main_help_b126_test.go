@@ -86,6 +86,8 @@ func b126InteractiveNames(t *testing.T) []string {
 		require.True(t, ok && lit.Kind == token.STRING, cannot(b))
 		name, err := strconv.Unquote(lit.Value)
 		require.NoError(t, err)
+		// the predicate lower-cases its input first, so a name with an upper-case letter can never match (O-C2-02)
+		require.Equal(t, strings.ToLower(name), name, "isInteractiveSuite compares with %q, which no input can match", name)
 		names = append(names, name)
 	}
 	walk(ret.Results[0])
@@ -117,7 +119,7 @@ func TestB126_AvailableSuitesIsEveryRoute(t *testing.T) {
 		accepted = append(accepted, r.label)
 	}
 	accepted = append(accepted, b126InteractiveNames(t)...)
-	sort.Strings(accepted) // the same red output on every run
+	sort.Strings(accepted) // list A in alphabetical order in the failure message
 	assert.ElementsMatch(t, accepted, listed,
 		"list A = accepted names (switch labels + isInteractiveSuite), list B = availableSuites")
 }

@@ -29,9 +29,10 @@ import (
 // B-155: the names /run and --run accept are pinned by the switch labels (B-49) and isInteractiveSuite (B-126). These
 // source checks pin the four routing functions around them, so a route for an extra name added there fails a test.
 
-// b155Func is one function declaration with the import names of its own file.
+// b155Func is one function declaration with its file and the import names of that file.
 type b155Func struct {
 	decl    *ast.FuncDecl
+	file    string
 	imports map[string]bool
 }
 
@@ -40,12 +41,12 @@ type b155Pkg struct {
 	fset    *token.FileSet
 	globals map[string]bool // package-level functions (no receiver), vars, consts and types
 	funcs   map[string][]b155Func
-	dots    []string            // each dot import, as "file: path"
-	paths   map[string][]string // each file's imports, as the path, or "name path" for a named import
+	dots    []string // each dot import, as "file: path"
+	mainImp []string // main.go's imports, as the path, or "name path" for a named import
 }
 
-// b155MainImports is main.go's import list at e234189. The four routing functions are in main.go, so a package they
-// use is one of these: a new import, or a new path under a name already used, changes this list.
+// b155MainImports is main.go's import list at e234189. The four routing functions must be in main.go (fn), so a
+// package they use is one of these: a new import, or a new path under a name already used, changes this list.
 var b155MainImports = []string{
 	"context", "flag", "fmt", "log/slog", "os", "os/signal", "strings", "syscall",
 	"github.com/prilive-com/galigo/cmd/galigo-testbot/cleanup",
@@ -62,8 +63,7 @@ var b155MainImports = []string{
 // b155Scan parses every non-test .go file of the package.
 func b155Scan(t *testing.T) *b155Pkg {
 	t.Helper()
-	p := &b155Pkg{fset: token.NewFileSet(), globals: map[string]bool{}, funcs: map[string][]b155Func{},
-		paths: map[string][]string{}}
+	p := &b155Pkg{fset: token.NewFileSet(), globals: map[string]bool{}, funcs: map[string][]b155Func{}}
 	files, err := filepath.Glob("*.go")
 	require.NoError(t, err)
 	for _, name := range files {
@@ -76,11 +76,12 @@ func b155Scan(t *testing.T) *b155Pkg {
 		for _, im := range f.Imports {
 			ipath, err := strconv.Unquote(im.Path.Value)
 			require.NoError(t, err)
-			n := path.Base(ipath)
-			p.paths[name] = append(p.paths[name], ipath)
+			n, spec := path.Base(ipath), ipath
 			if im.Name != nil {
-				n = im.Name.Name
-				p.paths[name][len(p.paths[name])-1] = n + " " + ipath
+				n, spec = im.Name.Name, im.Name.Name+" "+ipath
+			}
+			if name == "main.go" {
+				p.mainImp = append(p.mainImp, spec)
 			}
 			if n == "." {
 				p.dots = append(p.dots, name+": "+ipath)
@@ -93,7 +94,7 @@ func b155Scan(t *testing.T) *b155Pkg {
 			case *ast.FuncDecl:
 				if x.Recv == nil {
 					p.globals[x.Name.Name] = true
-					p.funcs[x.Name.Name] = append(p.funcs[x.Name.Name], b155Func{x, imports})
+					p.funcs[x.Name.Name] = append(p.funcs[x.Name.Name], b155Func{x, name, imports})
 				}
 			case *ast.GenDecl:
 				for _, sp := range x.Specs {
@@ -117,7 +118,9 @@ func b155Scan(t *testing.T) *b155Pkg {
 func (p *b155Pkg) fn(t *testing.T, name string) b155Func {
 	t.Helper()
 	require.Len(t, p.funcs[name], 1, "exactly one declaration of %s", name)
-	return p.funcs[name][0]
+	f := p.funcs[name][0]
+	require.Equal(t, "main.go", f.file, "B155-READS: %s is declared in main.go, whose imports are pinned", name)
+	return f
 }
 
 func (p *b155Pkg) print(t *testing.T, n ast.Node) string {
@@ -208,8 +211,12 @@ func b155Defs(body *ast.BlockStmt) []string {
 	return defs
 }
 
-// b155Sorted returns the keys of a set, sorted.
-func b155Sorted(set map[string]bool) []string {
+// b155StructLit is the one struct type the four functions write as a keyed literal at e234189 (engine.RunnerConfig in
+// handleRun and runSuiteCommand); its keys are field names.
+const b155StructLit = "engine.RunnerConfig"
+
+// b155Sorted returns the keys of a map, sorted.
+func b155Sorted[V any](set map[string]V) []string {
 	out := []string{}
 	for k := range set {
 		out = append(out, k)
@@ -226,7 +233,7 @@ func TestB155_RunRouting(t *testing.T) {
 
 	t.Run("package", func(t *testing.T) {
 		assert.Empty(t, p.dots, "B155-DOTIMPORT: a dot import puts names in scope without a package qualifier")
-		assert.Equal(t, b155MainImports, p.paths["main.go"], "B155-IMPORTS: main.go imports"+update)
+		assert.Equal(t, b155MainImports, p.mainImp, "B155-IMPORTS: main.go imports"+update)
 	})
 
 	t.Run("sendMessage", func(t *testing.T) {
@@ -290,22 +297,22 @@ func TestB155_RunRouting(t *testing.T) {
 			}
 			assert.Empty(t, bad, "B155-SHADOW: %s defines names that hide others%s", row.fn, update)
 
-			// AC2b: (i) package-level names and (ii) import names the body uses. A selector's Sel and a key of a
-			// struct literal name a field, not a package-level name; a key of a map or array literal is a value.
+			// AC2b: (i) package-level names and (ii) import names the body uses. A selector's Sel names a field or a
+			// package member. A key names a field only in a literal of b155StructLit, the one struct type the four
+			// functions write as a literal; every other key (a map of any named or elided type) is a value.
 			notRef := map[*ast.Ident]bool{}
 			ast.Inspect(body, func(n ast.Node) bool {
 				switch x := n.(type) {
 				case *ast.SelectorExpr:
 					notRef[x.Sel] = true
 				case *ast.CompositeLit:
-					switch x.Type.(type) {
-					case *ast.MapType, *ast.ArrayType:
-					default:
-						for _, e := range x.Elts {
-							if kv, ok := e.(*ast.KeyValueExpr); ok {
-								if id, ok := kv.Key.(*ast.Ident); ok {
-									notRef[id] = true
-								}
+					if x.Type == nil || p.print(t, x.Type) != b155StructLit {
+						return true
+					}
+					for _, e := range x.Elts {
+						if kv, ok := e.(*ast.KeyValueExpr); ok {
+							if id, ok := kv.Key.(*ast.Ident); ok {
+								notRef[id] = true
 							}
 						}
 					}
@@ -376,8 +383,9 @@ func TestB155_BotRunPrivateSuccess(t *testing.T) {
 
 // b155RunSuccess runs the bot's /run api104 through handleCommand from chat, with a message budget, the B-65F mock
 // and a config chat that is not the command chat. It checks every request the mock server received, also those the
-// B-65F handlers do not record: each body is a JSON object, there is one "Running" reply and one summary, each with
-// only chat_id and text, and every chat_id is the command chat. The report check is last, so a wrong chat is reported
+// B-65F handlers do not record: each body is a JSON object, there is one "Running" reply and one summary, no request
+// is ephemeral, each sendMessage has only chat_id, text and maybe reply_parameters, and every chat_id is the command
+// chat. The report check is last, so a wrong chat is reported
 // as B156-CHAT.
 func b155RunSuccess(t *testing.T, chat int64) {
 	t.Helper()
@@ -411,10 +419,12 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	}
 	assert.Equal(t, []int{1, 1}, []int{running, summaries}, "B156-COUNT: one Running reply and one summary")
 	for i, c := range captures {
-		if text, _ := bodies[i]["text"].(string); path.Base(c.Path) == "sendMessage" &&
-			(text == "Running 4 scenario(s)..." || strings.HasPrefix(text, "Test Run: ")) {
-			assert.ElementsMatch(t, []string{"chat_id", "text"}, b155Sorted(b155Keys(bodies[i])),
-				"B156-CHAT: the /run reply %d has only chat_id and text", i)
+		keys := b155Sorted(bodies[i])
+		assert.NotContains(t, keys, "ephemeral_message_parameters", "B156-CHAT: request %d (%s) is not ephemeral", i,
+			path.Base(c.Path))
+		if path.Base(c.Path) == "sendMessage" {
+			assert.Contains(t, [][]string{{"chat_id", "text"}, {"chat_id", "reply_parameters", "text"}}, keys,
+				"B156-CHAT: message %d has no recipient field other than chat_id", i)
 		}
 		if id, ok := bodies[i]["chat_id"]; ok {
 			assert.Equal(t, float64(chat), id, "B156-CHAT: request %d (%s) goes to the chat the command came from", i,
@@ -423,13 +433,4 @@ func b155RunSuccess(t *testing.T, chat int64) {
 	}
 	rep := b72Report(t, cfg.StorageDir)
 	assert.True(t, *rep.Success, "the run is successful, so the success path is checked")
-}
-
-// b155Keys returns the keys of a JSON object as a set.
-func b155Keys(m map[string]any) map[string]bool {
-	keys := map[string]bool{}
-	for k := range m {
-		keys[k] = true
-	}
-	return keys
 }

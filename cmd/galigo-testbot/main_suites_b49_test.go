@@ -376,10 +376,14 @@ func b49RunBotFrom(t *testing.T, chat int64, budget int, suite string) (string, 
 			ChatID int64  `json:"chat_id"`
 			Text   string `json:"text"`
 		}
-		// strict: a /run reply has only chat_id and text, so an extra field (an ephemeral receiver, a topic) fails
-		dec := json.NewDecoder(strings.NewReader(string(c.Body)))
-		dec.DisallowUnknownFields()
-		require.NoError(t, dec.Decode(&body), "B156-CHAT: the /run reply %s has only chat_id and text", c.Body)
+		// strict: a /run reply is one JSON object with exactly the keys chat_id and text, so an extra field (an
+		// ephemeral receiver, a topic), a key in another case or data after the object fails
+		var raw map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(c.Body, &raw), "B156-CHAT: the /run reply %s is one JSON object", c.Body)
+		require.Equal(t, []string{"chat_id", "text"}, b155Sorted(raw), "B156-CHAT: the /run reply %s has only chat_id "+
+			"and text", c.Body)
+		require.NoError(t, json.Unmarshal(raw["chat_id"], &body.ChatID), "B156-CHAT: chat_id of %s", c.Body)
+		require.NoError(t, json.Unmarshal(raw["text"], &body.Text), "B156-CHAT: text of %s", c.Body)
 		require.Equal(t, chat, body.ChatID, "B156-CHAT: the /run reply %q goes to the chat the command came from", body.Text)
 		texts = append(texts, body.Text)
 	}

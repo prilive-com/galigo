@@ -318,8 +318,11 @@ func (api101bTimeout) Temporary() bool { return true }
 // api101bFailTransport fails every round trip with a network timeout and counts the calls (no network is used).
 type api101bFailTransport struct{ n atomic.Int32 }
 
-func (rt *api101bFailTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (rt *api101bFailTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.n.Add(1)
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
 	return nil, api101bTimeout{}
 }
 

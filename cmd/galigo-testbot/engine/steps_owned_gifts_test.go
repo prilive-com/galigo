@@ -90,8 +90,11 @@ type b145FailTransport struct {
 	err error
 }
 
-func (rt *b145FailTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (rt *b145FailTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.n.Add(1)
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
 	return nil, rt.err
 }
 

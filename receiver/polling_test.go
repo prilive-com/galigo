@@ -1210,9 +1210,15 @@ type handlerTransport struct{ rec *deleteWebhookRecorder }
 
 func (ht handlerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := req.Context().Err(); err != nil {
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return nil, err
 	}
 	if req.URL == nil || (req.URL.Scheme != "http" && req.URL.Scheme != "https") || req.URL.Host == "" {
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return nil, errors.New("handlerTransport: unsupported scheme or empty host")
 	}
 	var wire bytes.Buffer

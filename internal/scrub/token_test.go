@@ -81,8 +81,11 @@ const (
 
 type countingTransport struct{ calls atomic.Int32 }
 
-func (c *countingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+func (c *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	c.calls.Add(1)
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
 	return nil, errBoom
 }
 

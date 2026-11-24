@@ -193,9 +193,9 @@ type ChatInviteLink struct {
 	PendingJoinRequestCount int    `json:"pending_join_request_count,omitempty"`
 }
 
-// ChatJoinRequest represents a join request sent to a chat. A bot that is an administrator with the
-// can_invite_users right decides it with Client.ApproveChatJoinRequest or Client.DeclineChatJoinRequest
-// (package sender).
+// ChatJoinRequest represents a join request sent to a chat. Without a QueryID, a bot that is an administrator in
+// the chat with the can_invite_users right decides it with Client.ApproveChatJoinRequest or
+// Client.DeclineChatJoinRequest (package sender); with a QueryID, see QueryID.
 type ChatJoinRequest struct {
 	Chat       *Chat           `json:"chat"`
 	From       *User           `json:"from"`

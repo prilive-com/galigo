@@ -508,8 +508,15 @@ func (c *PollingClient) deliverDropNewest(ctx context.Context, update tg.Update)
 	}
 }
 
-// deliverDropOldest drops oldest update to make room for new one.
+// deliverDropOldest drops the oldest buffered update to make room for the new one. If the consumer makes room
+// first, the new update is sent and nothing is dropped. With an unbuffered channel nothing is dropped: it waits
+// for a reader (or ctx/stop), without UpdateDeliveryTimeout.
 func (c *PollingClient) deliverDropOldest(ctx context.Context, update tg.Update) error {
+	// Drop only from a buffer: a receive on an unbuffered channel would take another sender's update.
+	drain := c.updates
+	if cap(drain) == 0 {
+		drain = nil // a nil channel case never proceeds
+	}
 	for {
 		select {
 		case c.updates <- update:
@@ -518,9 +525,14 @@ func (c *PollingClient) deliverDropOldest(ctx context.Context, update tg.Update)
 			return nil
 
 		default:
-			// Channel full - try to drain oldest
+			// Channel full: send as soon as there is room, or drop the oldest buffered update
 			select {
-			case dropped := <-c.updates:
+			case c.updates <- update:
+				c.advanceOffset(update.UpdateID)
+				c.logger.Debug("update sent", "update_id", update.UpdateID)
+				return nil
+
+			case dropped := <-drain:
 				c.logger.Warn("channel full, dropping oldest update",
 					"dropped_id", dropped.UpdateID,
 					"new_id", update.UpdateID,

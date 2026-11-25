@@ -268,12 +268,13 @@ func b163Body(ids ...int) string {
 	return `{"ok":true,"result":[` + strings.Join(parts, ",") + `]}`
 }
 
-// b163NoSpin: with the fix the inner select evaluates Done() once and blocks.
+// b163NoSpin: with the fix the inner select evaluates Done() once and blocks. Exactly 1 also catches an extra
+// ctx.Done() check in the deliverer, which a bound of 2 let through.
 func b163NoSpin(t *testing.T, c *b163Ctx) {
 	t.Helper()
 	count, spin, _ := c.stats()
 	assert.False(t, spin, "spin guard fired")
-	assert.True(t, 1 <= count && count <= 2, "Done() calls from the deliverer = %d, want 1 or 2", count)
+	assert.Equal(t, 1, count, "Done() calls from the deliverer")
 }
 
 // T1: capacity 0, the reader comes after UpdateDeliveryTimeout. DropOldest waits for it (no drop) and delivers as

@@ -134,6 +134,7 @@ type b163Row struct {
 	pollers []*receiver.PollingClient
 	serving sync.WaitGroup
 	drops   b163Drops
+	refill  func() // T8: called once, from the drop callback, after the first drop
 }
 
 func b163NewRow(t *testing.T, ch chan tg.Update) *b163Row {
@@ -183,7 +184,13 @@ func (r *b163Row) cfg(timeout time.Duration) receiver.Config {
 	cfg.UpdateDeliveryTimeout = timeout
 	cfg.PollingTimeout = 1
 	cfg.BaseURL = "http://b163.invalid/bot"
-	cfg.OnUpdateDropped = r.drops.add
+	cfg.OnUpdateDropped = func(id int, reason string) {
+		r.drops.add(id, reason)
+		if f := r.refill; f != nil {
+			r.refill = nil
+			f()
+		}
+	}
 	return cfg
 }
 
@@ -480,6 +487,44 @@ func TestB163T5ContextEndWebhook(t *testing.T) {
 		}
 		assert.Empty(t, r.drops.get(), "drops")
 		b163NoSpin(t, ctx)
+	})
+}
+
+// T8: capacity 1, buffer full, and another producer refills the freed slot right after a drop (the drop callback
+// sends 200 once). The deliverer must try again with the same select, not block on a plain send: it drops 200 too
+// and then delivers. This also checks the drop bound: one drop plus the update the other producer sent.
+func TestB163T8RefillAfterDropPolling(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ch := make(chan tg.Update, 1)
+		ch <- tg.Update{UpdateID: 100}
+		r := b163NewRow(t, ch)
+		r.refill = func() { ch <- tg.Update{UpdateID: 200} }
+		_, rt := r.poll(r.ctx(0, nil), 0, 1)
+		synctest.Wait()
+		assert.Equal(t, []string{"100:channel_full_drop_oldest", "200:channel_full_drop_oldest"}, r.drops.get(), "drops")
+		assert.Equal(t, []string{"0", "2"}, rt.offsets(), "next request offset")
+		if assert.Equal(t, 1, len(ch), "updates in the channel") {
+			assert.Equal(t, 1, (<-ch).UpdateID, "update in the channel")
+		}
+	})
+}
+
+func TestB163T8RefillAfterDropWebhook(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ch := make(chan tg.Update, 1)
+		ch <- tg.Update{UpdateID: 100}
+		r := b163NewRow(t, ch)
+		r.refill = func() { ch <- tg.Update{UpdateID: 200} }
+		s := r.serve(r.handler(0), r.ctx(10*time.Second, nil), 9)
+		if r.returned(s.done, "ServeHTTP") {
+			assert.Equal(t, time.Duration(0), s.at, "bubble time of the handler return")
+			assert.Equal(t, http.StatusOK, s.rec.Code)
+		}
+		assert.Equal(t, []string{"100:webhook_channel_full_drop_oldest", "200:webhook_channel_full_drop_oldest"},
+			r.drops.get(), "drops")
+		if assert.Equal(t, 1, len(ch), "updates in the channel") {
+			assert.Equal(t, 9, (<-ch).UpdateID, "update in the channel")
+		}
 	})
 }
 

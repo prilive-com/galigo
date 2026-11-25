@@ -298,9 +298,10 @@ func (h *WebhookHandler) webhookDeliverDropNewest(update tg.Update) error {
 	return nil
 }
 
-// webhookDeliverDropOldest drops the oldest buffered update to make room. If the consumer makes room first, the
-// update is forwarded and nothing is dropped. With an unbuffered channel nothing is dropped: it waits for a reader
-// or the request end, without UpdateDeliveryTimeout.
+// webhookDeliverDropOldest drops the oldest buffered update to make room. If the consumer empties the buffer first,
+// the update is forwarded and nothing is dropped; with both free space and older updates, the select may still
+// drop the oldest. With an unbuffered channel nothing is dropped: it waits for a reader or the request end, without
+// UpdateDeliveryTimeout.
 func (h *WebhookHandler) webhookDeliverDropOldest(ctx context.Context, update tg.Update) error {
 	if h.updatesBidi == nil {
 		// Fallback: can't drain from send-only channel

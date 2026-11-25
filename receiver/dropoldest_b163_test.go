@@ -166,9 +166,12 @@ func b163NewRow(t *testing.T, ch chan tg.Update) *b163Row {
 
 // ctx returns a counting context; timeout 0 means no deadline.
 func (r *b163Row) ctx(timeout time.Duration, drain chan tg.Update) *b163Ctx {
-	base, cancel := context.WithCancel(context.Background())
+	var base context.Context
+	var cancel context.CancelFunc
 	if timeout > 0 {
 		base, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		base, cancel = context.WithCancel(context.Background())
 	}
 	r.cancels = append(r.cancels, cancel)
 	return &b163Ctx{Context: base, cancel: cancel, drain: drain}

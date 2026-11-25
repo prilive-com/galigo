@@ -131,7 +131,7 @@ galigo supports three delivery policies when the update channel is full:
 |--------|----------|
 | `DeliveryPolicyBlock` (default) | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop the update |
 | `DeliveryPolicyDropNewest` | Drop incoming update, continue |
-| `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new; if the consumer makes room first, deliver and drop nothing. Unbuffered channel: drop nothing, wait for a reader like Block with no time limit |
+| `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new; if the consumer empties the buffer first, deliver and drop nothing (with both free space and older updates, the oldest may still be dropped). Unbuffered channel: drop nothing, wait for a reader like Block with no time limit |
 
 These settings are in `receiver.Config`. `galigo.Bot` has no option for them: it always uses `DeliveryPolicyBlock`,
 the 5 s default and no drop callback. To choose them, use the `receiver` package directly:

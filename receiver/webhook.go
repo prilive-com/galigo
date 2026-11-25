@@ -298,11 +298,19 @@ func (h *WebhookHandler) webhookDeliverDropNewest(update tg.Update) error {
 	return nil
 }
 
-// webhookDeliverDropOldest drops the oldest update to make room.
+// webhookDeliverDropOldest drops the oldest buffered update to make room. If the consumer empties the buffer first,
+// the update is forwarded and nothing is dropped; with both free space and older updates, the select may still
+// drop the oldest. With an unbuffered channel nothing is dropped: it waits for a reader or the request end, without
+// UpdateDeliveryTimeout.
 func (h *WebhookHandler) webhookDeliverDropOldest(ctx context.Context, update tg.Update) error {
 	if h.updatesBidi == nil {
 		// Fallback: can't drain from send-only channel
 		return h.webhookDeliverDropNewest(update)
+	}
+	// Drop only from a buffer: a receive on an unbuffered channel would take another handler's update.
+	drain := h.updatesBidi
+	if cap(drain) == 0 {
+		drain = nil // a nil channel case never proceeds
 	}
 	for {
 		select {
@@ -310,8 +318,12 @@ func (h *WebhookHandler) webhookDeliverDropOldest(ctx context.Context, update tg
 			h.logger.Debug("update forwarded", "update_id", update.UpdateID)
 			return nil
 		default:
+			// Channel full: forward as soon as there is room, or drop the oldest buffered update
 			select {
-			case dropped := <-h.updatesBidi:
+			case h.updates <- update:
+				h.logger.Debug("update forwarded", "update_id", update.UpdateID)
+				return nil
+			case dropped := <-drain:
 				h.logger.Warn("webhook channel full, dropping oldest",
 					"dropped_id", dropped.UpdateID,
 					"new_id", update.UpdateID,

@@ -31,8 +31,11 @@ const (
 	// Offset advances - update is lost but polling continues.
 	DeliveryPolicyDropNewest
 
-	// DeliveryPolicyDropOldest drops oldest update to make room.
-	// Uses non-blocking receive/send pattern.
+	// DeliveryPolicyDropOldest drops the oldest buffered update to make room for the new one.
+	// If the consumer empties the buffer first, the new update is delivered and nothing is dropped;
+	// if the buffer then has both free space and older updates, the oldest may still be dropped.
+	// With an unbuffered channel it drops nothing: it waits for a reader (or ctx/stop; webhook:
+	// the request end), without UpdateDeliveryTimeout.
 	DeliveryPolicyDropOldest
 )
 

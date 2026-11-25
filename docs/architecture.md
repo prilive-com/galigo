@@ -104,8 +104,9 @@ If your application consumes updates slower than they arrive, the channel will f
   the update only when it receives a `getUpdates` request with a higher offset.
 - **Webhook mode**: the same policies apply. When the handler drops an update, it writes 200; if Telegram receives
   that response, it does not send the update again. With `DeliveryPolicyBlock`, the handler waits for space until the
-  timeout or until the request ends. If the end of the request ends the wait (for example, Telegram stops waiting), the
-  update is not delivered and no drop is reported; Telegram may send it again.
+  timeout or until the request ends. With `DeliveryPolicyDropOldest` and an unbuffered channel, the handler waits until
+  a reader takes the update or the request ends. If the end of the request ends the wait (for example, Telegram stops
+  waiting), the update is not delivered and no drop is reported; Telegram may send it again.
 
 ### Recommended Consumer Pattern
 
@@ -130,7 +131,7 @@ galigo supports three delivery policies when the update channel is full:
 |--------|----------|
 | `DeliveryPolicyBlock` (default) | Wait for space up to `UpdateDeliveryTimeout` (default 5 s; 0 = no limit), then drop the update |
 | `DeliveryPolicyDropNewest` | Drop incoming update, continue |
-| `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new |
+| `DeliveryPolicyDropOldest` | Drop oldest update in buffer, accept new; if the consumer empties the buffer first, deliver and drop nothing (with both free space and older updates, the oldest may still be dropped). Unbuffered channel: drop nothing, wait for a reader like Block with no time limit |
 
 These settings are in `receiver.Config`. `galigo.Bot` has no option for them: it always uses `DeliveryPolicyBlock`,
 the 5 s default and no drop callback. To choose them, use the `receiver` package directly:

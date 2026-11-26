@@ -145,7 +145,8 @@ func WithDeliveryTimeout(timeout time.Duration) PollingOption {
 // polling client passes delivery_timeout, channel_full_drop_newest, channel_full_drop_oldest or decode_error (the
 // update did not decode; the receiver keeps running). The webhook handler, which takes the callback only from
 // Config.OnUpdateDropped, passes webhook_delivery_timeout, webhook_channel_full_drop_newest,
-// webhook_channel_full_drop_oldest or webhook_decode_error.
+// webhook_channel_full_drop_oldest or webhook_decode_error. Do not call Stop from the callback, or wait there for
+// code that calls it: the callback runs on the poll goroutine, and Stop waits for that goroutine.
 func WithUpdateDroppedCallback(fn func(updateID int, reason string)) PollingOption {
 	return func(c *PollingClient) {
 		c.onUpdateDropped = fn
@@ -300,24 +301,32 @@ func (c *PollingClient) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop gracefully stops the polling client.
+// Stop gracefully stops the polling client. It returns after the poll loop has exited, also when another Stop
+// call is already stopping it or the loop has ended by itself.
+//
+// Stop may be called more than once and from several goroutines; each call returns after the poll loop has exited.
+// Do not call it while Start is running, do not call Start again until every Stop has returned, and do not call it
+// from code that runs on the poll goroutine (the OnUpdateDropped callback, a log handler, the HTTP client or a
+// circuit breaker given with the options), and that code must not wait for it: Stop waits for that goroutine.
 func (c *PollingClient) Stop() {
-	if !c.running.CompareAndSwap(true, false) {
-		return
-	}
+	wasRunning := c.running.Swap(false)
 
 	c.mu.Lock()
-	select {
-	case <-c.stopCh:
-		// Already closed
-	default:
-		close(c.stopCh)
+	if c.stopCh != nil { // a zero-value PollingClient has none
+		select {
+		case <-c.stopCh:
+			// Already closed
+		default:
+			close(c.stopCh)
+		}
 	}
 	c.stopped.Store(true)
 	c.mu.Unlock()
 
 	c.wg.Wait()
-	c.logger.Info("long polling stopped")
+	if wasRunning {
+		c.logger.Info("long polling stopped")
+	}
 }
 
 // Running returns true if polling is active.

@@ -216,7 +216,10 @@ func (b *Bot) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop gracefully stops the bot.
+// Stop gracefully stops the bot. In polling mode it waits for the poll loop to exit. Stop and Close may run at the
+// same time, and Stop may be called more than once. Do not call it while Start is running. Code that runs on the
+// poll goroutine (for example a log handler) must not call or wait for Stop or Close: they wait for that goroutine.
+// To restart, call Stop, wait until every Stop call has returned, then call Start.
 func (b *Bot) Stop() {
 	if b.receiver != nil {
 		b.receiver.Stop()
@@ -237,7 +240,11 @@ func (b *Bot) Format(f fmt.State, verb rune) {
 //
 // In polling mode, Close() waits for the poll loop to exit (via Stop()),
 // then closes the updates channel. It is safe to range over Updates()
-// until it closes.
+// until it closes. Close and Stop may run at the same time: Close still
+// waits for the poll loop. Do not call Close while Start is running.
+// Code that runs on the poll goroutine (for example a log handler) must
+// not call or wait for Close. Close is final: do not call Start after it;
+// make a new Bot instead. It also closes the sender.
 //
 // In webhook mode, the updates channel is NOT closed because the HTTP
 // server may still be accepting connections. Stop your HTTP server first,

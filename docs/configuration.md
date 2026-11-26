@@ -84,9 +84,9 @@ galigo enforces Telegram's rate limits automatically.
 
 | Component | Thread-safe | Notes |
 |-----------|-------------|-------|
-| `galigo.Bot` | Yes | All methods safe for concurrent use |
+| `galigo.Bot` | Yes | Safe for concurrent use; `Stop`/`Close` not while `Start` runs, `Close` is final (docs/architecture.md, Stopping the Bot) |
 | `sender.Client` | Yes | Designed for high-concurrency workloads |
-| `receiver.PollingClient` | Yes | Single goroutine fetches; multiple can consume |
+| `receiver.PollingClient` | Yes | Single goroutine fetches; multiple can consume; `Stop`: see its doc |
 | `receiver.WebhookHandler` | Yes | Safe for concurrent HTTP requests |
 | `tg.Update` | Yes | Immutable after creation |
 

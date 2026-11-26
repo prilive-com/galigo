@@ -7,7 +7,6 @@ package receiver_test
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -31,14 +30,13 @@ const (
 )
 
 // b162RT answers getUpdates. Call n (1-based, up to len(entered)) closes entered[n-1] and waits for a result array
-// on release[n-1] or for the request context to end. Later calls wait for the request context. With fail, every
-// call fails at once; with fast, every call after call 1 answers [] at once.
+// on release[n-1] or for the request context to end. Later calls wait for the request context. With fast, every
+// call after call 1 answers [] at once.
 type b162RT struct {
 	mu      sync.Mutex
 	calls   int
 	entered []chan struct{}
 	release []chan string
-	fail    bool
 	fast    bool
 }
 
@@ -56,9 +54,6 @@ func (rt *b162RT) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.calls++
 	n := rt.calls
 	rt.mu.Unlock()
-	if rt.fail {
-		return nil, errors.New("b162: request failed")
-	}
 	if rt.fast && n > 1 {
 		return b162Resp(req, "[]"), nil
 	}
@@ -135,11 +130,11 @@ func (l *b162Log) free() {
 	}
 }
 
-func b162Client(rt *b162RT, l *b162Log, maxErrors int) (*receiver.PollingClient, chan tg.Update) {
+func b162Client(rt *b162RT, l *b162Log) (*receiver.PollingClient, chan tg.Update) {
 	cfg := receiver.DefaultConfig()
 	cfg.Mode = receiver.ModeLongPolling
 	cfg.PollingTimeout = 30
-	cfg.PollingMaxErrors = maxErrors
+	cfg.PollingMaxErrors = 0
 	cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyBlock
 	cfg.BaseURL = "http://b162.invalid/bot"
 	ch := make(chan tg.Update, 10)
@@ -194,7 +189,7 @@ func TestB162R1TwoStopsBothWait(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(1), &b162Log{}
-		c, _ := b162Client(rt, lg, 0)
+		c, _ := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		a := b162Go(c.Stop)
@@ -221,7 +216,7 @@ func TestB162R1ThreeStops(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(1), &b162Log{}
-		c, _ := b162Client(rt, lg, 0)
+		c, _ := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		var stops []chan struct{}
@@ -251,7 +246,7 @@ func TestB162R4OneStop(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(1), &b162Log{}
-		c, _ := b162Client(rt, lg, 0)
+		c, _ := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		s := b162Go(c.Stop)
@@ -270,7 +265,7 @@ func TestB162R4StopNeverStarted(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(2), &b162Log{}
-		c, ch := b162Client(rt, lg, 0)
+		c, ch := b162Client(rt, lg)
 		first := b162Go(c.Stop)
 		synctest.Wait()
 		assert.True(t, b162Done(first), "Stop on a client that was never started")
@@ -298,7 +293,7 @@ func TestB162R4StopTwice(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(1), &b162Log{}
-		c, _ := b162Client(rt, lg, 0)
+		c, _ := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		s := b162Go(c.Stop)
@@ -326,7 +321,7 @@ func TestB162R4RestartAfterStops(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt, lg := newB162RT(3), &b162Log{}
-		c, ch := b162Client(rt, lg, 0)
+		c, ch := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		a := b162Go(c.Stop)
@@ -367,7 +362,7 @@ func TestB162R6StopWaitsForLastLog(t *testing.T) {
 		rt, lg := newB162RT(1), &b162Log{}
 		lg.hold(b162LastLoopLog)
 		defer lg.free()
-		c, _ := b162Client(rt, lg, 0)
+		c, _ := b162Client(rt, lg)
 		require.NoError(t, c.Start(ctx))
 		b162Entered(t, rt, 1)
 		s := b162Go(c.Stop)
@@ -402,7 +397,7 @@ func b162WaitReal(wg *sync.WaitGroup, d time.Duration) bool {
 // S2a: 16 Stops at once on a client that was never started: no panic (close of a closed stop channel), all return.
 func TestB162S2FanInNeverStarted(t *testing.T) {
 	for trial := range 200 {
-		c, _ := b162Client(newB162RT(0), &b162Log{}, 0)
+		c, _ := b162Client(newB162RT(0), &b162Log{})
 		var wg sync.WaitGroup
 		var panics atomic.Int32
 		gate := make(chan struct{})
@@ -437,7 +432,7 @@ func TestB162S2FanInRunning(t *testing.T) {
 			defer cancel()
 			rt, lg := newB162RT(1), &b162Log{}
 			rt.fast = true
-			c, _ := b162Client(rt, lg, 0)
+			c, _ := b162Client(rt, lg)
 			require.NoError(t, c.Start(ctx))
 			select {
 			case <-rt.entered[0]:

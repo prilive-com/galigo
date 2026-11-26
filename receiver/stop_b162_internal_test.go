@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/prilive-com/galigo/internal/testutil"
 	"github.com/prilive-com/galigo/tg"
 )
 
@@ -55,34 +56,18 @@ func (rt *b162iRT) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 }
 
-type b162iLog struct {
-	mu   sync.Mutex
-	msgs []string
-}
-
-func (l *b162iLog) Enabled(context.Context, slog.Level) bool { return true }
-func (l *b162iLog) WithAttrs([]slog.Attr) slog.Handler       { return l }
-func (l *b162iLog) WithGroup(string) slog.Handler            { return l }
-func (l *b162iLog) Handle(_ context.Context, r slog.Record) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.msgs = append(l.msgs, r.Message)
-	return nil
-}
-
-func (l *b162iLog) count(msg string) int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// b162iCount counts the records with message msg (c2, A-C2-03: the recorder is testutil.LogRecorder).
+func b162iCount(l *testutil.LogRecorder, msg string) int {
 	n := 0
-	for _, m := range l.msgs {
-		if m == msg {
+	for _, r := range l.Records() {
+		if r.Message == msg {
 			n++
 		}
 	}
 	return n
 }
 
-func b162iClient(rt *b162iRT, l *b162iLog, maxErrors int) *PollingClient {
+func b162iClient(rt *b162iRT, l *testutil.LogRecorder, maxErrors int) *PollingClient {
 	cfg := DefaultConfig()
 	cfg.Mode = ModeLongPolling
 	cfg.PollingTimeout = 30
@@ -130,7 +115,7 @@ func TestB162R3StopWaitsWhenRunningAlreadyFalse(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		rt := &b162iRT{entered: make(chan struct{}), release: make(chan string, 1)}
-		c := b162iClient(rt, &b162iLog{}, 0)
+		c := b162iClient(rt, testutil.NewLogRecorder(), 0)
 		require.NoError(t, c.Start(ctx))
 		synctest.Wait()
 		require.True(t, b162iDone(rt.entered), "getUpdates call 1 did not begin")
@@ -148,7 +133,7 @@ func TestB162R3StopWaitsWhenRunningAlreadyFalse(t *testing.T) {
 
 // R5a: Stop on a client that was never started closes the stop channel and sets stopped.
 func TestB162R5StopClosesStopChNeverStarted(t *testing.T) {
-	c := b162iClient(&b162iRT{}, &b162iLog{}, 0)
+	c := b162iClient(&b162iRT{}, testutil.NewLogRecorder(), 0)
 	c.Stop()
 	closed, stopped := b162iStopSignal(c)
 	assert.True(t, closed, "stopCh still open")
@@ -161,7 +146,7 @@ func TestB162R5StopAfterSelfEnd(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		lg := &b162iLog{}
+		lg := testutil.NewLogRecorder()
 		c := b162iClient(&b162iRT{fail: true}, lg, 1)
 		require.NoError(t, c.Start(ctx))
 		synctest.Wait()
@@ -172,6 +157,6 @@ func TestB162R5StopAfterSelfEnd(t *testing.T) {
 		closed, stopped := b162iStopSignal(c)
 		assert.True(t, closed, "stopCh still open")
 		assert.True(t, stopped, "stopped still false")
-		assert.Equal(t, 0, lg.count("long polling stopped"), "stop log lines")
+		assert.Equal(t, 0, b162iCount(lg, "long polling stopped"), "stop log lines")
 	})
 }

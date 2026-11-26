@@ -197,7 +197,8 @@ leaderelection.RunOrDie(electionCtx, leaderelection.LeaderElectionConfig{
     RetryPeriod:   2 * time.Second,
     Callbacks: leaderelection.LeaderCallbacks{
         OnStartedLeading: func(ctx context.Context) {
-            // Only the leader polls. This callback owns the bot: it makes it, starts it and closes it.
+            // This replica starts polling after it gets the lease; ctx ends when it loses the lease. client-go does not
+            // promise that only one replica polls at a time. This callback owns the bot: it makes it, starts it and closes it.
             bot, err := galigo.New(token, galigo.WithPolling(30, 100))
             if err != nil {
                 log.Printf("bot: %v", err)

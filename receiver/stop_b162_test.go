@@ -428,7 +428,8 @@ func TestB162S2FanInNeverStarted(t *testing.T) {
 	}
 }
 
-// S2b: 16 Stops at once on a running client: all return after the loop exited, and exactly one logs.
+// S2b: 16 Stops at once on a running client: all 16 return and exactly one logs "long polling stopped". It does not
+// prove that each one waited for the loop (the request is released before the check): R1 and R2 prove that.
 func TestB162S2FanInRunning(t *testing.T) {
 	for trial := range 500 {
 		ok := func() bool {

@@ -201,7 +201,7 @@ leaderelection.RunOrDie(electionCtx, leaderelection.LeaderElectionConfig{
             bot, err := galigo.New(token, galigo.WithPolling(30, 100))
             if err != nil {
                 log.Printf("bot: %v", err)
-                stopElection() // give up the lease: this replica cannot poll
+                stopElection() // stop renewing the lease (it expires): this replica cannot poll
                 return
             }
             defer bot.Close() // runs after Start has returned

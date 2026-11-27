@@ -64,7 +64,7 @@ func runDocGroup(goPath, root string, files []string, env []string) docGroup {
 	var g docGroup
 	slashRoot := filepath.ToSlash(root)
 	for _, name := range files {
-		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name))) // #nosec G304 -- name is a docs file from docFiles or a fixture path in testdata
 		if err != nil {
 			g.errs = append(g.errs, docErr{File: name, Msg: err.Error()})
 			continue
@@ -337,22 +337,22 @@ func docShapes(blocks []docBlock) []docShape {
 }
 
 func TestDocGoBlocksFences(t *testing.T) {
-	const real = "<!-- go-check: func() -->\n```go\nx := 1\n```\n"
+	const goBlock = "<!-- go-check: func() -->\n```go\nx := 1\n```\n"
 	at := func(fence int) []docShape { return []docShape{{fence, fence + 1, "func", []string{"x := 1"}}} }
 	rows := []struct {
 		name, src string
 		want      []docShape
 	}{
-		{"go_in_bash", "```bash\n<!-- go-check: func() -->\n```go\n```\n\n" + real, at(7)},
-		{"quote_in_bash", "```bash\n> ```go\n```\n\n" + real, at(6)},
-		{"quote_bash_quoted", "> ```bash\n> ```go\n> ```\n\n" + real, at(6)},
-		{"inline_ticks_line", "```go`x`\n\n" + real, at(4)},
-		{"go_in_four_ticks", "````text\n```go\n````\n\n" + real, at(6)},
-		{"go_in_tilde", "~~~\n```go\n~~~\n\n" + real, at(6)},
-		{"ticks_in_tilde", "~~~\n```\n" + real + "~~~\n\n" + real, at(10)},
-		{"short_in_four", "````\n```\n" + real + "````\n\n" + real, at(10)},
-		{"go_in_comment", "<!--\n```go\nx\n```\n-->\n\n" + real, at(8)},
-		{"midline_comment", "Text with `<!--` in it.\n\n" + real, at(4)},
+		{"go_in_bash", "```bash\n<!-- go-check: func() -->\n```go\n```\n\n" + goBlock, at(7)},
+		{"quote_in_bash", "```bash\n> ```go\n```\n\n" + goBlock, at(6)},
+		{"quote_bash_quoted", "> ```bash\n> ```go\n> ```\n\n" + goBlock, at(6)},
+		{"inline_ticks_line", "```go`x`\n\n" + goBlock, at(4)},
+		{"go_in_four_ticks", "````text\n```go\n````\n\n" + goBlock, at(6)},
+		{"go_in_tilde", "~~~\n```go\n~~~\n\n" + goBlock, at(6)},
+		{"ticks_in_tilde", "~~~\n```\n" + goBlock + "~~~\n\n" + goBlock, at(10)},
+		{"short_in_four", "````\n```\n" + goBlock + "````\n\n" + goBlock, at(10)},
+		{"go_in_comment", "<!--\n```go\nx\n```\n-->\n\n" + goBlock, at(8)},
+		{"midline_comment", "Text with `<!--` in it.\n\n" + goBlock, at(4)},
 		{"closer_trailing_space", "<!-- go-check: func() -->\n```go\nx := 1\n```  \n\nafter\n", at(2)},
 		{"list_item", "- item\n\n   <!-- go-check: func() -->\n   ```go\n   x := 1\n   ```\n", []docShape{{4, 5, "func", []string{"   x := 1"}}}},
 	}
@@ -453,7 +453,7 @@ func TestDocGoBlocksGenerate(t *testing.T) {
 
 func TestDocGoBlocksParse(t *testing.T) {
 	var blocks []docBlock
-	for k := 0; k < 8; k++ {
+	for k := range 8 {
 		blocks = append(blocks, docBlock{File: "README.md", Fence: 10 * (k + 1)})
 	}
 	blocks[7].File = "docs/x.md"
@@ -883,7 +883,7 @@ func generate(b docBlock, k int) (string, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "s.go", src, 0)
 	if err != nil {
-		return src, nil // the compiler reports the syntax error at its Markdown line
+		return src, nil //nolint:nilerr // the compiler reports the syntax error at its Markdown line
 	}
 	off := func(p token.Pos) int { return fset.PositionFor(p, false).Offset }
 	var edits []docEdit
@@ -977,7 +977,7 @@ func buildBlocks(goPath, root string, files []genFile, env []string) (out string
 	targets := make([]string, 0, len(files))
 	for _, f := range files {
 		p := filepath.Join(tmp, f.Dir+".go")
-		if err := os.WriteFile(p, []byte(f.Src), 0o600); err != nil {
+		if err = os.WriteFile(p, []byte(f.Src), 0o600); err != nil {
 			return err.Error(), -1, nil
 		}
 		replace[filepath.Join(root, "docsnippetchk", f.Dir, "s.go")] = p
@@ -1076,7 +1076,7 @@ func parseBuild(out string, rc int, root string, blocks []docBlock) []docErr {
 		case line == "":
 			continue
 		case strings.HasPrefix(line, "# "):
-			inGroup, group, last = true, -1, -1
+			inGroup, last = true, -1
 			group = block(docGroupRE, normPath(line[2:], root))
 			continue
 		case strings.HasPrefix(line, "\t"):

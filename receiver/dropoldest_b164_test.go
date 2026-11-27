@@ -1,6 +1,7 @@
 package receiver_test
 
-// B-164: with DeliveryPolicyDropOldest the polling offset moves past an update only when that update is sent.
+// B-164: with DeliveryPolicyDropOldest, deliverDropOldest moves the polling offset past an update only when it sends
+// that update (an update that does not decode moves it without a send, B-135; not staged here).
 // After a drop the loop may leave on ctx end or Stop (the inner select chooses at random among ready cases, Go
 // spec "Select statements"); then the offset must not move for the update that was not sent. The rows stage this
 // through a drop hook, so the expected values do not depend on how many drops happen: capacity 1; after every drop
@@ -9,10 +10,12 @@ package receiver_test
 // or far above it (10000): 100 is sent (offset 101) and the pending update finds the buffer full. The cancel row
 // cancels the Start context at the first drop; the Stop row holds the hook after the third drop until Stop has
 // closed its channel; either way the pending update is never sent and the offset must stay 101. The deadline row
-// runs from offset 0 (100 in the buffer, the reply [1]: offset must stay 0) and from offset 101 (the reply 100 and
-// 10000); at the first drop the hook sleeps past the context deadline. Every case runs twice: with OnUpdateDropped as
-// the hook (subtest "callback") and with no OnUpdateDropped (the default config has none) and the drop's Warn record
-// as the hook (subtest "log"). So every exit runs with and without a callback, at every offset and pending id.
+// runs from offset 0 (100 in the buffer, the reply [1]: offset must stay 0) and from offset 101 (the reply 100, then
+// 10000 or 101); at the first drop the hook sleeps past the context deadline. The Stop row also reads the offset while
+// the hook holds, before Stop: a move that is undone at the exit is caught there. Every case runs twice: with
+// OnUpdateDropped as the hook (subtest "callback") and with no OnUpdateDropped (the default config has none) and the
+// drop's Warn record as the hook (subtest "log"). So every exit runs with and without a callback, at every offset and
+// pending id.
 
 import (
 	"context"
@@ -177,7 +180,7 @@ func TestB164OffsetAfterDropCancel(t *testing.T) {
 }
 
 // The Start context passes its deadline at the first drop (the hook sleeps past it). From offset 0 (100 buffered, a
-// pending id below every drop) and from offset 101.
+// pending id below every drop) and from offset 101 (a pending id far above it, and one equal to it).
 func TestB164OffsetAfterDropDeadline(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -187,6 +190,7 @@ func TestB164OffsetAfterDropDeadline(t *testing.T) {
 	}{
 		{"offset0", true, []int{1}, 0},
 		{"offset101", false, []int{100, 10000}, 101},
+		{"offset101eq", false, []int{100, 101}, 101}, // pending id equal to the offset
 	} {
 		for _, h := range b164Hooks {
 			t.Run(tc.name+"/"+h.name, func(t *testing.T) {
@@ -228,6 +232,7 @@ func TestB164OffsetAfterDropStop(t *testing.T) {
 					synctest.Wait() // the hook waits at the third drop
 					_, n := f.counts()
 					require.Equal(t, 3, n, "refills before Stop")
+					assert.Equal(t, int64(101), p.Offset(), "polling offset while the hook holds the third drop (before Stop)")
 					done := make(chan struct{})
 					go func() { p.Stop(); close(done) }()
 					synctest.Wait() // Stop has closed its channel and waits for the poll loop

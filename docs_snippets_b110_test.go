@@ -315,6 +315,7 @@ func TestDocGoBlocksExtract(t *testing.T) {
 		{"skip_no_reason", "<!-- go-check: skip -->\n```go\nx\n```\n", []docErr{{"x.md", 1, 0, "go-check skip needs a reason"}}},
 		{"bad_signature", "<!-- go-check: func(a b c) -->\n```go\nx\n```\n", []docErr{{"x.md", 1, 0, "go-check func signature does not parse: func(a b c)"}}},
 		{"unclosed_go_fence", d + "```go\nx\n", []docErr{{"x.md", 2, 0, "unclosed fence"}}},
+		{"list_go_unclosed", "- item\n\n  " + d + "  ```go\n  x := 1\n\nafter\n", []docErr{{"x.md", 4, 0, "unclosed fence"}}},
 		{"indent_mismatch", d + "   ```go\n   x\n   ```\n", []docErr{{"x.md", 1, 0, "go-check directive indent differs from its Go fence"}}},
 		{"bad_directive", "<!-- go-check func() -->\n```go\nx\n```\n", []docErr{
 			{"x.md", 1, 0, "malformed go-check directive"},
@@ -334,6 +335,15 @@ func TestDocGoBlocksExtract(t *testing.T) {
 		{"list_marker_go", "- ```go\n  x\n  ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: - ```go"}}},
 		{"quote_directive", "> <!-- go-check: func() -->\n> ```go\n> x\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
 		{"quote_bad_directive", "> <!-- go-check func() -->\n", nil},
+		{"quote_nested_spaced", ">  > ```go\n>  > x\n>  > ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: >  > ```go"}}},
+		{"list_marker_star", "* ```go\n  x\n  ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: * ```go"}}},
+		{"list_marker_plus", "+ ```go\n  x\n  ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: + ```go"}}},
+		{"list_marker_ordered", "1. ```go\n   x\n   ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: 1. ```go"}}},
+		{"list_marker_paren", "1) ```go\n   x\n   ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: 1) ```go"}}},
+		{"list_quote_go", "- > ```go\n  > x := nope\n  > ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: - > ```go"}}},
+		{"nested_list_go", "- - ```go\n    x := 1\n    ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: - - ```go"}}},
+		{"quote_tab_go", "> \t```go\n> x\n> ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: > \t```go"}}},
+		{"quote_tab_code", ">\t  ```bash\n> ```go\n> x\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -381,6 +391,14 @@ func TestDocGoBlocksFences(t *testing.T) {
 		{"quote_ends_at_blank", "> ```bash\n> echo\n\n" + goBlock, at(5)},
 		{"quote_ticks_in_bash", "```bash\n> ```\n```\n\n" + goBlock, at(6)},
 		{"list_marker_bash", "- ```bash\n  echo\n  ```\n\n" + goBlock, at(6)},
+		{"indent4_closer_top", "```markdown\n1. Step\n    ```go\n    code\n    ```\n```\n\n" + goBlock, at(9)},
+		{"indent_closer_list", "1. Step\n\n   ```bash\n   echo\n       ```\n   ```\n\n" + goBlock, at(9)},
+		{"root_indent_bash", "    ```bash\n\n" + goBlock, at(4)},
+		{"list_outdent", "- ```bash\n  echo\n\n" + goBlock, at(5)},
+		{"nested_list_bash", "- - ```bash\n    echo\n    ```\n\n" + goBlock, at(6)},
+		{"list_ended_fence", "- item\n\nafter\n\n  ```bash\n  echo\n```\n\n" + goBlock, at(10)},
+		{"list_then_fence", "- item\n```bash\necho\n```\n\n" + goBlock, at(7)},
+		{"list_fence_outdent", "- item\n\n  ```bash\n  echo\n\n" + goBlock, at(7)},
 		{"list_item", "- item\n\n   <!-- go-check: func() -->\n   ```go\n   x := 1\n   ```\n", []docShape{{4, 5, "func", []string{"   x := 1"}}}},
 	}
 	for _, row := range rows {
@@ -455,6 +473,14 @@ func TestDocGoBlocksGenerate(t *testing.T) {
 			head + "//line /r/x.md:3:1\nimport (\n\t\"fmt\"\n) // fmt\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:6:1\n\n_ = fmt.Sprint()\n}\n"},
 		{"import_two_decls", block("func()", "import \"fmt\"\nimport \"os\"\n\n_ = fmt.Sprint(os.Args)\n"),
 			head + "//line /r/x.md:3:1\nimport \"fmt\"\nimport \"os\"\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:5:1\n\n_ = fmt.Sprint(os.Args)\n}\n"},
+		{"import_same_line", block("func()", "import \"fmt\"; _ = fmt.Sprint(1)\n"),
+			head + fn + "import \"fmt\"; _ = fmt.Sprint(1)\n}\n"},
+		{"import_block_comment", block("func()", "import \"fmt\" /* a\nb */\n_ = fmt.Sprint()\n"),
+			head + fn + "import \"fmt\" /* a\nb */\n_ = fmt.Sprint()\n}\n"},
+		{"import_line_directive", block("func()", "//line demo.go:100\nimport \"fmt\"\n\n_ = fmt.Sprint()\n"),
+			head + "//line /r/x.md:3:1\n//line demo.go:100\nimport \"fmt\"\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:5:1\n\n_ = fmt.Sprint()\n}\n"},
+		{"import_empty_group", block("func()", "import ()\n\n_ = errors.New(\"x\")\n"),
+			head + "//line /r/x.md:3:1\nimport ()\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:4:1\n\n_ = errors.New(\"x\")\n}\n"},
 		{"import_not_leading", block("func()", "_ = 1\nimport \"fmt\"\n"),
 			head + fn + "_ = 1\nimport \"fmt\"\n}\n"},
 		{"names_in_comments", block("func()", "// time.Second in a comment\n_ = \"fmt.Sprint\"\n"),
@@ -479,6 +505,17 @@ func TestDocGoBlocksGenerate(t *testing.T) {
 		const decls = "var x = 1\n\nfunc f() {\n\ty := 2\n}\n"
 		assert.Equal(t, head+"//line /r/x.md:3:1\n"+decls, gen(t, block("decls", decls)))
 		assert.Equal(t, "//line /r/x.md:3:1\npackage p\n\nvar x = 1\n", gen(t, block("file", "package p\n\nvar x = 1\n")))
+	})
+	t.Run("stray_brace", func(t *testing.T) {
+		for _, body := range []string{"}\nfunc helper() {\n", "}\ntype T struct {\n"} {
+			blocks, errs := extractBlocks("x.md", []byte(block("func()", body)))
+			require.Empty(t, errs)
+			require.Len(t, blocks, 1)
+			blocks[0].Abs = "/r/x.md"
+			var err error
+			require.NotPanics(t, func() { _, err = generate(blocks[0], 0) }, body)
+			assert.EqualError(t, err, "block is not a function body: its braces do not match the wrapper", body)
+		}
 	})
 }
 
@@ -641,6 +678,23 @@ func docFence(text string) (ch byte, n int, info string, ok bool) {
 	return ch, n, info, true
 }
 
+// docExpandTabs replaces each tab with spaces up to the next tab stop of 4
+// (CommonMark 2.2). Only the copy used to find fences is expanded.
+func docExpandTabs(s string) string {
+	if !strings.Contains(s, "\t") {
+		return s
+	}
+	var b strings.Builder
+	for _, c := range []byte(s) {
+		if c == '\t' {
+			b.WriteString("    "[b.Len()%4:])
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
+
 // docTrimIndent removes up to 3 leading spaces (CommonMark: 4 start indented code).
 func docTrimIndent(s string) string {
 	i := 0
@@ -652,7 +706,8 @@ func docTrimIndent(s string) string {
 
 // docQuote removes the indent and up to limit block-quote markers (all for limit < 0).
 // A nested marker may have up to 3 spaces before it; each marker takes one optional
-// space or tab after it, and the text keeps any further indent (CommonMark 5.1).
+// space after it, and the text keeps any further indent (CommonMark 5.1). The
+// caller expands tabs first.
 func docQuote(line string, limit int) (depth int, text string) {
 	text = strings.TrimLeft(line, " \t")
 	for limit < 0 || depth < limit {
@@ -665,9 +720,7 @@ func docQuote(line string, limit int) (depth int, text string) {
 		}
 		depth++
 		text = rest[1:]
-		if text != "" && (text[0] == ' ' || text[0] == '\t') {
-			text = text[1:]
-		}
+		text = strings.TrimPrefix(text, " ")
 	}
 	return depth, text
 }
@@ -716,6 +769,7 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 	type fence struct {
 		ch           byte
 		n, depth, at int
+		col          int       // at depth 0: the column of its container (a list item), 0 at top level
 		block        *docBlock // nil for a fence that is not a Go block
 	}
 	type directive struct {
@@ -728,6 +782,8 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 	var open *fence
 	var dir *directive
 	var comment *htmlComment // an open HTML comment
+	listCol := -1            // content column of the open list item at depth 0 (-1 = none)
+	prevBlank := false
 	ordinal := 0
 	lines := strings.Split(string(src), "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -736,7 +792,11 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 	for i, line := range lines {
 		ln := i + 1
 		line = strings.TrimSuffix(line, "\r")
-		depth, text := docQuote(line, -1)
+		x := docExpandTabs(line) // the copy used to find fences and markers
+		depth, text := docQuote(x, -1)
+		ind := len(x) - len(strings.TrimLeft(x, " ")) // indent at depth 0
+		blank, wasBlank := strings.TrimSpace(x) == "", prevBlank
+		prevBlank = blank
 		if comment != nil {
 			if depth >= comment.depth {
 				if strings.Contains(line, "-->") {
@@ -746,10 +806,17 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 			}
 			comment = nil // the block quote ended, and its comment with it
 		}
+		if open != nil && depth >= open.depth && open.depth == 0 && !blank && ind < open.col {
+			if open.block != nil { // the list item ended, and its fence with it
+				fail(open.at, "unclosed fence")
+			}
+			open = nil
+		}
 		if open != nil {
 			if depth >= open.depth {
-				_, inner := docQuote(line, open.depth)
-				if ch, n, info, ok := docFence(inner); ok && ch == open.ch && n >= open.n && info == "" {
+				_, inner := docQuote(x, open.depth)
+				if ch, n, info, ok := docFence(inner); ok && ch == open.ch && n >= open.n && info == "" &&
+					(open.depth > 0 || ind <= open.col+3) {
 					if open.block != nil {
 						blocks = append(blocks, *open.block)
 					}
@@ -763,12 +830,44 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 			}
 			open = nil // the block quote ended, and its fence with it
 		}
+		if depth == 0 && !blank {
+			if m := docListRE.FindString(text); m != "" {
+				listCol = ind + len(m)
+			} else if listCol >= 0 && ind < listCol && wasBlank {
+				listCol = -1 // a less indented line after a blank line ends the list
+			}
+		}
 		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
 		ch, n, info, isFence := docFence(text)
+		col, fdepth := 0, depth
+		if isFence && depth == 0 {
+			if listCol >= 0 && ind < listCol {
+				listCol = -1 // a fence less indented than the item ends the list
+			}
+			if listCol >= 0 {
+				col = listCol
+			}
+			if ind-col >= 4 {
+				isFence = false // indented code, not a fence (CommonMark 4.4)
+			}
+		}
 		listFence := false
-		if m := docListRE.FindString(docTrimIndent(text)); !isFence && m != "" {
-			ch, n, info, isFence = docFence(docTrimIndent(text)[len(m):])
-			listFence = isFence
+		for rest := text; !isFence; { // list and quote markers, in any order
+			r := docTrimIndent(rest)
+			if m := docListRE.FindString(r); m != "" {
+				rest = r[len(m):]
+			} else if strings.HasPrefix(r, ">") {
+				rest = strings.TrimPrefix(r[1:], " ")
+				fdepth++
+			} else {
+				break
+			}
+			if ch, n, info, isFence = docFence(rest); isFence {
+				listFence = true
+				if fdepth == 0 {
+					col = len(x) - len(rest)
+				}
+			}
 		}
 		goOpener := isFence && !listFence && depth == 0 && ch == '`' && n == 3 && info == "go"
 		if dir != nil && dir.line == ln-1 && !goOpener {
@@ -798,7 +897,7 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 		if !isFence {
 			continue
 		}
-		open = &fence{ch: ch, n: n, depth: depth, at: ln}
+		open = &fence{ch: ch, n: n, depth: fdepth, at: ln, col: col}
 		if !goOpener {
 			if docGoish(info) {
 				fail(ln, "unsupported Go fence form: "+strings.TrimSpace(line))
@@ -912,12 +1011,14 @@ func docImportDecl(specs []string) string {
 
 // docImportLines returns how many leading lines of a func block hold its import
 // declarations (0 = none), read with go/scanner so comments and layout do not matter.
+// An import declaration counts only when the rest of its line is empty or a "//"
+// comment; otherwise nothing is hoisted and the compiler reports the import.
 func docImportLines(lines []string) int {
-	src := []byte(strings.Join(lines, "\n"))
+	src := strings.Join(lines, "\n")
 	fset := token.NewFileSet()
 	file := fset.AddFile("", fset.Base(), len(src))
 	var s scanner.Scanner
-	s.Init(file, src, nil, 0)
+	s.Init(file, []byte(src), nil, 0)
 	end := 0
 	for {
 		_, tok, _ := s.Scan()
@@ -927,18 +1028,24 @@ func docImportLines(lines []string) int {
 		if tok != token.IMPORT {
 			return end
 		}
-		pos, tok, _ := s.Scan()
+		pos, tok, lit := s.Scan()
 		want := token.STRING
 		if tok == token.LPAREN {
 			want = token.RPAREN
 		}
 		for tok != want && tok != token.EOF {
-			pos, tok, _ = s.Scan()
+			pos, tok, lit = s.Scan()
 		}
 		if tok == token.EOF {
 			return end
 		}
-		end = file.Line(pos)
+		at := file.Offset(pos) + max(len(lit), 1) // byte offsets: a //line comment does not move them
+		rest, _, _ := strings.Cut(src[at:], "\n")
+		rest = strings.TrimSpace(rest)
+		if rest != "" && !strings.HasPrefix(rest, "//") {
+			return 0
+		}
+		end = 1 + strings.Count(src[:at], "\n")
 	}
 }
 
@@ -979,9 +1086,21 @@ func generate(b docBlock, k int) (string, error) {
 		return src, nil //nolint:nilerr // the compiler reports the syntax error at its Markdown line
 	}
 	off := func(p token.Pos) int { return fset.PositionFor(p, false).Offset }
+	if b.Mode == "func" {
+		fd, ok := f.Decls[len(f.Decls)-1].(*ast.FuncDecl)
+		if !ok || fd.Name.Name != fmt.Sprintf("docBlock%02d", k) {
+			return "", errors.New("block is not a function body: its braces do not match the wrapper")
+		}
+	}
+	shown := false // the block shows an import declaration, maybe an empty one
+	for _, d := range f.Decls {
+		if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
+			shown = true
+		}
+	}
 	var edits []docEdit
 	var specs []string
-	if len(f.Imports) == 0 {
+	if !shown {
 		for name := range docUnresolvedBases(f) {
 			if p, ok := docImports[name]; ok {
 				specs = append(specs, strconv.Quote(p))

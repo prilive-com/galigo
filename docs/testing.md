@@ -471,7 +471,8 @@ Rules:
 
 - A result that a `func` block declares at its top level and does not use is not reported (`msg, err := ...` is fine). A name declared deeper, for example inside an `if`, must be used.
 - A block that shows its own imports must show all of them: the test then adds no import for the body.
-- No compiler message is ignored. A Go fence in a block quote, on a list-marker line (```` - ```go ````), or in another form (`~~~go`, ```` ```Go ````), is an error.
+- No compiler message is ignored. A Go fence in a block quote, on a list-marker line (```` - ```go ````), in indented code, or in another form (`~~~go`, ```` ```Go ````), is an error. So is a fence closer that is less indented than its list item.
+- Adding, removing or skipping a block changes the counts that `TestDocGoBlocks` pins (`block_counts`, `skips`, `build`): update them in the same change. The fixture tests compare exact compiler messages, checked with Go 1.27.x.
 
 Run the check:
 

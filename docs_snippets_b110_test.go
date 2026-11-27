@@ -260,6 +260,7 @@ func TestDocGoBlocksDetects(t *testing.T) {
 		}
 		assert.Equal(t, filesA, built)
 		assert.Equal(t, docTargets(len(filesA)), argsTail(a.args, len(filesA)))
+		assert.Contains(t, a.args, "-gcflags=-e", "the child build must report every error, not stop at 10")
 	})
 	for _, row := range docGroupA {
 		t.Run(row.name, func(t *testing.T) {
@@ -343,6 +344,17 @@ func TestDocGoBlocksExtract(t *testing.T) {
 		{"nested_list_go", "- - ```go\n    x := 1\n    ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: - - ```go"}}},
 		{"quote_tab_go", "> \t```go\n> x\n> ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: > \t```go"}}},
 		{"quote_tab_code", ">\t  ```bash\n> ```go\n> x\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
+		{"nested_list_outer_go", "10. Outer\n    - Inner\n\n    ```go\n    _ = nope\n    ```\n", []docErr{{"x.md", 4, 0, "unsupported Go fence form: ```go"}}},
+		{"quoted_list_go", "> - Item\n>\n>     ```go\n>     _ = nope\n>     ```\n", []docErr{{"x.md", 3, 0, "unsupported Go fence form: >     ```go"}}},
+		{"list_quote_outdent", "- > ```bash\n> ```go\n> _ = nope\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
+		{"list_comment_outdent", "- Item\n\n  <!-- Note\n\n```go\n_ = nope\n```\n\n-->\n", []docErr{{"x.md", 5, 0, "Go fence without a go-check directive"}}},
+		{"list_para_closer", "1. Run:\n   ```bash\n   make\n   ```\nThen text.\n\n   ```bash\n   echo\n```\n\n" + d + "```go\nx := nope\n```\n",
+			[]docErr{{"x.md", 9, 0, "fence closer is less indented than its list item"}}},
+		{"list_lazy_closer", "- item\nlazy\n\n  ```bash\n  echo\n```\n\n```go\nx := 1\n```\n", []docErr{
+			{"x.md", 6, 0, "fence closer is less indented than its list item"},
+			{"x.md", 8, 0, "Go fence without a go-check directive"},
+		}},
+		{"thematic_break_code", "* * *\n\n    ```go\n    _ = nope\n    ```\n", []docErr{{"x.md", 3, 0, "unsupported Go fence form: ```go"}}},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -403,6 +415,19 @@ func TestDocGoBlocksFences(t *testing.T) {
 		{"list_then_fence", "- a\n```bash\nx\n```\n  <!-- go-check: func() -->\n  ```go\n  x := 1\n  ```\n", []docShape{{6, 7, "func", []string{"  x := 1"}}}},
 		{"list_fence_outdent", "- item\n\n  ```bash\n  echo\n\n" + goBlock, at(7)},
 		{"list_item", "- item\n\n   <!-- go-check: func() -->\n   ```go\n   x := 1\n   ```\n", []docShape{{4, 5, "func", []string{"   x := 1"}}}},
+		{"list_heading_fence", "- item\n# Title\n  ```bash\n  echo\n```\n\n" + goBlock, at(8)},
+		{"list_hr_fence", "- item\n***\n  ```bash\n  echo\n```\n\n" + goBlock, at(8)},
+		{"list_heading_indented", "- item\n# Title\n    ```text\n  <!-- go-check: func() -->\n  ```go\n  x := nope\n  ```\n",
+			[]docShape{{5, 6, "func", []string{"  x := nope"}}}},
+		{"ordered_marker_width", "1. Step\n\n   ```bash\n  <!-- go-check: func() -->\n  ```go\n  x := 1\n  ```\n", []docShape{{5, 6, "func", []string{"  x := 1"}}}},
+		{"quote_list_no_track", "> - q\n\n  ```bash\n  echo\n```\n\n" + goBlock, at(8)},
+		{"space_only_blank", "- a\n\n  ```bash\n \n  echo\n  ```\n\n  <!-- go-check: func() -->\n  ```go\n  x := 1\n  ```\n",
+			[]docShape{{9, 10, "func", []string{"  x := 1"}}}},
+		{"ordered_two_digits", "10. Step\n\n    ```bash\n    echo\n    ```\n\n    <!-- go-check: func() -->\n    ```go\n    x := 1\n    ```\n",
+			[]docShape{{8, 9, "func", []string{"    x := 1"}}}},
+		{"comment_end_midline", "<!-- a\n--> text\n\n" + goBlock, at(5)},
+		{"comment_after_item", "- item\n<!-- c\n```go\nx\n```\n-->\n\n" + goBlock, at(9)},
+		{"break_in_item", "10. a\n\n    ***\n\n    <!-- go-check: func() -->\n    ```go\n    x := 1\n    ```\n", []docShape{{6, 7, "func", []string{"    x := 1"}}}},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -510,7 +535,7 @@ func TestDocGoBlocksGenerate(t *testing.T) {
 		assert.Equal(t, "//line /r/x.md:3:1\npackage p\n\nvar x = 1\n", gen(t, block("file", "package p\n\nvar x = 1\n")))
 	})
 	t.Run("stray_brace", func(t *testing.T) {
-		for _, body := range []string{"}\nfunc helper() {\n", "}\ntype T struct {\n"} {
+		for _, body := range []string{"}\nfunc helper() {\n", "}\ntype T struct {\n", "}\ntype T struct{}\nfunc (T) docBlock00() {\n"} {
 			blocks, errs := extractBlocks("x.md", []byte(block("func()", body)))
 			require.Empty(t, errs)
 			require.Len(t, blocks, 1)
@@ -731,6 +756,12 @@ func docQuote(line string, limit int) (depth int, text string) {
 // docListRE matches a list marker and the spaces after it (CommonMark 5.2).
 var docListRE = regexp.MustCompile(`^(?:[-+*]|\d{1,9}[.)])[ \t]+`)
 
+// docHeadingRE matches an ATX heading and docBreakRE a thematic break (CommonMark 4.1, 4.2).
+var (
+	docHeadingRE = regexp.MustCompile(`^#{1,6}(?:[ \t]|$)`)
+	docBreakRE   = regexp.MustCompile(`^(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$`)
+)
+
 func docGoish(info string) bool {
 	fields := strings.Fields(info)
 	if len(fields) == 0 {
@@ -781,7 +812,7 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 		block  docBlock
 		ok     bool
 	}
-	type htmlComment struct{ line, depth int }
+	type htmlComment struct{ line, depth, col int } // col: as fence.col
 	var open *fence
 	var dir *directive
 	var comment *htmlComment // an open HTML comment
@@ -801,16 +832,26 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 		blank, wasBlank := strings.TrimSpace(x) == "", prevBlank
 		prevBlank = blank
 		if comment != nil {
-			if depth >= comment.depth {
+			switch {
+			case depth == 0 && !blank && ind < comment.col:
+				comment = nil // the list item ended, and its comment with it
+			case depth >= comment.depth:
 				if strings.Contains(line, "-->") {
 					comment = nil
 				}
 				continue
+			default:
+				comment = nil // the block quote ended, and its comment with it
 			}
-			comment = nil // the block quote ended, and its comment with it
 		}
-		if open != nil && depth >= open.depth && open.depth == 0 && !blank && ind < open.col {
-			if open.block != nil { // the list item ended, and its fence with it
+		if open != nil && !blank && ind < open.col { // the list item ended, and its fence with it
+			_, inner := docQuote(x, open.depth)
+			if ch, n, info, ok := docFence(inner); ok && ch == open.ch && n >= open.n && info == "" {
+				fail(ln, "fence closer is less indented than its list item")
+				open = nil
+				continue
+			}
+			if open.block != nil {
 				fail(open.at, "unclosed fence")
 			}
 			open = nil
@@ -834,10 +875,14 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 			open = nil // the block quote ended, and its fence with it
 		}
 		if depth == 0 && !blank {
-			if m := docListRE.FindString(text); m != "" {
+			if docBreakRE.MatchString(text) {
+				if ind < listCol {
+					listCol = -1 // a thematic break, not a list marker, ends the list
+				}
+			} else if m := docListRE.FindString(text); m != "" {
 				listCol = ind + len(m)
-			} else if listCol >= 0 && ind < listCol && wasBlank {
-				listCol = -1 // a less indented line after a blank line ends the list
+			} else if listCol >= 0 && ind < listCol && (wasBlank || docHeadingRE.MatchString(text)) {
+				listCol = -1 // a less indented line after a blank line, or a heading, ends the list
 			}
 		}
 		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
@@ -855,22 +900,22 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 			}
 		}
 		listFence := false
-		for rest := text; !isFence; { // list and quote markers, in any order
+		rest := text
+		for !isFence { // list and quote markers, in any order
 			r := docTrimIndent(rest)
 			if m := docListRE.FindString(r); m != "" {
 				rest = r[len(m):]
+				if fdepth == 0 {
+					col = len(x) - len(rest) // the list content column
+				}
 			} else if strings.HasPrefix(r, ">") {
 				rest = strings.TrimPrefix(r[1:], " ")
 				fdepth++
 			} else {
 				break
 			}
-			if ch, n, info, isFence = docFence(rest); isFence {
-				listFence = true
-				if fdepth == 0 {
-					col = len(x) - len(rest)
-				}
-			}
+			ch, n, info, isFence = docFence(rest)
+			listFence = isFence
 		}
 		goOpener := isFence && !listFence && depth == 0 && ch == '`' && n == 3 && info == "go"
 		if dir != nil && dir.line == ln-1 && !goOpener {
@@ -893,11 +938,18 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 				fail(ln, "malformed go-check directive")
 			}
 			if !strings.Contains(lead[4:], "-->") {
-				comment = &htmlComment{ln, depth}
+				comment = &htmlComment{ln, depth, 0}
+				if depth == 0 && listCol >= 0 && ind >= listCol {
+					comment.col = listCol
+				}
 			}
 			continue
 		}
 		if !isFence {
+			// A Go fence line this reader cannot place (indented code, a container it does not follow) is loud.
+			if _, _, lone, ok := docFence(strings.TrimLeft(rest, " ")); ok && docGoish(lone) {
+				fail(ln, "unsupported Go fence form: "+strings.TrimSpace(line))
+			}
 			continue
 		}
 		open = &fence{ch: ch, n: n, depth: fdepth, at: ln, col: col}
@@ -1089,9 +1141,11 @@ func generate(b docBlock, k int) (string, error) {
 		return src, nil //nolint:nilerr // the compiler reports the syntax error at its Markdown line
 	}
 	off := func(p token.Pos) int { return fset.PositionFor(p, false).Offset }
+	var fd *ast.FuncDecl // the wrapper, in func mode
 	if b.Mode == "func" {
-		fd, ok := f.Decls[len(f.Decls)-1].(*ast.FuncDecl)
-		if !ok || fd.Name.Name != fmt.Sprintf("docBlock%02d", k) {
+		var ok bool
+		fd, ok = f.Decls[len(f.Decls)-1].(*ast.FuncDecl)
+		if !ok || fd.Recv != nil || fd.Name.Name != fmt.Sprintf("docBlock%02d", k) {
 			return "", errors.New("block is not a function body: its braces do not match the wrapper")
 		}
 	}
@@ -1117,7 +1171,6 @@ func generate(b docBlock, k int) (string, error) {
 			}
 			return true
 		})
-		fd := f.Decls[len(f.Decls)-1].(*ast.FuncDecl)
 		alias := map[string]string{}
 		ast.Inspect(fd.Type, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
@@ -1145,7 +1198,6 @@ func generate(b docBlock, k int) (string, error) {
 		})
 	}
 	if b.Mode == "func" {
-		fd := f.Decls[len(f.Decls)-1].(*ast.FuncDecl)
 		for _, st := range fd.Body.List {
 			var names []string
 			switch st := st.(type) {

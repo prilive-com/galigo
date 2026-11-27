@@ -1,21 +1,19 @@
 package receiver_test
 
 // B-164: with DeliveryPolicyDropOldest, deliverDropOldest moves the polling offset past an update only when it sends
-// that update (an update that does not decode moves it without a send, B-135; not staged here).
+// that update (deliverUpdates also moves it past an update that does not decode, B-135; not staged here).
 // After a drop the loop may leave on ctx end or Stop (the inner select chooses at random among ready cases, Go
 // spec "Select statements"); then the offset must not move for the update that was not sent. The rows stage this
 // through a drop hook, so the expected values do not depend on how many drops happen: capacity 1; after every drop
 // the hook puts a new update (200, 201, ...) into the freed slot, so the send case is never ready while the exit is.
-// The cancel and Stop rows run twice, with the reply 100 and a pending id equal to the offset after 100 is sent (101)
-// or far above it (10000): 100 is sent (offset 101) and the pending update finds the buffer full. The cancel row
-// cancels the Start context at the first drop; the Stop row holds the hook after the third drop until Stop has
-// closed its channel; either way the pending update is never sent and the offset must stay 101. The deadline row
-// runs from offset 0 (100 in the buffer, the reply [1]: offset must stay 0) and from offset 101 (the reply 100, then
-// 10000 or 101); at the first drop the hook sleeps past the context deadline. The Stop row also reads the offset while
-// the hook holds, before Stop: a move that is undone at the exit is caught there. Every case runs twice: with
-// OnUpdateDropped as the hook (subtest "callback") and with no OnUpdateDropped (the default config has none) and the
-// drop's Warn record as the hook (subtest "log"). So every exit runs with and without a callback, at every offset and
-// pending id.
+// Each exit runs from offset 0 (100 in the buffer, the reply [1]: offset must stay 0) and from offset 101 (the reply
+// 100, which is sent, then a pending id far above the offset (10000) or equal to it (101); the pending update finds
+// the buffer full and the offset must stay 101). The cancel rows cancel the Start context at the first drop; the
+// deadline rows sleep in the hook past the context deadline at the first drop; the Stop rows hold the hook after the
+// third drop until Stop has closed its channel. The deadline and Stop rows also read the offset while the hook holds
+// (the sleep, the wait at drop 3): a move made before the hold and undone at the exit is caught there. Every case runs
+// twice: with OnUpdateDropped as the hook (subtest "callback") and with no OnUpdateDropped (the default config has
+// none) and the drop's Warn record as the hook (subtest "log").
 
 import (
 	"context"
@@ -150,8 +148,29 @@ func b164Check(t *testing.T, r *b163Row, f *b164Refill, p *receiver.PollingClien
 	}
 }
 
-// b164Pending: the two pending ids of the cancel and Stop rows: equal to the offset after 100 is sent, and far above it.
-var b164Pending = []int{101, 10000}
+// b164Case: a start state, the getUpdates reply and the offset that must hold after the exit.
+type b164Case struct {
+	name     string
+	buffered bool // the channel holds update 100 at the start
+	ids      []int
+	want     int64
+}
+
+// b164Cases: the cases of the cancel and Stop rows (the deadline rows add offset101eq).
+var b164Cases = []b164Case{
+	{"pending101", false, []int{100, 101}, 101}, // pending id equal to the offset after 100 is sent
+	{"pending10000", false, []int{100, 10000}, 101},
+	{"offset0", true, []int{1}, 0},
+}
+
+// b164Chan: the capacity-1 channel of a row, holding update 100 when the case says so.
+func b164Chan(tc b164Case) chan tg.Update {
+	ch := make(chan tg.Update, 1)
+	if tc.buffered {
+		ch <- tg.Update{UpdateID: 100}
+	}
+	return ch
+}
 
 // b164Hooks: the two drop hooks every case runs with (b164Refill.viaLog).
 var b164Hooks = []struct {
@@ -161,18 +180,18 @@ var b164Hooks = []struct {
 
 // The Start context is cancelled at the first drop (the hook cancels it).
 func TestB164OffsetAfterDropCancel(t *testing.T) {
-	for _, pending := range b164Pending {
+	for _, tc := range b164Cases {
 		for _, h := range b164Hooks {
-			t.Run("pending"+strconv.Itoa(pending)+"/"+h.name, func(t *testing.T) {
+			t.Run(tc.name+"/"+h.name, func(t *testing.T) {
 				synctest.Test(t, func(t *testing.T) {
-					r := b163NewRow(t, make(chan tg.Update, 1))
+					r := b163NewRow(t, b164Chan(tc))
 					ctx, cancel := context.WithCancel(context.Background())
 					r.cancels = append(r.cancels, cancel)
 					f := &b164Refill{r: r, cancel: cancel, viaLog: h.viaLog}
-					p, rt := b164Start(t, r, ctx, f, 100, pending)
+					p, rt := b164Start(t, r, ctx, f, tc.ids...)
 					synctest.Wait()
 					assert.False(t, p.Running(), "Running after the Start context ended")
-					b164Check(t, r, f, p, rt, 101)
+					b164Check(t, r, f, p, rt, tc.want)
 				})
 			})
 		}
@@ -180,14 +199,10 @@ func TestB164OffsetAfterDropCancel(t *testing.T) {
 }
 
 // The Start context passes its deadline at the first drop (the hook sleeps past it). From offset 0 (100 buffered, a
-// pending id below every drop) and from offset 101 (a pending id far above it, and one equal to it).
+// pending id below every drop) and from offset 101 (a pending id far above it, and one equal to it). The offset is read
+// also while the hook sleeps.
 func TestB164OffsetAfterDropDeadline(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		buffered bool
-		ids      []int
-		want     int64
-	}{
+	for _, tc := range []b164Case{
 		{"offset0", true, []int{1}, 0},
 		{"offset101", false, []int{100, 10000}, 101},
 		{"offset101eq", false, []int{100, 101}, 101}, // pending id equal to the offset
@@ -195,15 +210,13 @@ func TestB164OffsetAfterDropDeadline(t *testing.T) {
 		for _, h := range b164Hooks {
 			t.Run(tc.name+"/"+h.name, func(t *testing.T) {
 				synctest.Test(t, func(t *testing.T) {
-					ch := make(chan tg.Update, 1)
-					if tc.buffered {
-						ch <- tg.Update{UpdateID: 100}
-					}
-					r := b163NewRow(t, ch)
+					r := b163NewRow(t, b164Chan(tc))
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 					r.cancels = append(r.cancels, cancel)
 					f := &b164Refill{r: r, sleep: 2 * time.Second, viaLog: h.viaLog}
 					p, rt := b164Start(t, r, ctx, f, tc.ids...)
+					synctest.Wait() // the hook sleeps at the first drop
+					assert.Equal(t, tc.want, p.Offset(), "polling offset while the hook sleeps at the first drop (before the deadline)")
 					time.Sleep(3 * time.Second) // bubble time: the hook's sleep ends after the deadline
 					synctest.Wait()
 					assert.False(t, p.Running(), "Running after the Start context ended")
@@ -217,28 +230,28 @@ func TestB164OffsetAfterDropDeadline(t *testing.T) {
 // Stop is called while the hook waits at the third drop; the hook goes on only after Stop has closed its channel and
 // waits for the poll loop. Stop runs on the test side, not on the poll goroutine.
 func TestB164OffsetAfterDropStop(t *testing.T) {
-	for _, pending := range b164Pending {
+	for _, tc := range b164Cases {
 		for _, h := range b164Hooks {
-			t.Run("pending"+strconv.Itoa(pending)+"/"+h.name, func(t *testing.T) {
+			t.Run(tc.name+"/"+h.name, func(t *testing.T) {
 				synctest.Test(t, func(t *testing.T) {
-					r := b163NewRow(t, make(chan tg.Update, 1))
+					r := b163NewRow(t, b164Chan(tc))
 					ctx, cancel := context.WithCancel(context.Background())
 					r.cancels = append(r.cancels, cancel)
 					f := &b164Refill{r: r, holdAt: 3, release: make(chan struct{}), viaLog: h.viaLog}
 					var once sync.Once
 					free := func() { once.Do(func() { close(f.release) }) }
 					r.cancels = append(r.cancels, free) // the B-163 cleanup calls it before Stop, so a failed row cannot leave the hook waiting
-					p, rt := b164Start(t, r, ctx, f, 100, pending)
+					p, rt := b164Start(t, r, ctx, f, tc.ids...)
 					synctest.Wait() // the hook waits at the third drop
 					_, n := f.counts()
 					require.Equal(t, 3, n, "refills before Stop")
-					assert.Equal(t, int64(101), p.Offset(), "polling offset while the hook holds the third drop (before Stop)")
+					assert.Equal(t, tc.want, p.Offset(), "polling offset while the hook holds the third drop (before Stop)")
 					done := make(chan struct{})
 					go func() { p.Stop(); close(done) }()
 					synctest.Wait() // Stop has closed its channel and waits for the poll loop
 					free()
 					if r.returned(done, "Stop") {
-						b164Check(t, r, f, p, rt, 101)
+						b164Check(t, r, f, p, rt, tc.want)
 					}
 				})
 			})

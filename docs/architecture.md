@@ -40,6 +40,7 @@ galigo spawns background goroutines for:
 
 ### Starting the Bot
 
+<!-- go-check: func(ctx context.Context, token string) -->
 ```go
 bot, err := galigo.New(token, galigo.WithPolling(30, 100))
 if err != nil {
@@ -53,16 +54,17 @@ if err := bot.Start(ctx); err != nil {
 
 // Now safe to consume
 for update := range bot.Updates() {
-    // ...
+    _ = update // handle the update
 }
 ```
 
 ### Stopping the Bot
 
+<!-- go-check: func(bot *galigo.Bot) -->
 ```go
 // Close stops polling and waits for goroutines to finish
 if err := bot.Close(); err != nil {
-    log.Error("close failed", "error", err)
+    slog.Error("close failed", "error", err)
 }
 ```
 
@@ -90,6 +92,7 @@ time limit.
 
 Updates arrive via a buffered channel:
 
+<!-- go-check: func(bot *galigo.Bot) -->
 ```go
 updates := bot.Updates()  // <-chan tg.Update
 ```
@@ -115,6 +118,7 @@ If your application consumes updates slower than they arrive, the channel will f
 
 ### Recommended Consumer Pattern
 
+<!-- go-check: func(ctx context.Context, bot *galigo.Bot, handleUpdate func(context.Context, tg.Update)) -->
 ```go
 // Bounded worker pool — prevents goroutine explosion
 workers := make(chan struct{}, 10)  // Max 10 concurrent handlers
@@ -141,6 +145,7 @@ galigo supports three delivery policies when the update channel is full:
 These settings are in `receiver.Config`. `galigo.Bot` has no option for them: it always uses `DeliveryPolicyBlock`,
 the 5 s default and no drop callback. To choose them, use the `receiver` package directly:
 
+<!-- go-check: func(metrics interface{ Increment(name string, tags ...string) }) -->
 ```go
 cfg := receiver.DefaultConfig()
 cfg.UpdateDeliveryPolicy = receiver.DeliveryPolicyDropOldest
@@ -182,6 +187,7 @@ Running multiple replicas with the same token causes:
 
 ### Leader Election Example (Kubernetes)
 
+<!-- go-check: skip imports k8s.io/client-go, which is not a galigo dependency -->
 ```go
 import "k8s.io/client-go/tools/leaderelection"
 
@@ -252,6 +258,7 @@ leaderelection.RunOrDie(electionCtx, leaderelection.LeaderElectionConfig{
 
 ## Graceful Shutdown
 
+<!-- go-check: func(token string, handleUpdate func(context.Context, tg.Update)) -->
 ```go
 ctx, cancel := signal.NotifyContext(context.Background(),
     syscall.SIGINT, syscall.SIGTERM)
@@ -274,14 +281,14 @@ cancel()     // a second Ctrl-C now ends the program at once
 
 // Close takes no context: it stops the poller and closes the updates channel
 if err := bot.Close(); err != nil {
-    log.Error("shutdown error", "error", err)
+    slog.Error("shutdown error", "error", err)
 }
 
 // Wait for the loop to handle the updates left in the channel, but not forever
 select {
 case <-done:
 case <-time.After(10 * time.Second):
-    log.Warn("handlers did not finish in time")
+    slog.Warn("handlers did not finish in time")
 }
 ```
 

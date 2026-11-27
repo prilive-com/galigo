@@ -4,6 +4,7 @@ This guide covers how to write tests for galigo and use the testing infrastructu
 
 ## Quick Start
 
+<!-- go-check: file -->
 ```go
 package sender_test
 
@@ -79,6 +80,7 @@ make test-short
 
 Creates a mock HTTP server that simulates the Telegram Bot API.
 
+<!-- go-check: func(t *testing.T, token string, handler http.HandlerFunc) -->
 ```go
 // Create server (automatically cleaned up after test)
 server := testutil.NewMockServer(t)
@@ -96,11 +98,12 @@ botURL := server.BotURL(token)  // e.g., "http://127.0.0.1:12345/bot123:ABC"
 
 All requests are automatically captured:
 
+<!-- go-check: func(server *testutil.MockTelegramServer) -->
 ```go
 // Get captures
 captures := server.Captures()      // All captures
 cap := server.LastCapture()        // Most recent
-cap := server.CaptureAt(0)         // By index
+first := server.CaptureAt(0)       // By index
 count := server.CaptureCount()     // Total count
 
 // Time between requests (for rate limit testing)
@@ -113,6 +116,7 @@ server.ResetCaptures()  // Clear captures only
 
 #### Capture Assertions
 
+<!-- go-check: func(t *testing.T, server *testutil.MockTelegramServer, myStruct any) -->
 ```go
 cap := server.LastCapture()
 
@@ -142,6 +146,7 @@ raw := cap.BodyString()
 
 Pre-built response functions for common Telegram API responses:
 
+<!-- go-check: func(w http.ResponseWriter, result any, messageID, msgID int, chatID int64, updates []map[string]any, url string, pendingCount, code int, description string, params *testutil.Parameters, retryAfterSeconds int) -->
 ```go
 // Success responses
 testutil.ReplyOK(w, result)                    // Generic success
@@ -167,6 +172,7 @@ testutil.ReplyRateLimit(w, retryAfterSeconds)  // 429 with retry_after
 
 For deterministic retry testing without actual delays:
 
+<!-- go-check: func(t *testing.T, server *testutil.MockTelegramServer, token string) -->
 ```go
 // Create fake sleeper
 sleeper := &testutil.FakeSleeper{}
@@ -194,6 +200,7 @@ sleeper.Reset()
 
 For integration tests that need actual delays:
 
+<!-- go-check: func(ctx context.Context) -->
 ```go
 sleeper := testutil.RealSleeper{}
 err := sleeper.Sleep(ctx, 100*time.Millisecond)
@@ -203,18 +210,19 @@ err := sleeper.Sleep(ctx, 100*time.Millisecond)
 
 Pre-configured test clients for different testing scenarios:
 
+<!-- go-check: func(t *testing.T, server *testutil.MockTelegramServer) -->
 ```go
 // Standard test client (no retries, default circuit breaker)
 client := testutil.NewTestClient(t, server.BaseURL())
 
 // Retry test client (circuit breaker never trips, use with FakeSleeper)
 sleeper := &testutil.FakeSleeper{}
-client := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper,
+retryClient := testutil.NewRetryTestClient(t, server.BaseURL(), sleeper,
     sender.WithRetries(3),
 )
 
 // Circuit breaker test client (aggressive tripping, no retries)
-client := testutil.NewBreakerTestClient(t, server.BaseURL())
+breakerClient := testutil.NewBreakerTestClient(t, server.BaseURL())
 ```
 
 All test clients are automatically cleaned up when the test completes.
@@ -223,12 +231,13 @@ All test clients are automatically cleaned up when the test completes.
 
 For tests that need custom circuit breaker behavior:
 
+<!-- go-check: func(server *testutil.MockTelegramServer) -->
 ```go
 // Never trip - for testing retry logic without breaker interference
 settings := testutil.CircuitBreakerNeverTrip()
 
 // Aggressive trip - for testing circuit breaker behavior
-settings := testutil.CircuitBreakerAggressiveTrip()
+aggressive := testutil.CircuitBreakerAggressiveTrip()
 
 // Use with manual client creation
 client, _ := sender.New(testutil.TestToken,
@@ -241,14 +250,15 @@ client, _ := sender.New(testutil.TestToken,
 
 Pre-built test data for consistent tests:
 
+<!-- go-check: func(id, chatID int64, messageID, updateID int) -->
 ```go
 // Constants
-testutil.TestToken      // "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-testutil.TestChatID     // int64(123456789)
-testutil.TestUserID     // int64(987654321)
-testutil.TestBotID      // int64(123456789)
-testutil.TestUsername   // "testuser"
-testutil.TestBotUsername // "testbot"
+_ = testutil.TestToken       // "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+_ = testutil.TestChatID      // int64(123456789)
+_ = testutil.TestUserID      // int64(987654321)
+_ = testutil.TestBotID       // int64(123456789)
+_ = testutil.TestUsername    // "testuser"
+_ = testutil.TestBotUsername // "testbot"
 
 // User fixtures
 user := testutil.TestUser()   // Regular user
@@ -262,16 +272,16 @@ channel := testutil.TestChannelChat(id, "Title", "username")
 
 // Message fixtures
 msg := testutil.TestMessage(messageID, "text")
-msg := testutil.TestMessageInChat(messageID, chatID, "text")
+msgInChat := testutil.TestMessageInChat(messageID, chatID, "text")
 
 // Update fixtures
 update := testutil.TestUpdate(updateID, "text")
-update := testutil.TestUpdateWithMessage(updateID, msg)
-update := testutil.TestUpdateWithCallback(updateID, "cb_id", "data")
+updateWithMsg := testutil.TestUpdateWithMessage(updateID, msg)
+updateWithCallback := testutil.TestUpdateWithCallback(updateID, "cb_id", "data")
 
 // Callback query fixtures
 cb := testutil.TestCallbackQuery("id", "data")
-cb := testutil.TestCallbackQueryWithMessage("id", "data", msg)
+cbWithMsg := testutil.TestCallbackQueryWithMessage("id", "data", msg)
 
 // Keyboard fixtures
 kb := testutil.TestInlineKeyboard(
@@ -286,6 +296,7 @@ kb := testutil.TestInlineKeyboard(
 
 ### Testing Retry Logic
 
+<!-- go-check: decls -->
 ```go
 func TestRetry_429WithRetryAfter(t *testing.T) {
     var attempts atomic.Int32
@@ -304,7 +315,7 @@ func TestRetry_429WithRetryAfter(t *testing.T) {
         sender.WithRetries(3),
     )
 
-    msg, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
+    _, err := client.SendMessage(context.Background(), sender.SendMessageRequest{
         ChatID: testutil.TestChatID,
         Text:   "Hello",
     })
@@ -317,6 +328,7 @@ func TestRetry_429WithRetryAfter(t *testing.T) {
 
 ### Testing Circuit Breaker
 
+<!-- go-check: decls -->
 ```go
 func TestCircuitBreaker_OpensOnFailures(t *testing.T) {
     server := testutil.NewMockServer(t)
@@ -347,6 +359,7 @@ func TestCircuitBreaker_OpensOnFailures(t *testing.T) {
 
 ### Testing Error Handling
 
+<!-- go-check: decls -->
 ```go
 func TestSendMessage_BotBlocked(t *testing.T) {
     server := testutil.NewMockServer(t)
@@ -368,6 +381,7 @@ func TestSendMessage_BotBlocked(t *testing.T) {
 
 ### Testing Context Cancellation
 
+<!-- go-check: decls -->
 ```go
 func TestSendMessage_ContextCancel(t *testing.T) {
     server := testutil.NewMockServer(t)
@@ -393,6 +407,7 @@ func TestSendMessage_ContextCancel(t *testing.T) {
 
 ### Table-Driven Tests
 
+<!-- go-check: decls -->
 ```go
 func TestSendMessage(t *testing.T) {
     tests := []struct {
@@ -442,6 +457,29 @@ func TestSendMessage(t *testing.T) {
     }
 }
 ```
+
+## Go blocks in the docs
+
+`TestDocGoBlocks` (`docs_snippets_b110_test.go`) builds every fenced `go` block in `README.md` and `docs/*.md`. Each block needs a directive on the line right before its fence, with the same indent as the fence (inside a list item, both are indented):
+
+- `<!-- go-check: file -->`: a whole Go file. It is built as written; `package main` is built as a command.
+- `<!-- go-check: decls -->`: top-level declarations. The test adds a package clause and the imports from a fixed list (galigo, tg, sender, receiver, engine, testutil and common standard packages).
+- `<!-- go-check: func(PARAMS) RESULTS -->`: statements. The test builds them as the body of a function with these parameters and results. Give the real types (`ctx context.Context`, `client *sender.Client`); a small interface or func type is fine for an application name (`alerting interface{ SendPagerDuty(string, error) }`).
+- `<!-- go-check: skip REASON -->`: not built. The reason is required. Use it only for code that cannot build here, for example an import that is not a galigo dependency.
+
+Rules:
+
+- A result that a `func` block declares at its top level and does not use is not reported (`msg, err := ...` is fine). A name declared deeper, for example inside an `if`, must be used.
+- A block that shows its own imports must show all of them: the test then adds no import for the body.
+- No compiler message is ignored. A Go fence in a block quote, or in another form (`~~~go`, ```` ```Go ````), is an error.
+
+Run the check:
+
+```bash
+go test -count=1 -run TestDocGoBlocks .
+```
+
+Use `-count=1`: without it the result can be `(cached)`, because a change in a package that only the test's child build uses does not change the test itself.
 
 ## Coverage
 
@@ -1040,6 +1078,7 @@ cmd/galigo-testbot/
 ### Adding a New Acceptance Test Scenario
 
 1. **Add step** in `engine/steps.go`:
+   <!-- go-check: skip a sketch of a type in package engine; the real one is cmd/galigo-testbot/engine/steps_geo.go -->
    ```go
    type SendLocationStep struct {
        Latitude, Longitude float64
@@ -1055,12 +1094,15 @@ cmd/galigo-testbot/
 3. **Add adapter** in `engine/adapter.go`
 
 4. **Create scenario** in `suites/`:
+   <!-- go-check: decls -->
    ```go
+   import "github.com/prilive-com/galigo/cmd/galigo-testbot/engine"
+
    func S10_Location() engine.Scenario {
        return &engine.BaseScenario{
            ScenarioName:   "S10_Location",
            CoveredMethods: []string{"sendLocation"},
-           ScenarioSteps:  []engine.Step{&engine.SendLocationStep{...}, &engine.CleanupStep{}},
+           ScenarioSteps:  []engine.Step{&engine.SendLocationStep{Latitude: 51.5007, Longitude: -0.1246}, &engine.CleanupStep{}},
        }
    }
    ```

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"io/fs"
 	"os"
@@ -234,6 +235,13 @@ func TestDocGoBlocksDetects(t *testing.T) {
 	goenv := filepath.Join(t.TempDir(), "goenv")
 	goenvErr := os.WriteFile(goenv, []byte("GOFLAGS=-n\n"), 0o600)
 	a7 := runDocGroup(goPath, root, filesA, childEnv(append(os.Environ(), "GOENV="+goenv)))
+	var ctlEnv []string // the same GOENV file, with no GOFLAGS override
+	for _, kv := range childEnv(append(os.Environ(), "GOENV="+goenv)) {
+		if !strings.HasPrefix(kv, "GOFLAGS=") {
+			ctlEnv = append(ctlEnv, kv)
+		}
+	}
+	a7c := runDocGroup(goPath, root, filesA, ctlEnv)
 	ran := func(t *testing.T, g docGroup) {
 		t.Helper()
 		require.Empty(t, g.errs)
@@ -278,6 +286,15 @@ func TestDocGoBlocksDetects(t *testing.T) {
 		ran(t, a7)
 		assert.Equal(t, docWantA(), a7.reports)
 	})
+	t.Run("F7_goenv_control", func(t *testing.T) {
+		require.NoError(t, goenvErr)
+		ran(t, a7c)
+		seen := false
+		for _, e := range a7c.reports {
+			seen = seen || strings.Contains(e.Msg, "$WORK")
+		}
+		assert.Truef(t, seen, "the GOENV file's GOFLAGS=-n did not reach the child build: %v", a7c.reports)
+	})
 }
 
 // --- U1, U2, U3: extractBlocks ---
@@ -312,6 +329,11 @@ func TestDocGoBlocksExtract(t *testing.T) {
 		{"quote_go", "> ```go\n> x\n> ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: > ```go"}}},
 		{"quote_nested", "> > ```go\n> > x\n> > ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: > > ```go"}}},
 		{"quote_tight", ">> ```go\n>> x\n>> ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: >> ```go"}}},
+		{"quote_indented_code", ">     ```bash\n> ```go\n> x\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
+		{"go_tab_title", "```go\ttitle\nx\n```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: ```go\ttitle"}}},
+		{"list_marker_go", "- ```go\n  x\n  ```\n", []docErr{{"x.md", 1, 0, "unsupported Go fence form: - ```go"}}},
+		{"quote_directive", "> <!-- go-check: func() -->\n> ```go\n> x\n> ```\n", []docErr{{"x.md", 2, 0, "unsupported Go fence form: > ```go"}}},
+		{"quote_bad_directive", "> <!-- go-check func() -->\n", nil},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -354,6 +376,11 @@ func TestDocGoBlocksFences(t *testing.T) {
 		{"go_in_comment", "<!--\n```go\nx\n```\n-->\n\n" + goBlock, at(8)},
 		{"midline_comment", "Text with `<!--` in it.\n\n" + goBlock, at(4)},
 		{"closer_trailing_space", "<!-- go-check: func() -->\n```go\nx := 1\n```  \n\nafter\n", at(2)},
+		{"quote_comment", "> <!--\n> ```go\n> -->\n\n" + goBlock, at(6)},
+		{"quote_comment_unclosed", "> <!--\n\n" + goBlock, at(4)},
+		{"quote_ends_at_blank", "> ```bash\n> echo\n\n" + goBlock, at(5)},
+		{"quote_ticks_in_bash", "```bash\n> ```\n```\n\n" + goBlock, at(6)},
+		{"list_marker_bash", "- ```bash\n  echo\n  ```\n\n" + goBlock, at(6)},
 		{"list_item", "- item\n\n   <!-- go-check: func() -->\n   ```go\n   x := 1\n   ```\n", []docShape{{4, 5, "func", []string{"   x := 1"}}}},
 	}
 	for _, row := range rows {
@@ -424,6 +451,12 @@ func TestDocGoBlocksGenerate(t *testing.T) {
 			head + "import (\n\tdocp_sender \"github.com/prilive-com/galigo/sender\"\n)\n//line /r/x.md:3:1\nimport \"fmt\"\n//line /r/x.md:1:1\nfunc docBlock00() *docp_sender.Client {\n//line /r/x.md:4:1\n\n_ = fmt.Sprint()\nreturn nil\n}\n"},
 		{"alias_unique", block("func(client *sender.Client)", "import \"fmt\"\n\ndocp_sender := fmt.Sprint(client)\n"),
 			head + "import (\n\tdocp_sender1 \"github.com/prilive-com/galigo/sender\"\n)\n//line /r/x.md:3:1\nimport \"fmt\"\n//line /r/x.md:1:1\nfunc docBlock00(client *docp_sender1.Client) {\n//line /r/x.md:4:1\n\ndocp_sender := fmt.Sprint(client); _ = docp_sender /*line /r/x.md:5:34*/\n}\n"},
+		{"import_comment_closer", block("func()", "import (\n\t\"fmt\"\n) // fmt\n\n_ = fmt.Sprint()\n"),
+			head + "//line /r/x.md:3:1\nimport (\n\t\"fmt\"\n) // fmt\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:6:1\n\n_ = fmt.Sprint()\n}\n"},
+		{"import_two_decls", block("func()", "import \"fmt\"\nimport \"os\"\n\n_ = fmt.Sprint(os.Args)\n"),
+			head + "//line /r/x.md:3:1\nimport \"fmt\"\nimport \"os\"\n//line /r/x.md:1:1\nfunc docBlock00() {\n//line /r/x.md:5:1\n\n_ = fmt.Sprint(os.Args)\n}\n"},
+		{"import_not_leading", block("func()", "_ = 1\nimport \"fmt\"\n"),
+			head + fn + "_ = 1\nimport \"fmt\"\n}\n"},
 		{"names_in_comments", block("func()", "// time.Second in a comment\n_ = \"fmt.Sprint\"\n"),
 			head + fn + "// time.Second in a comment\n_ = \"fmt.Sprint\"\n}\n"},
 	}
@@ -590,6 +623,7 @@ var docDirectiveRE = regexp.MustCompile(`^<!-- go-check: (.*) -->$`)
 // docFence returns the fence character, run length and info string of an
 // opener line (text after indent and quote markers), or ok false.
 func docFence(text string) (ch byte, n int, info string, ok bool) {
+	text = docTrimIndent(text)
 	if text == "" || (text[0] != '`' && text[0] != '~') {
 		return 0, 0, "", false
 	}
@@ -607,19 +641,46 @@ func docFence(text string) (ch byte, n int, info string, ok bool) {
 	return ch, n, info, true
 }
 
+// docTrimIndent removes up to 3 leading spaces (CommonMark: 4 start indented code).
+func docTrimIndent(s string) string {
+	i := 0
+	for i < 3 && i < len(s) && s[i] == ' ' {
+		i++
+	}
+	return s[i:]
+}
+
 // docQuote removes the indent and up to limit block-quote markers (all for limit < 0).
+// A nested marker may have up to 3 spaces before it; each marker takes one optional
+// space or tab after it, and the text keeps any further indent (CommonMark 5.1).
 func docQuote(line string, limit int) (depth int, text string) {
 	text = strings.TrimLeft(line, " \t")
-	for (limit < 0 || depth < limit) && strings.HasPrefix(text, ">") {
+	for limit < 0 || depth < limit {
+		rest := text
+		if depth > 0 {
+			rest = docTrimIndent(text)
+		}
+		if !strings.HasPrefix(rest, ">") {
+			break
+		}
 		depth++
-		text = strings.TrimLeft(text[1:], " \t")
+		text = rest[1:]
+		if text != "" && (text[0] == ' ' || text[0] == '\t') {
+			text = text[1:]
+		}
 	}
 	return depth, text
 }
 
+// docListRE matches a list marker and the spaces after it (CommonMark 5.2).
+var docListRE = regexp.MustCompile(`^(?:[-+*]|\d{1,9}[.)])[ \t]+`)
+
 func docGoish(info string) bool {
-	word, _, _ := strings.Cut(info, " ")
-	word = strings.ToLower(word)
+	fields := strings.Fields(info)
+	if len(fields) == 0 {
+		return false
+	}
+	word := strings.ToLower(fields[0])
 	return word == "go" || word == "golang"
 }
 
@@ -663,9 +724,10 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 		block  docBlock
 		ok     bool
 	}
+	type htmlComment struct{ line, depth int }
 	var open *fence
 	var dir *directive
-	comment := 0 // line of an open HTML comment
+	var comment *htmlComment // an open HTML comment
 	ordinal := 0
 	lines := strings.Split(string(src), "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -674,13 +736,16 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 	for i, line := range lines {
 		ln := i + 1
 		line = strings.TrimSuffix(line, "\r")
-		if comment > 0 {
-			if strings.Contains(line, "-->") {
-				comment = 0
-			}
-			continue
-		}
 		depth, text := docQuote(line, -1)
+		if comment != nil {
+			if depth >= comment.depth {
+				if strings.Contains(line, "-->") {
+					comment = nil
+				}
+				continue
+			}
+			comment = nil // the block quote ended, and its comment with it
+		}
 		if open != nil {
 			if depth >= open.depth {
 				_, inner := docQuote(line, open.depth)
@@ -700,13 +765,18 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 		}
 		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
 		ch, n, info, isFence := docFence(text)
-		goOpener := isFence && depth == 0 && ch == '`' && n == 3 && info == "go"
+		listFence := false
+		if m := docListRE.FindString(docTrimIndent(text)); !isFence && m != "" {
+			ch, n, info, isFence = docFence(docTrimIndent(text)[len(m):])
+			listFence = isFence
+		}
+		goOpener := isFence && !listFence && depth == 0 && ch == '`' && n == 3 && info == "go"
 		if dir != nil && dir.line == ln-1 && !goOpener {
 			fail(dir.line, "go-check directive not followed by a Go fence")
 			dir = nil
 		}
-		if depth == 0 && strings.HasPrefix(text, "<!--") {
-			if m := docDirectiveRE.FindStringSubmatch(text); m != nil {
+		if lead := docTrimIndent(text); strings.HasPrefix(lead, "<!--") {
+			if m := docDirectiveRE.FindStringSubmatch(text); depth == 0 && m != nil {
 				d := directive{line: ln, indent: indent}
 				d.block.DirLine = ln
 				if msg := docMode(&d.block, m[1]); msg != "" {
@@ -717,11 +787,11 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 				dir = &d
 				continue
 			}
-			if strings.HasPrefix(text, "<!-- go-check") {
+			if depth == 0 && strings.HasPrefix(text, "<!-- go-check") {
 				fail(ln, "malformed go-check directive")
 			}
-			if !strings.Contains(text[4:], "-->") {
-				comment = ln
+			if !strings.Contains(lead[4:], "-->") {
+				comment = &htmlComment{ln, depth}
 			}
 			continue
 		}
@@ -754,8 +824,8 @@ func extractBlocks(name string, src []byte) ([]docBlock, []docErr) {
 	if open != nil && open.depth == 0 {
 		fail(open.at, "unclosed fence")
 	}
-	if comment > 0 {
-		fail(comment, "HTML comment not closed")
+	if comment != nil {
+		fail(comment.line, "HTML comment not closed")
 	}
 	return blocks, errs
 }
@@ -840,6 +910,38 @@ func docImportDecl(specs []string) string {
 	return "import (\n\t" + strings.Join(specs, "\n\t") + "\n)\n"
 }
 
+// docImportLines returns how many leading lines of a func block hold its import
+// declarations (0 = none), read with go/scanner so comments and layout do not matter.
+func docImportLines(lines []string) int {
+	src := []byte(strings.Join(lines, "\n"))
+	fset := token.NewFileSet()
+	file := fset.AddFile("", fset.Base(), len(src))
+	var s scanner.Scanner
+	s.Init(file, src, nil, 0)
+	end := 0
+	for {
+		_, tok, _ := s.Scan()
+		for tok == token.SEMICOLON {
+			_, tok, _ = s.Scan()
+		}
+		if tok != token.IMPORT {
+			return end
+		}
+		pos, tok, _ := s.Scan()
+		want := token.STRING
+		if tok == token.LPAREN {
+			want = token.RPAREN
+		}
+		for tok != want && tok != token.EOF {
+			pos, tok, _ = s.Scan()
+		}
+		if tok == token.EOF {
+			return end
+		}
+		end = file.Line(pos)
+	}
+}
+
 // generate writes the Go file for block k (PLAN.md §4, Modes, Generated imports, Line mapping).
 func generate(b docBlock, k int) (string, error) {
 	lineDir := func(line int) string { return fmt.Sprintf("//line %s:%d:1\n", b.Abs, line) }
@@ -860,16 +962,7 @@ func generate(b docBlock, k int) (string, error) {
 	if b.Mode == "decls" {
 		src = pkg + lineDir(b.First) + body
 	} else {
-		for i, l := range b.Lines {
-			if t := strings.TrimSpace(l); strings.HasPrefix(t, "import ") || strings.HasPrefix(t, "import(") {
-				hoistLines = i + 1
-				if strings.HasSuffix(t, "(") {
-					for hoistLines < len(b.Lines) && strings.TrimSpace(b.Lines[hoistLines-1]) != ")" {
-						hoistLines++
-					}
-				}
-			}
-		}
+		hoistLines = docImportLines(b.Lines)
 		src = pkg
 		if hoistLines > 0 {
 			src += lineDir(b.First) + strings.Join(b.Lines[:hoistLines], "\n") + "\n"

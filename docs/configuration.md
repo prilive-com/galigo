@@ -139,24 +139,24 @@ import (
 )
 
 // From file ID (already on Telegram servers) — retry-safe
-photo := sender.FromFileID("AgACAgIAAxkBAAI...")
+fromFileID := sender.FromFileID("AgACAgIAAxkBAAI...")
 
 // From URL (Telegram downloads it) — retry-safe
-photo = sender.FromURL("https://example.com/image.jpg")
+fromURL := sender.FromURL("https://example.com/image.jpg")
 
 // From bytes (in-memory data) — retry-safe
 data, _ := os.ReadFile("photo.jpg")
-photo = sender.FromBytes(data, "photo.jpg")
+fromBytes := sender.FromBytes(data, "photo.jpg")
 
 // From io.Reader — NOT retry-safe, use only with WithRetries(0)
 file, _ := os.Open("photo.jpg")
 defer file.Close()
-photo = sender.FromReader(file, "photo.jpg")
+fromReader := sender.FromReader(file, "photo.jpg")
 
-// Send
+// Send one of them (fromBytes is retry-safe; fromReader needs WithRetries(0))
 msg, err := client.SendPhoto(ctx, sender.SendPhotoRequest{
     ChatID:    tg.ChatID(chatID),
-    Photo:     photo,
+    Photo:     fromBytes,
     Caption:   "Hello!",
     ParseMode: tg.ParseModeMarkdown,
 })

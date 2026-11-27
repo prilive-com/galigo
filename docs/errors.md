@@ -175,7 +175,7 @@ if errors.Is(err, tg.ErrBotBlocked) {
     userRepo.SetBlocked(ctx, userID)
     return nil
 }
-return nil
+return err
 ```
 
 ### Don't Alert on Expected Errors

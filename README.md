@@ -133,14 +133,14 @@ msg, err := bot.Sender().SendPoll(ctx, sender.SendPollRequest{ChatID: chatID, Qu
 
 | Component | Safe | Notes |
 |-----------|------|-------|
-| `galigo.Bot` | ✅ | All methods safe for concurrent use |
+| `galigo.Bot` | ✅ | Safe for concurrent use; `Stop`/`Close` not while `Start` runs, `Close` is final (docs/architecture.md, Stopping the Bot) |
 | `sender.Client` | ✅ | Designed for high-concurrency |
-| `receiver.PollingClient` | ✅ | Single goroutine fetches, multiple can consume |
+| `receiver.PollingClient` | ✅ | Single goroutine fetches, multiple can consume; `Stop`: see its doc |
 | `tg.Update` | ✅ | Immutable after creation |
 
 ### Close() Idempotency
 
-Both `Bot.Close()` and `sender.Client.Close()` are idempotent — safe to call multiple times or concurrently without panicking. This is important for:
+Both `Bot.Close()` and `sender.Client.Close()` are idempotent — safe to call multiple times or concurrently without panicking. `Stop()` and `Close()` may also run at the same time: both wait for the poller to exit. This is important for:
 
 - `defer bot.Close()` combined with explicit shutdown paths
 - Graceful shutdown handlers that may race with other cleanup code

@@ -87,7 +87,9 @@ type Config struct {
 	// OnUpdateDropped is called when an update is dropped, with its id and a reason. Long polling: delivery_timeout,
 	// channel_full_drop_newest, channel_full_drop_oldest, decode_error (the update did not decode; the receiver
 	// keeps running). Webhook: webhook_delivery_timeout, webhook_channel_full_drop_newest,
-	// webhook_channel_full_drop_oldest, webhook_decode_error.
+	// webhook_channel_full_drop_oldest, webhook_decode_error. Long polling: do not call Stop from the callback, or
+	// wait there for code that calls it: the callback runs on the poll goroutine, and Stop waits for that goroutine.
+	// (The webhook handler calls it on the HTTP handler goroutine, which Stop does not wait for.)
 	OnUpdateDropped func(int, string)
 
 	// Circuit breaker

@@ -66,11 +66,16 @@ if err := bot.Close(); err != nil {
 }
 ```
 
-**Important:** Always call `Close()`, and make it the only way you stop the bot: do not call `Stop()` and `Close()`
-at the same time. In polling mode `Close()` stops the poller and waits for it to exit. It does not cancel a
+**Important:** Always call `Close()` when you are done: `Stop()` only stops the poller, and `Close()` also closes the
+updates channel (polling mode) and the sender. `Stop()` and `Close()` may run at the same time: each waits until the
+poller has exited. Do not call them while `Start` is running. To restart, call `Stop()`, wait until every `Stop()` call
+has returned, then `Start`; `Close()` is final: after it, make a new bot. Never call them from the poller's own
+goroutine (for example from a log handler), and do not wait there for code that calls them: they wait for that
+goroutine and never return. In polling mode `Close()` stops the poller and waits for it to exit. It does not cancel a
 `getUpdates` request in flight: cancel the context you passed to `Start` to cancel that request. The default HTTP
 client timeout is the long-poll timeout plus 10 s; it limits the request, not `Close()`. While the poller stops, it can
 still send an update when the channel has space, with every policy, and the other policies can also drop updates then.
+Such a send happens before `Stop()` and `Close()` return, so `Close()` never closes the channel under it.
 With `DeliveryPolicyBlock` (the only policy `galigo.Bot` uses), when a stop or a cancelled `Start` context ends a wait
 for channel space, the poller does not deliver or drop that update or the rest of the batch, and does not move its
 offset for them (a delivery timeout that ends first still drops the update). Telegram confirms an update only when it
@@ -180,21 +185,44 @@ Running multiple replicas with the same token causes:
 ```go
 import "k8s.io/client-go/tools/leaderelection"
 
-leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+// RunOrDie does not wait for OnStartedLeading to return, so a process that exits right after RunOrDie
+// returns may exit before bot.Close has run.
+electionCtx, stopElection := context.WithCancel(ctx)
+defer stopElection()
+
+leaderelection.RunOrDie(electionCtx, leaderelection.LeaderElectionConfig{
     Lock:          lock,
     LeaseDuration: 15 * time.Second,
     RenewDeadline: 10 * time.Second,
     RetryPeriod:   2 * time.Second,
     Callbacks: leaderelection.LeaderCallbacks{
         OnStartedLeading: func(ctx context.Context) {
-            // Only the leader starts polling
-            bot.Start(ctx)
-            for update := range bot.Updates() {
-                handleUpdate(ctx, update)
+            // This replica starts polling after it gets the lease; ctx ends when it loses the lease. client-go does not
+            // promise that only one replica polls at a time. This callback owns the bot: it makes it, starts it and closes it.
+            bot, err := galigo.New(token, galigo.WithPolling(30, 100))
+            if err != nil {
+                log.Printf("bot: %v", err)
+                stopElection() // stop renewing the lease (it expires): this replica cannot poll
+                return
+            }
+            defer bot.Close() // runs after Start has returned
+            if err := bot.Start(ctx); err != nil {
+                log.Printf("bot start: %v", err)
+                stopElection()
+                return
+            }
+            for {
+                select {
+                case <-ctx.Done(): // leadership ended
+                    return
+                case update := <-bot.Updates():
+                    handleUpdate(ctx, update)
+                }
             }
         },
         OnStoppedLeading: func() {
-            bot.Close()
+            // Required by client-go. OnStartedLeading closes the bot; do not use it here.
+            log.Print("leadership lost")
         },
     },
 })
@@ -259,7 +287,8 @@ case <-time.After(10 * time.Second):
 
 ## Thread Safety Summary
 
-All galigo types are safe for concurrent use:
+All galigo types are safe for concurrent use (for `Bot.Start`, `Stop` and `Close`, and `PollingClient.Start` and
+`Stop`, see [Stopping the Bot](#stopping-the-bot)):
 
 - Call `SendMessage()` from multiple goroutines simultaneously
 - The update channel can be read by one consumer (but you can fan-out with a worker pool)

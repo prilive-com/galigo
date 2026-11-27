@@ -29,6 +29,7 @@ go get github.com/prilive-com/galigo
 
 ## Quick Start
 
+<!-- go-check: file -->
 ```go
 package main
 
@@ -125,6 +126,7 @@ For the complete method list, see the [API Reference](https://pkg.go.dev/github.
 
 `galigo.Bot` has convenience methods for the most common calls only. Every other method is on its sender client, `bot.Sender()`:
 
+<!-- go-check: func(ctx context.Context, bot *galigo.Bot, chatID int64) -->
 ```go
 msg, err := bot.Sender().SendPoll(ctx, sender.SendPollRequest{ChatID: chatID, Question: "Lunch?", Options: []sender.InputPollOption{{Text: "Yes"}, {Text: "No"}}})
 ```
@@ -146,6 +148,7 @@ Both `Bot.Close()` and `sender.Client.Close()` are idempotent — safe to call m
 - Graceful shutdown handlers that may race with other cleanup code
 - Error recovery scenarios
 
+<!-- go-check: func(token string) -->
 ```go
 bot, _ := galigo.New(token)
 defer bot.Close()  // Safe even if Close() called elsewhere
@@ -160,9 +163,12 @@ bot.Close()  // No panic, just a no-op
 
 galigo provides typed errors for precise handling:
 
+<!-- go-check: func(ctx context.Context, bot *galigo.Bot, chatID int64, text string) -->
 ```go
 import (
     "errors"
+    "log"
+
     "github.com/prilive-com/galigo/tg"
 )
 
@@ -205,6 +211,7 @@ if err != nil {
 
 ### Bot Options
 
+<!-- go-check: func(token string) -->
 ```go
 bot, err := galigo.New(token,
     // Receiving mode (choose one)
@@ -233,6 +240,7 @@ For advanced configuration, see the [sender](https://pkg.go.dev/github.com/prili
 
 Use only the packages you need:
 
+<!-- go-check: func(ctx context.Context, token string, chatID int64) -->
 ```go
 // Only sending messages
 import "github.com/prilive-com/galigo/sender"
@@ -242,9 +250,15 @@ client.SendMessage(ctx, sender.SendMessageRequest{
     ChatID: chatID,
     Text:   "Hello!",
 })
+```
 
+<!-- go-check: func(ctx context.Context, token string, logger *slog.Logger, cfg receiver.Config) -->
+```go
 // Only receiving updates
-import "github.com/prilive-com/galigo/receiver"
+import (
+    "github.com/prilive-com/galigo/receiver"
+    "github.com/prilive-com/galigo/tg"
+)
 
 updates := make(chan tg.Update, 100)
 poller := receiver.NewPollingClient(tg.SecretToken(token), updates, logger, cfg)

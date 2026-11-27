@@ -6,8 +6,13 @@ galigo provides typed sentinel errors that you can check with `errors.Is()`. Thi
 
 All errors are defined in the `tg` package and re-exported in `sender` for convenience.
 
+<!-- go-check: func(err error) -->
 ```go
-import "github.com/prilive-com/galigo/tg"
+import (
+    "errors"
+
+    "github.com/prilive-com/galigo/tg"
+)
 
 if errors.Is(err, tg.ErrBotBlocked) {
     // Handle blocked user
@@ -66,6 +71,7 @@ if errors.Is(err, tg.ErrBotBlocked) {
 
 ### Basic Pattern
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, req sender.SendMessageRequest, userID int64, userRepo interface{ SetInactive(context.Context, int64) }, metrics interface{ Increment(name string, tags ...string) }, ErrServiceDegraded error) error -->
 ```go
 msg, err := client.SendMessage(ctx, req)
 if err != nil {
@@ -89,14 +95,16 @@ if err != nil {
         return fmt.Errorf("send message: %w", err)
     }
 }
+return nil
 ```
 
 ### Extracting APIError Details
 
+<!-- go-check: func(err error) -->
 ```go
 var apiErr *tg.APIError
 if errors.As(err, &apiErr) {
-    log.Error("telegram API error",
+    slog.Error("telegram API error",
         "code", apiErr.Code,
         "description", apiErr.Description,
         "method", apiErr.Method,
@@ -107,6 +115,7 @@ if errors.As(err, &apiErr) {
 
 ### Checking Retryability
 
+<!-- go-check: func(err error, queue interface{ Enqueue(any) }, message any) -->
 ```go
 var apiErr *tg.APIError
 if errors.As(err, &apiErr) && apiErr.IsRetryable() {
@@ -131,6 +140,7 @@ if errors.As(err, &apiErr) && apiErr.IsRetryable() {
 
 ### Don't Retry 4xx Errors
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, req sender.SendMessageRequest) error -->
 ```go
 // WRONG — infinite loop
 for {
@@ -147,15 +157,17 @@ if err != nil {
     // If we get here, the error is not retryable
     return err
 }
+return nil
 ```
 
 ### Don't Ignore ErrBotBlocked
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, req sender.SendMessageRequest, userID int64, userRepo interface{ SetBlocked(context.Context, int64) }) error -->
 ```go
 // WRONG — keeps trying to message blocked users
 _, err := client.SendMessage(ctx, req)
 if err != nil {
-    log.Error("failed to send", "error", err)
+    slog.Error("failed to send", "error", err)
 }
 
 // RIGHT — stop messaging blocked users
@@ -163,10 +175,12 @@ if errors.Is(err, tg.ErrBotBlocked) {
     userRepo.SetBlocked(ctx, userID)
     return nil
 }
+return err
 ```
 
 ### Don't Alert on Expected Errors
 
+<!-- go-check: func(err error, alerting interface{ SendPagerDuty(string, error); SendSlack(string, error) }) -->
 ```go
 // WRONG — alerts on normal user behavior
 if err != nil {
@@ -188,13 +202,10 @@ case errors.Is(err, tg.ErrBotBlocked):
 
 galigo errors support `errors.Is()` and `errors.As()` through the standard Go error chain:
 
+<!-- go-check: func(apiErr *tg.APIError) -->
 ```go
 // APIError wraps a sentinel for Is() checks
-err := &tg.APIError{
-    Code:        403,
-    Description: "Forbidden: bot was blocked by the user",
-    cause:       tg.ErrBotBlocked,  // internal
-}
+err := tg.NewAPIError("sendMessage", 403, "Forbidden: bot was blocked by the user")
 
 // Both work:
 errors.Is(err, tg.ErrBotBlocked)  // true

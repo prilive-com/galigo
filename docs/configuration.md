@@ -102,8 +102,11 @@ galigo can be used as a unified bot or as separate sender/receiver components.
 
 ### Sender-Only Example
 
+<!-- go-check: func(ctx context.Context, token string, chatID int64) -->
 ```go
 import (
+    "log"
+
     "github.com/prilive-com/galigo/sender"
     "github.com/prilive-com/galigo/tg"
 )
@@ -126,31 +129,34 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 
 ### File Upload Example
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, chatID int64) -->
 ```go
 import (
+    "os"
+
     "github.com/prilive-com/galigo/sender"
     "github.com/prilive-com/galigo/tg"
 )
 
 // From file ID (already on Telegram servers) — retry-safe
-photo := sender.FromFileID("AgACAgIAAxkBAAI...")
+fromFileID := sender.FromFileID("AgACAgIAAxkBAAI...")
 
 // From URL (Telegram downloads it) — retry-safe
-photo := sender.FromURL("https://example.com/image.jpg")
+fromURL := sender.FromURL("https://example.com/image.jpg")
 
 // From bytes (in-memory data) — retry-safe
 data, _ := os.ReadFile("photo.jpg")
-photo := sender.FromBytes(data, "photo.jpg")
+fromBytes := sender.FromBytes(data, "photo.jpg")
 
 // From io.Reader — NOT retry-safe, use only with WithRetries(0)
 file, _ := os.Open("photo.jpg")
 defer file.Close()
-photo := sender.FromReader(file, "photo.jpg")
+fromReader := sender.FromReader(file, "photo.jpg")
 
-// Send
+// Send one of them (fromBytes is retry-safe; fromReader needs WithRetries(0))
 msg, err := client.SendPhoto(ctx, sender.SendPhotoRequest{
     ChatID:    tg.ChatID(chatID),
-    Photo:     photo,
+    Photo:     fromBytes,
     Caption:   "Hello!",
     ParseMode: tg.ParseModeMarkdown,
 })
@@ -169,8 +175,11 @@ msg, err := client.SendPhoto(ctx, sender.SendPhotoRequest{
 
 ### Receiver-Only Example
 
+<!-- go-check: func(ctx context.Context, token string, logger *slog.Logger, process func(tg.Update)) -->
 ```go
 import (
+    "log"
+
     "github.com/prilive-com/galigo/receiver"
     "github.com/prilive-com/galigo/tg"
 )
@@ -205,6 +214,7 @@ for {
 
 Use `tg.ChatID()` to wrap chat IDs in requests:
 
+<!-- go-check: func(ctx context.Context, client *sender.Client) -->
 ```go
 // From int64
 msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
@@ -213,7 +223,7 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 })
 
 // Negative IDs for groups/channels
-msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+msg, err = client.SendMessage(ctx, sender.SendMessageRequest{
     ChatID: tg.ChatID(-100123456789),
     Text:   "Hello group!",
 })
@@ -223,13 +233,17 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 
 Use constants instead of raw strings:
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, chatID int64) -->
 ```go
-import "github.com/prilive-com/galigo/tg"
+import (
+    "github.com/prilive-com/galigo/sender"
+    "github.com/prilive-com/galigo/tg"
+)
 
 // Available parse modes
-tg.ParseModeMarkdown    // "Markdown"
-tg.ParseModeMarkdownV2  // "MarkdownV2"
-tg.ParseModeHTML        // "HTML"
+_ = tg.ParseModeMarkdown   // "Markdown"
+_ = tg.ParseModeMarkdownV2 // "MarkdownV2"
+_ = tg.ParseModeHTML       // "HTML"
 
 // Usage
 msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
@@ -243,8 +257,12 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 
 Control how link previews are displayed in messages:
 
+<!-- go-check: func(ctx context.Context, client *sender.Client, chatID int64) -->
 ```go
-import "github.com/prilive-com/galigo/tg"
+import (
+    "github.com/prilive-com/galigo/sender"
+    "github.com/prilive-com/galigo/tg"
+)
 
 // News channel style: large preview above text
 msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
@@ -257,7 +275,7 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 })
 
 // Disable link preview entirely
-msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+msg, err = client.SendMessage(ctx, sender.SendMessageRequest{
     ChatID: tg.ChatID(chatID),
     Text:   "https://example.com (no preview)",
     LinkPreviewOptions: &tg.LinkPreviewOptions{
@@ -266,7 +284,7 @@ msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
 })
 
 // Force preview for a specific URL (even if multiple URLs in text)
-msg, err := client.SendMessage(ctx, sender.SendMessageRequest{
+msg, err = client.SendMessage(ctx, sender.SendMessageRequest{
     ChatID: tg.ChatID(chatID),
     Text:   "Visit https://a.com or https://b.com",
     LinkPreviewOptions: &tg.LinkPreviewOptions{
